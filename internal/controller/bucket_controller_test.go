@@ -61,18 +61,19 @@ var _ = Describe("Bucket Controller", func() {
 			By("creating the custom resource for the Kind Bucket")
 			err := k8sClient.Get(ctx, typeNamespacedName, bucket)
 			if err != nil && errors.IsNotFound(err) {
-				resource := bucket
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				bucket.ResourceVersion = ""
+				Expect(k8sClient.Create(ctx, bucket)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			err := k8sClient.Get(ctx, typeNamespacedName, bucket)
+			fetchedBucket := &v1alpha1.Bucket{}
+			err := k8sClient.Get(ctx, typeNamespacedName, fetchedBucket)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Cleanup the specific resource instance Bucket")
-			Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, fetchedBucket)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
@@ -88,5 +89,21 @@ var _ = Describe("Bucket Controller", func() {
 			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})
+
+		It("should default PublicAccess to false", func() {
+			By("Fetching the created resource and verifying the default PublicAccess")
+			fetchedBucket := &v1alpha1.Bucket{}
+			err := k8sClient.Get(ctx, typeNamespacedName, fetchedBucket)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(fetchedBucket.Spec.PublicAccess).To(BeFalse())
+		})
+		It("should default DeletionPolicy to Retain", func() {
+			By("Fetching the created resource and verifying the default DeletionPolicy")
+			fetchedBucket := &v1alpha1.Bucket{}
+			err := k8sClient.Get(ctx, typeNamespacedName, fetchedBucket)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(fetchedBucket.Spec.DeletionPolicy).To(Equal(v1alpha1.DeletionPolicyRetain))
+		})
+
 	})
 })

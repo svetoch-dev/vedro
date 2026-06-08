@@ -20,4 +20,13 @@ resources:
   kind: ProviderConfig
   path: github.com/svetoch-dev/vedro/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: svetoch.dev
+  group: vedro
+  kind: Bucket
+  path: github.com/svetoch-dev/vedro/api/v1alpha1
+  version: v1alpha1
 version: "3"

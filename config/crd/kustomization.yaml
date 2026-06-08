@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/vedro.svetoch.dev_providerconfigs.yaml
+- bases/vedro.svetoch.dev_buckets.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

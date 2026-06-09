@@ -19,10 +19,11 @@ package controller
 import (
 	"context"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
 )
@@ -47,9 +48,26 @@ type BucketReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	var bucket vedrov1alpha1.Bucket
+	err := r.Get(ctx, req.NamespacedName, &bucket)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+
+		return ctrl.Result{}, err
+	}
+	bucket.Status.ExternalName = bucket.Name
+	bucket.Status.Location = bucket.Spec.Location
+	bucket.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
+	bucket.Status.ObservedGeneration = bucket.Generation
+	err = r.Status().Update(ctx, &bucket)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	log.Info("status success")
 
 	return ctrl.Result{}, nil
 }

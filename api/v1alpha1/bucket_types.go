@@ -56,6 +56,13 @@ type BucketLifecycleRule struct {
 	Action BucketLifecycleAction `json:"action"`
 }
 
+type BucketAppliedState struct {
+	PublicAccess bool                  `json:"publicAccess,omitempty"`
+	Versioning   *BucketVersioningSpec `json:"versioning,omitempty"`
+	Lifecycle    *BucketLifecycleSpec  `json:"lifecycle,omitempty"`
+	Labels       map[string]string     `json:"labels,omitempty"`
+}
+
 type BucketSpec struct {
 	// ProviderRef references the ProviderConfig used to manage this bucket.
 	ProviderRef ProviderConfigReference `json:"providerRef"`
@@ -114,15 +121,29 @@ type BucketSpec struct {
 }
 
 type BucketStatus struct {
-	// ExternalName is the provider-side bucket name/id.
+	// ExternalName is the provider-side bucket name.
 	//
 	// +optional
 	ExternalName string `json:"externalName,omitempty"`
+	// Location is the provider-side bucket region.
+	//
+	// +optional
+	Location string `json:"location,omitempty"`
+
+	// Provider used for this bucket
+	//
+	// +optional
+	ObservedProvider string `json:"observedProvider,omitempty"`
 
 	// ObservedGeneration is the latest metadata.generation observed by the controller.
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Applied is the applied bucket attributes
+	//
+	// +optional
+	Applied BucketAppliedState `json:"applied,omitempty"`
 
 	// Conditions represent the latest available observations of the bucket state.
 	//

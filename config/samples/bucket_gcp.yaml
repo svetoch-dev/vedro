@@ -1,0 +1,33 @@
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: Bucket
+metadata:
+  labels:
+    app.kubernetes.io/name: vedro
+    app.kubernetes.io/managed-by: kustomize
+  name: bucket-sample-gcp
+  namespace: vedro-system
+spec:
+  providerRef:
+    name: provider-sample-gcp
+
+  location: europe-west1
+  name: app-logs-dev
+
+  deletionPolicy: Retain
+  publicAccess: false
+
+  versioning:
+    enabled: true
+
+  lifecycle:
+    rules:
+      - name: delete-old-logs
+        enabled: true
+        ageDays: 90
+        action: Delete
+
+  labels:
+    app: payments
+    env: dev
+
+  unsupportedFeaturePolicy: Fail

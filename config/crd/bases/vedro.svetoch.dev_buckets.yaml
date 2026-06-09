@@ -158,6 +158,58 @@ spec:
             type: object
           status:
             properties:
+              applied:
+                description: Applied is the applied bucket attributes
+                properties:
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  lifecycle:
+                    properties:
+                      rules:
+                        items:
+                          properties:
+                            action:
+                              description: Action describes what happens to matching
+                                objects.
+                              enum:
+                              - Delete
+                              type: string
+                            ageDays:
+                              description: AgeDays matches objects older than this
+                                many days.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            enabled:
+                              description: Enabled controls whether this lifecycle
+                                rule should be active.
+                              type: boolean
+                            name:
+                              description: Name is a stable identifier for this lifecycle
+                                rule.
+                              minLength: 1
+                              type: string
+                          required:
+                          - action
+                          - ageDays
+                          - enabled
+                          - name
+                          type: object
+                        type: array
+                    type: object
+                  publicAccess:
+                    type: boolean
+                  versioning:
+                    properties:
+                      enabled:
+                        description: Enabled controls bucket object versioning.
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                type: object
               conditions:
                 description: Conditions represent the latest available observations
                   of the bucket state.
@@ -217,13 +269,19 @@ spec:
                   type: object
                 type: array
               externalName:
-                description: ExternalName is the provider-side bucket name/id.
+                description: ExternalName is the provider-side bucket name.
+                type: string
+              location:
+                description: Location is the provider-side bucket region.
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the latest metadata.generation
                   observed by the controller.
                 format: int64
                 type: integer
+              observedProvider:
+                description: Provider used for this bucket
+                type: string
             type: object
         type: object
     served: true

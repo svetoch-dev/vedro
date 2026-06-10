@@ -83,7 +83,7 @@ func newClient(
 		//		return storage.NewClient(ctx, option.WithCredentialsJSON(credentialsJSON))
 		//
 	default:
-		return nil, fmt.Errorf("unsupported provider auth method %q", cfg.Spec.Auth.Method)
+		return nil, fmt.Errorf("unsupported provider auth method %q", cfg.Spec.Method)
 	}
 }
 
@@ -93,7 +93,7 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 			Versioning:          true,
 			LifecycleExpiration: true,
 			PublicAccessBlock:   true,
-			labels:              true,
+			Labels:              true,
 		},
 	}
 }

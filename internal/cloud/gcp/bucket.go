@@ -12,7 +12,7 @@ type Bucket struct {
 	client *storage.Client
 }
 
-func (p *Bucket) ValidateBucketSpec(spec vedrov1alpha1.BucketSpec) ValidationResult {
+func (p *Bucket) ValidateBucketSpec(spec vedrov1alpha1.BucketSpec) cloud.ValidationResult {
 	return cloud.Valid()
 }
 
@@ -21,5 +21,5 @@ func (p *Bucket) EnsureBucket(ctx context.Context, spec vedrov1alpha1.BucketSpec
 }
 
 func (p *Bucket) DeleteBucket(ctx context.Context, status vedrov1alpha1.BucketStatus) error {
-	return nil, nil
+	return nil
 }

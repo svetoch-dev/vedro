@@ -27,7 +27,7 @@ type BucketCapabilities struct {
 	Versioning          bool
 	LifecycleExpiration bool
 	PublicAccessBlock   bool
-	labels              bool
+	Labels              bool
 }
 
 type ValidationResult struct {

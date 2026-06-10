@@ -30,3 +30,11 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - vedro.svetoch.dev
+  resources:
+  - providerconfigs
+  verbs:
+  - get
+  - list
+  - watch

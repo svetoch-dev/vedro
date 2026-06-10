@@ -1,5 +1,0 @@
-## Append samples of your project ##
-resources:
-- vedro_v1alpha1_providerconfig.yaml
-- vedro_v1alpha1_bucket.yaml
-# +kubebuilder:scaffold:manifestskustomizesamples

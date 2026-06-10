@@ -8,7 +8,7 @@ metadata:
   namespace: vedro-system
 spec:
   providerRef:
-    name: provider-sample-gcp
+    name: providerconfig-sample-gcp
 
   location: europe-west1
   name: app-logs-dev

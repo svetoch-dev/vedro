@@ -21,13 +21,14 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	"github.com/svetoch-dev/vedro/internal/resolvers"
 )
 
 // BucketReconciler reconciles a Bucket object
@@ -42,48 +43,57 @@ type BucketReconciler struct {
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=providerconfigs,verbs=get;list;watch
 func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
+	bucket := resolvers.BucketResolver{
+		KubeClient: r.Client,
+		Log:        log,
+	}
 
-	var bucket vedrov1alpha1.Bucket
-	err := r.Get(ctx, req.NamespacedName, &bucket)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
+	bucket.Resolve(ctx, req.NamespacedName)
+
+	if !bucket.IsOk() {
+		if apierrors.IsNotFound(bucket.Error) {
 			return ctrl.Result{}, nil
 		}
 
-		return ctrl.Result{}, err
+		return ctrl.Result{}, bucket.Error
 	}
 
-	bucket.Status.ObservedGeneration = bucket.Generation
-	bucket.Status.ExternalName = bucket.Name
-	bucket.Status.Location = bucket.Spec.Location
-	bucket.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
+	original := bucket.Object.DeepCopy()
 
-	providerConfig, providerCondition, err := ensureProviderConfig(
-		ctx,
-		bucket.Spec.ProviderRef,
-		r.Client,
-	)
-	providerCondition.ObservedGeneration = bucket.Generation
-	meta.SetStatusCondition(&bucket.Status.Conditions, providerCondition)
+	bucket.Object.Status.ObservedGeneration = original.Generation
+	bucket.Object.Status.ExternalName = original.Name
+	bucket.Object.Status.Location = original.Spec.Location
+	bucket.Object.Status.ObservedProvider = original.Spec.ProviderRef.Name
 
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			err = r.Status().Update(ctx, &bucket)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
+	providerConfig := resolvers.ProviderConfigResolver{
+		KubeClient: r.Client,
+		Log:        log,
+	}
 
+	providerConfigName := types.NamespacedName{
+		Name: bucket.Object.Spec.ProviderRef.Name,
+	}
+
+	providerConfig.Resolve(ctx, providerConfigName)
+
+	providerConfig.Condition.ObservedGeneration = bucket.Object.Generation
+
+	bucket.SetStatusCondition(providerConfig.Condition)
+
+	if statusErr := r.Status().Patch(ctx, &bucket.Object, client.MergeFrom(original)); statusErr != nil {
+		return ctrl.Result{}, statusErr
+	}
+
+	if !providerConfig.IsOk() {
+		if apierrors.IsNotFound(providerConfig.Error) {
 			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, err
-	}
 
-	err = r.Status().Update(ctx, &bucket)
-	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, providerConfig.Error
 	}
+	//provider, err = registry.NewProvider(ctx, providerConfig, r.Client)
 
-	log.Info(fmt.Sprintf("status success %q", providerConfig.Name))
+	log.Info(fmt.Sprintf("status success %q", providerConfig.Object.Name))
 
 	return ctrl.Result{}, nil
 }

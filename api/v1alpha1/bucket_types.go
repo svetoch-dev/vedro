@@ -143,7 +143,7 @@ type BucketStatus struct {
 	// Applied is the applied bucket attributes
 	//
 	// +optional
-	Applied BucketAppliedState `json:"applied,omitempty"`
+	Applied *BucketAppliedState `json:"applied,omitempty"`
 
 	// Conditions represent the latest available observations of the bucket state.
 	//

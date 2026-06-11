@@ -21,8 +21,10 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -58,30 +60,29 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, bucket.Error
 	}
 
-	original := bucket.Object.DeepCopy()
-
-	bucket.Object.Status.ObservedGeneration = original.Generation
-	bucket.Object.Status.ExternalName = original.Name
-	bucket.Object.Status.Location = original.Spec.Location
-	bucket.Object.Status.ObservedProvider = original.Spec.ProviderRef.Name
-
 	providerConfig := resolvers.ProviderConfigResolver{
 		KubeClient: r.Client,
 		Log:        log,
 	}
 
 	providerConfigName := types.NamespacedName{
-		Name: bucket.Object.Spec.ProviderRef.Name,
+		Name: bucket.Spec.ProviderRef.Name,
 	}
 
 	providerConfig.Resolve(ctx, providerConfigName)
+	providerConfig.Condition.ObservedGeneration = bucket.Generation
 
-	providerConfig.Condition.ObservedGeneration = bucket.Object.Generation
+	err := r.patchBucketStatus(ctx, req, func(bucket *vedrov1alpha1.Bucket) {
+		bucket.Status.ObservedGeneration = bucket.Generation
+		bucket.Status.ExternalName = bucket.Name
+		bucket.Status.Location = bucket.Spec.Location
+		bucket.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
 
-	bucket.SetStatusCondition(providerConfig.Condition)
+		meta.SetStatusCondition(&bucket.Status.Conditions, providerConfig.Condition)
+	})
 
-	if statusErr := r.Status().Patch(ctx, &bucket.Object, client.MergeFrom(original)); statusErr != nil {
-		return ctrl.Result{}, statusErr
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if !providerConfig.IsOk() {
@@ -93,9 +94,29 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	//provider, err = registry.NewProvider(ctx, providerConfig, r.Client)
 
-	log.Info(fmt.Sprintf("status success %q", providerConfig.Object.Name))
+	log.Info(fmt.Sprintf("status success %q", providerConfig.Name))
 
 	return ctrl.Result{}, nil
+}
+
+func (r *BucketReconciler) patchBucketStatus(
+	ctx context.Context,
+	req ctrl.Request,
+	mutate func(bucket *vedrov1alpha1.Bucket),
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var bucket vedrov1alpha1.Bucket
+
+		if err := r.Get(ctx, req.NamespacedName, &bucket); err != nil {
+			return err
+		}
+
+		original := bucket.DeepCopy()
+
+		mutate(&bucket)
+
+		return r.Status().Patch(ctx, &bucket, client.MergeFrom(original))
+	})
 }
 
 // SetupWithManager sets up the controller with the Manager.

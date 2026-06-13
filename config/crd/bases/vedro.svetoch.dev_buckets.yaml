@@ -56,6 +56,14 @@ spec:
             type: object
           spec:
             properties:
+              StorageClass:
+                default: Standard
+                description: bucket storage class
+                enum:
+                - Standard
+                - InfrequentAccess
+                - Archive
+                type: string
               deletionPolicy:
                 default: Retain
                 description: |-
@@ -98,8 +106,6 @@ spec:
                           minLength: 1
                           type: string
                       required:
-                      - action
-                      - ageDays
                       - enabled
                       - name
                       type: object
@@ -158,58 +164,6 @@ spec:
             type: object
           status:
             properties:
-              applied:
-                description: Applied is the applied bucket attributes
-                properties:
-                  labels:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  lifecycle:
-                    properties:
-                      rules:
-                        items:
-                          properties:
-                            action:
-                              description: Action describes what happens to matching
-                                objects.
-                              enum:
-                              - Delete
-                              type: string
-                            ageDays:
-                              description: AgeDays matches objects older than this
-                                many days.
-                              format: int32
-                              minimum: 1
-                              type: integer
-                            enabled:
-                              description: Enabled controls whether this lifecycle
-                                rule should be active.
-                              type: boolean
-                            name:
-                              description: Name is a stable identifier for this lifecycle
-                                rule.
-                              minLength: 1
-                              type: string
-                          required:
-                          - action
-                          - ageDays
-                          - enabled
-                          - name
-                          type: object
-                        type: array
-                    type: object
-                  publicAccess:
-                    type: boolean
-                  versioning:
-                    properties:
-                      enabled:
-                        description: Enabled controls bucket object versioning.
-                        type: boolean
-                    required:
-                    - enabled
-                    type: object
-                type: object
               conditions:
                 description: Conditions represent the latest available observations
                   of the bucket state.
@@ -282,6 +236,22 @@ spec:
               observedProvider:
                 description: Provider used for this bucket
                 type: string
+              unsupported:
+                description: List of unsupported features set on Bucket resource
+                items:
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                  required:
+                  - field
+                  - message
+                  - reason
+                  type: object
+                type: array
             type: object
         type: object
     served: true

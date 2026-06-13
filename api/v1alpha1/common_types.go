@@ -7,6 +7,13 @@ const (
 	ProviderTypeYandex ProviderType = "Yandex"
 )
 
+type ProviderConfigReference struct {
+	// Name is the name of the ProviderConfig.
+	//
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+}
+
 type AuthMethod string
 
 const (
@@ -28,9 +35,10 @@ const (
 	UnsupportedFeaturePolicyWarn UnsupportedFeaturePolicy = "Warn"
 )
 
-type ProviderConfigReference struct {
-	// Name is the name of the ProviderConfig.
-	//
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
+type UnsupportedFeatureReason string
+
+type UnsupportedFeature struct {
+	Field   string                   `json:"field"`
+	Message string                   `json:"message"`
+	Reason  UnsupportedFeatureReason `json:"reason"`
 }

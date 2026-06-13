@@ -13,13 +13,9 @@ import (
 
 func NewProvider(
 	ctx context.Context,
-	cfg *vedrov1alpha1.ProviderConfig,
+	cfg vedrov1alpha1.ProviderConfig,
 	kubeClient client.Client,
 ) (cloud.Provider, error) {
-	if cfg == nil {
-		return nil, fmt.Errorf("provider config is nil")
-	}
-
 	switch cfg.Spec.Type {
 	case vedrov1alpha1.ProviderTypeGCP:
 		return gcp.New(ctx, kubeClient, cfg)

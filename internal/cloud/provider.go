@@ -7,11 +7,8 @@ import (
 )
 
 type BucketState struct {
-	ExternalName     string
-	Location         string
-	ObservedProvider string
-
-	Applied vedrov1alpha1.BucketAppliedState
+	ExternalName string
+	ExternalId   string
 }
 
 type Provider interface {
@@ -24,10 +21,12 @@ type Capabilities struct {
 }
 
 type BucketCapabilities struct {
-	Versioning          bool
-	LifecycleExpiration bool
-	PublicAccessBlock   bool
-	Labels              bool
+	Versioning                   bool
+	LifecycleExpiration          bool
+	PublicAccess                 bool
+	StorageClassArchive          bool
+	StorageClassInfrequentAccess bool
+	Labels                       bool
 }
 
 type ValidationResult struct {

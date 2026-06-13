@@ -95,7 +95,7 @@ var _ = Describe("Bucket Controller", func() {
 			fetchedBucket := &v1alpha1.Bucket{}
 			err := k8sClient.Get(ctx, typeNamespacedName, fetchedBucket)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(fetchedBucket.Spec.PublicAccess).To(BeFalse())
+			Expect(fetchedBucket.Spec.PublicAccess).To(HaveValue(BeFalse()))
 		})
 		It("should default DeletionPolicy to Retain", func() {
 			By("Fetching the created resource and verifying the default DeletionPolicy")

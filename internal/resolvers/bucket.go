@@ -2,7 +2,6 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -36,18 +35,18 @@ func (o *BucketResolver) Resolve(
 	o.Log.V(1).Info("getting bucket", "name", name.String())
 
 	o.Condition = metav1.Condition{
-		Type: conditions.TypeReady,
+		Type:   conditions.TypeReady,
+		Status: metav1.ConditionFalse,
 	}
 
 	err := o.KubeClient.Get(ctx, name, &o.Bucket)
 	if err != nil {
 		o.Error = err
-		o.Condition.Status = metav1.ConditionFalse
 
 		if apierrors.IsNotFound(err) {
 			o.Log.Info("Bucket not found", "name", name.String())
 			o.Condition.Reason = conditions.ReasonBucketNotFound
-			o.Condition.Message = fmt.Sprintf("Bucket %q was not found", name.Name)
+			o.Condition.Message = "Bucket was not found"
 			return
 		}
 		o.Log.Error(err, "failed to get Bucket", "name", name.String())
@@ -56,8 +55,4 @@ func (o *BucketResolver) Resolve(
 		o.Condition.Message = err.Error()
 		return
 	}
-
-	o.Condition.Status = metav1.ConditionTrue
-	o.Condition.Reason = conditions.ReasonBucketFound
-	o.Condition.Message = fmt.Sprintf("Bucket %q was found", name.Name)
 }

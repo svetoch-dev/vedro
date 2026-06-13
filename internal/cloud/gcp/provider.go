@@ -19,7 +19,7 @@ type Provider struct {
 func New(
 	ctx context.Context,
 	kubeClient client.Client,
-	cfg *vedrov1alpha1.ProviderConfig,
+	cfg vedrov1alpha1.ProviderConfig,
 ) (*Provider, error) {
 
 	client, err := newClient(ctx, kubeClient, cfg)
@@ -41,7 +41,7 @@ func New(
 func newClient(
 	ctx context.Context,
 	kubeClient client.Client,
-	cfg *vedrov1alpha1.ProviderConfig,
+	cfg vedrov1alpha1.ProviderConfig,
 ) (*storage.Client, error) {
 	switch cfg.Spec.Method {
 	case vedrov1alpha1.AuthMethodWorkloadIdentity:
@@ -90,10 +90,12 @@ func newClient(
 func (p *Provider) Capabilities() cloud.Capabilities {
 	return cloud.Capabilities{
 		Bucket: cloud.BucketCapabilities{
-			Versioning:          true,
-			LifecycleExpiration: true,
-			PublicAccessBlock:   true,
-			Labels:              true,
+			Versioning:                   true,
+			LifecycleExpiration:          true,
+			PublicAccess:                 true,
+			StorageClassArchive:          true,
+			StorageClassInfrequentAccess: true,
+			Labels:                       true,
 		},
 	}
 }

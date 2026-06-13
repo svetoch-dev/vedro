@@ -20,6 +20,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	BucketUnsupportedVersioning          UnsupportedFeatureReason = "BucketUnsupportedVersioning"
+	BucketUnsupportedLabels              UnsupportedFeatureReason = "BucketUnsupportedLabels"
+	BucketUnsupportedPublicAccess        UnsupportedFeatureReason = "BucketUnsupportedPublicAccess"
+	BucketUnsupportedStorageClass        UnsupportedFeatureReason = "BucketUnsupportedStorageClass"
+	BucketUnsupportedLifecycleExpiration UnsupportedFeatureReason = "BucketUnsupportedLifecycleExpiration"
+)
+
+type BucketStorageClass string
+
+const (
+	BucketStorageClassStandard         BucketStorageClass = "Standard"
+	BucketStorageClassInfrequentAccess BucketStorageClass = "InfrequentAccess"
+	BucketStorageClassArchive          BucketStorageClass = "Archive"
+)
+
 type BucketLifecycleAction string
 
 const (
@@ -47,20 +63,15 @@ type BucketLifecycleRule struct {
 
 	// AgeDays matches objects older than this many days.
 	//
+	// +optional
 	// +kubebuilder:validation:Minimum=1
-	AgeDays int32 `json:"ageDays"`
+	AgeDays *int32 `json:"ageDays"`
 
 	// Action describes what happens to matching objects.
 	//
+	// +optional
 	// +kubebuilder:validation:Enum=Delete
 	Action BucketLifecycleAction `json:"action"`
-}
-
-type BucketAppliedState struct {
-	PublicAccess bool                  `json:"publicAccess,omitempty"`
-	Versioning   *BucketVersioningSpec `json:"versioning,omitempty"`
-	Lifecycle    *BucketLifecycleSpec  `json:"lifecycle,omitempty"`
-	Labels       map[string]string     `json:"labels,omitempty"`
 }
 
 type BucketSpec struct {
@@ -82,6 +93,13 @@ type BucketSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	Location string `json:"location"`
 
+	// bucket storage class
+	//
+	// +kubebuilder:validation:Enum=Standard;InfrequentAccess;Archive
+	// +kubebuilder:default:=Standard
+	// +optional
+	StorageClass BucketStorageClass `json:"StorageClass,omitempty"`
+
 	// DeletionPolicy controls what happens to the external bucket
 	// when this Kubernetes object is deleted.
 	//
@@ -94,7 +112,7 @@ type BucketSpec struct {
 	//
 	// +kubebuilder:default:=false
 	// +optional
-	PublicAccess bool `json:"publicAccess,omitempty"`
+	PublicAccess *bool `json:"publicAccess,omitempty"`
 
 	// Versioning configures object versioning.
 	//
@@ -140,10 +158,10 @@ type BucketStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Applied is the applied bucket attributes
+	// List of unsupported features set on Bucket resource
 	//
 	// +optional
-	Applied *BucketAppliedState `json:"applied,omitempty"`
+	UnsupportedFeatures []UnsupportedFeature `json:"unsupported,omitempty"`
 
 	// Conditions represent the latest available observations of the bucket state.
 	//

@@ -11,14 +11,17 @@ const (
 
 // Condition reasons for Bucket resources.
 const (
-	ReasonBucketNotFound  = "BucketNotFound"
-	ReasonBucketGetFailed = "BucketGetFailed"
-	ReasonBucketFound     = "BucketFound"
+	ReasonBucketNotFound            = "BucketNotFound"
+	ReasonBucketGetFailed           = "BucketGetFailed"
+	ReasonBucketInvalidCapabilities = "BucketInvalidCapabilities"
+	ReasonBucketReconciled          = "Reconciled"
 )
 
 // Condition reasons for ProviderConfig resources.
 const (
-	ReasonProviderConfigNotFound  = "ProviderConfigNotFound"
-	ReasonProviderConfigGetFailed = "ProviderConfigGetFailed"
-	ReasonProviderConfigFound     = "ProviderConfigFound"
+	ReasonProviderConfigNotFound   = "ProviderConfigNotFound"
+	ReasonProviderConfigGetFailed  = "ProviderConfigGetFailed"
+	ReasonProviderConfigError      = "ProviderConfigError"
+	ReasonProviderConfigReconciled = "Reconciled"
+	ReasonProviderConfigSet        = "ProviderConfigSet"
 )

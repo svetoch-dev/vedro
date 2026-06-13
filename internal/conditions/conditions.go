@@ -13,7 +13,8 @@ const (
 const (
 	ReasonBucketNotFound            = "BucketNotFound"
 	ReasonBucketGetFailed           = "BucketGetFailed"
-	ReasonBucketInvalidCapabilities = "BucketInvalidCapabilities"
+	ReasonBucketUnsupportedFeatures = "BucketUnsupportedFeatures"
+	ReasonBucketInvalidSpec         = "BucketInvalidSpec"
 	ReasonBucketReconciled          = "Reconciled"
 )
 

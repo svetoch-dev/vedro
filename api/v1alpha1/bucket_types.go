@@ -110,7 +110,6 @@ type BucketSpec struct {
 
 	// PublicAccess controls whether the bucket may be publicly accessible.
 	//
-	// +kubebuilder:default:=false
 	// +optional
 	PublicAccess *bool `json:"publicAccess,omitempty"`
 

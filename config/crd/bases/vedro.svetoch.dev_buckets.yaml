@@ -136,7 +136,6 @@ spec:
                 - name
                 type: object
               publicAccess:
-                default: false
                 description: PublicAccess controls whether the bucket may be publicly
                   accessible.
                 type: boolean

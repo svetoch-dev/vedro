@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -103,6 +104,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	//If error change status conditions and end Reconcile
 	if err != nil {
+		log.Error(err, "Error in setting NewProvider", "ProviderConfig", providerConfig.Name)
 		providerConfig.Condition.Status = metav1.ConditionFalse
 		providerConfig.Condition.Reason = conditions.ReasonProviderConfigError
 		providerConfig.Condition.Message = err.Error()
@@ -128,13 +130,15 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	//check bucket capabilities
 	caps := provider.Capabilities().Bucket
 	unsupported := validation.ValidateBucketCapabilities(caps, bucket.Spec)
+	bucket.Status.UnsupportedFeatures = unsupported
 
 	if len(unsupported) > 0 {
+		log.Info("Unsupported features found")
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketInvalidCapabilities
 		bucket.Condition.Message = "Bucket invalid capabilities"
 		patchErr := r.patchBucketStatus(ctx, req, func(b *vedrov1alpha1.Bucket) {
-			b.Status.UnsupportedFeatures = unsupported
+			b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
 		if patchErr != nil {
@@ -142,6 +146,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 
 		if bucket.Spec.UnsupportedFeaturePolicy == vedrov1alpha1.UnsupportedFeaturePolicyFail {
+			log.Info("UnsupportedFeaturePolicy set to Fail. stopping reconciliation")
 			return ctrl.Result{}, nil
 		}
 	}
@@ -156,6 +161,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		b.Status.ExternalName = bucket.Name
 		b.Status.Location = bucket.Spec.Location
 		b.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
+		b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 		meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
 		meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 	})
@@ -228,6 +234,7 @@ func (r *BucketReconciler) findBucketsForProviderConfig(
 func (r *BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&vedrov1alpha1.Bucket{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Watches(
 			&vedrov1alpha1.ProviderConfig{},
 			handler.EnqueueRequestsFromMapFunc(r.findBucketsForProviderConfig),

@@ -56,14 +56,6 @@ spec:
             type: object
           spec:
             properties:
-              StorageClass:
-                default: Standard
-                description: bucket storage class
-                enum:
-                - Standard
-                - InfrequentAccess
-                - Archive
-                type: string
               deletionPolicy:
                 default: Retain
                 description: |-
@@ -139,6 +131,14 @@ spec:
                 description: PublicAccess controls whether the bucket may be publicly
                   accessible.
                 type: boolean
+              storageClass:
+                default: Standard
+                description: bucket storage class
+                enum:
+                - Standard
+                - InfrequentAccess
+                - Archive
+                type: string
               unsupportedFeaturePolicy:
                 default: Fail
                 description: |-

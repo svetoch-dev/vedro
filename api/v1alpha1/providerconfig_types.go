@@ -21,6 +21,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// If StaticCredentials is set credentialsSecretRef should also be set
+// +kubebuilder:validation:XValidation:rule="self.method != 'StaticCredentials' || has(self.credentialsSecretRef)",message="credentialsSecretRef is required when method is StaticCredentials"
+// If WorkloadIdentity is set credentialsSecretRef should not be set
+// +kubebuilder:validation:XValidation:rule="self.method != 'WorkloadIdentity' || !has(self.credentialsSecretRef)",message="credentialsSecretRef must not be set when method is WorkloadIdentity"
 type ProviderConfigSpec struct {
 	// Type is the cloud provider type.
 	//
@@ -33,7 +37,7 @@ type ProviderConfigSpec struct {
 	// For Yandex this can be the folder ID or cloud ID, depending on your design.
 	//
 	// +kubebuilder:validation:MinLength=1
-	ProjectID string `json:"projectId"`
+	ProjectId string `json:"projectId"`
 
 	Region string `json:"region"`
 
@@ -65,7 +69,6 @@ type ProviderConfigStatus struct {
 // +kubebuilder:printcolumn:name="Type",type=string,JSONPath=`.spec.type`
 // +kubebuilder:printcolumn:name="Method",type=string,JSONPath=`.spec.method`
 // +kubebuilder:printcolumn:name="Region",type=string,JSONPath=`.spec.region`
-// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // ProviderConfig is the Schema for the providerconfigs API.

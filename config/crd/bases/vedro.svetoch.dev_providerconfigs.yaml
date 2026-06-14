@@ -26,9 +26,6 @@ spec:
     - jsonPath: .spec.region
       name: Region
       type: string
-    - jsonPath: .status.conditions[?(@.type=="Ready")].status
-      name: Ready
-      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -55,6 +52,9 @@ spec:
           metadata:
             type: object
           spec:
+            description: |-
+              If StaticCredentials is set credentialsSecretRef should also be set
+              If WorkloadIdentity is set credentialsSecretRef should not be set
             properties:
               credentialsSecretRef:
                 description: |-
@@ -101,6 +101,11 @@ spec:
             - region
             - type
             type: object
+            x-kubernetes-validations:
+            - message: credentialsSecretRef is required when method is StaticCredentials
+              rule: self.method != 'StaticCredentials' || has(self.credentialsSecretRef)
+            - message: credentialsSecretRef must not be set when method is WorkloadIdentity
+              rule: self.method != 'WorkloadIdentity' || !has(self.credentialsSecretRef)
           status:
             description: ProviderConfigStatus defines the observed provider configuration
               state.

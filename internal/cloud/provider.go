@@ -9,7 +9,7 @@ import (
 
 type BucketState struct {
 	ExternalName string
-	ExternalId   string
+	Location     string
 }
 
 type Provider interface {

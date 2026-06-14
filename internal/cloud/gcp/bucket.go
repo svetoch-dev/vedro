@@ -2,6 +2,8 @@ package gcp
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -12,8 +14,16 @@ import (
 )
 
 var (
-	invalid func(string) validation.ValidationResult = validation.Invalid
-	valid   func() validation.ValidationResult       = validation.Valid
+	invalid             = validation.Invalid
+	valid               = validation.Valid
+	regionalPattern     = regexp.MustCompile(`^[A-Z]+-[A-Z]+[0-9]+$`)
+	dualRegionPattern   = regexp.MustCompile(`^[A-Z]+[0-9]+$`)
+	bucketNamePattern   = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
+	storageClassMapping = map[vedrov1alpha1.BucketStorageClass]string{
+		vedrov1alpha1.BucketStorageClassStandard:         "STANDARD",
+		vedrov1alpha1.BucketStorageClassInfrequentAccess: "NEARLINE",
+		vedrov1alpha1.BucketStorageClassArchive:          "ARCHIVE",
+	}
 )
 
 func validateBucketLocation(location string) validation.ValidationResult {
@@ -30,13 +40,11 @@ func validateBucketLocation(location string) validation.ValidationResult {
 	}
 
 	// Allow normal regional names like europe-west1, us-central1.
-	regionalPattern := regexp.MustCompile(`^[a-z]+-[a-z]+[0-9]+$`)
-	if regionalPattern.MatchString(location) {
+	if regionalPattern.MatchString(normalized) {
 		return valid()
 	}
 
 	// Allow predefined dual-region IDs like NAM4, EUR4, ASIA1.
-	dualRegionPattern := regexp.MustCompile(`^[A-Z]+[0-9]+$`)
 	if dualRegionPattern.MatchString(normalized) {
 		return valid()
 	}
@@ -45,7 +53,6 @@ func validateBucketLocation(location string) validation.ValidationResult {
 }
 
 func validateBucketName(name string) validation.ValidationResult {
-	bucketNamePattern := regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
 	if !bucketNamePattern.MatchString(name) {
 		return invalid(
 			"bucket name must be 3-63 characters, contain only lowercase letters, numbers, dots, underscores, and dashes, and start/end with a letter or number",
@@ -68,10 +75,11 @@ func validateBucketName(name string) validation.ValidationResult {
 }
 
 type Bucket struct {
-	client *storage.Client
+	client    *storage.Client
+	projectId string
 }
 
-func (p *Bucket) ValidateBucketSpec(spec vedrov1alpha1.BucketSpec) validation.ValidationResult {
+func (b *Bucket) ValidateBucketSpec(spec vedrov1alpha1.BucketSpec) validation.ValidationResult {
 	v := validateBucketLocation(spec.Location)
 
 	if !v.Valid {
@@ -86,10 +94,75 @@ func (p *Bucket) ValidateBucketSpec(spec vedrov1alpha1.BucketSpec) validation.Va
 	return valid()
 }
 
-func (p *Bucket) EnsureBucket(ctx context.Context, spec vedrov1alpha1.BucketSpec) (*cloud.BucketState, error) {
-	return nil, nil
+func (b *Bucket) EnsureBucket(ctx context.Context, spec vedrov1alpha1.BucketSpec) (*cloud.BucketState, error) {
+	bucket := b.client.Bucket(spec.Name)
+	normalizedLocation := strings.ToUpper(spec.Location)
+	storageClass, ok := storageClassMapping[spec.StorageClass]
+	if !ok {
+		return nil, fmt.Errorf("spec.StroageClass %s doesnt map to any bucket StorageClass", spec.StorageClass)
+	}
+
+	attrs, err := bucket.Attrs(ctx)
+
+	if errors.Is(err, storage.ErrBucketNotExist) {
+		createAttrs := storage.BucketAttrs{
+			Location:     spec.Location,
+			StorageClass: storageClass,
+		}
+
+		if spec.Versioning != nil {
+			createAttrs.VersioningEnabled = spec.Versioning.Enabled
+		}
+
+		if err := bucket.Create(ctx, b.projectId, &createAttrs); err != nil {
+			return nil, fmt.Errorf("create bucket %q: %w", spec.Name, err)
+		}
+
+		return &cloud.BucketState{
+			ExternalName: spec.Name,
+			Location:     normalizedLocation,
+		}, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("get bucket attrs %q: %w", spec.Name, err)
+	}
+
+	if attrs.Location != normalizedLocation {
+		return nil, fmt.Errorf(
+			"bucket %q already exists in location %q, desired location is %q",
+			spec.Name,
+			attrs.Location,
+			normalizedLocation,
+		)
+	}
+
+	updateAttrs := storage.BucketAttrsToUpdate{}
+	needsUpdate := false
+
+	if spec.StorageClass != "" && attrs.StorageClass != storageClass {
+		updateAttrs.StorageClass = storageClass
+		needsUpdate = true
+	}
+
+	if spec.Versioning != nil && attrs.VersioningEnabled != spec.Versioning.Enabled {
+		updateAttrs.VersioningEnabled = spec.Versioning.Enabled
+		needsUpdate = true
+	}
+
+	if needsUpdate {
+		attrs, err = bucket.Update(ctx, updateAttrs)
+		if err != nil {
+			return nil, fmt.Errorf("update bucket %q: %w", spec.Name, err)
+		}
+	}
+
+	return &cloud.BucketState{
+		ExternalName: spec.Name,
+		Location:     attrs.Location,
+	}, nil
 }
 
-func (p *Bucket) DeleteBucket(ctx context.Context, status vedrov1alpha1.BucketStatus) error {
+func (b *Bucket) DeleteBucket(ctx context.Context, status vedrov1alpha1.BucketStatus) error {
 	return nil
 }

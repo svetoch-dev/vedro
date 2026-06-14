@@ -98,7 +98,7 @@ type BucketSpec struct {
 	// +kubebuilder:validation:Enum=Standard;InfrequentAccess;Archive
 	// +kubebuilder:default:=Standard
 	// +optional
-	StorageClass BucketStorageClass `json:"StorageClass,omitempty"`
+	StorageClass BucketStorageClass `json:"storageClass,omitempty"`
 
 	// DeletionPolicy controls what happens to the external bucket
 	// when this Kubernetes object is deleted.

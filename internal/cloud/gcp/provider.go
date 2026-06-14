@@ -12,7 +12,6 @@ import (
 )
 
 type Provider struct {
-	client *storage.Client
 	bucket *Bucket
 }
 
@@ -27,12 +26,11 @@ func New(
 		return nil, err
 	}
 
-	p := &Provider{
-		client: client,
-	}
+	p := &Provider{}
 
 	p.bucket = &Bucket{
-		client: client,
+		client:    client,
+		projectId: cfg.Spec.ProjectId,
 	}
 
 	return p, nil
@@ -48,16 +46,16 @@ func newClient(
 		return storage.NewClient(ctx)
 
 		//	case vedrov1alpha1.ProviderAuthMethodSecret:
-		//		secretRef := cfg.Spec.GCP.CredentialsSecretRef
+		//		secretRef := cfg.Spec.CredentialsSecretRef
 		//		if secretRef == nil {
-		//			return nil, fmt.Errorf("spec.gcp.credentialsSecretRef is required when auth.method is Secret")
+		//			return nil, fmt.Errorf("spec.credentialsSecretRef is required when auth.method is Secret")
 		//		}
 		//
-		//		secret := &corev1.Secret{}
+		//		var secret corev1.Secret
 		//		err := kubeClient.Get(ctx, client.ObjectKey{
 		//			Name:      secretRef.Name,
 		//			Namespace: secretRef.Namespace,
-		//		}, secret)
+		//		}, &secret)
 		//		if err != nil {
 		//			return nil, fmt.Errorf("get credentials secret %s/%s: %w",
 		//				secretRef.Namespace,
@@ -66,10 +64,7 @@ func newClient(
 		//			)
 		//		}
 		//
-		//		key := secretRef.Key
-		//		if key == "" {
-		//			key = "credentials.json"
-		//		}
+		//		key := "key"
 		//
 		//		credentialsJSON, ok := secret.Data[key]
 		//		if !ok {
@@ -90,12 +85,12 @@ func newClient(
 func (p *Provider) Capabilities() cloud.Capabilities {
 	return cloud.Capabilities{
 		Bucket: cloud.BucketCapabilities{
-			Versioning:                   false,
-			LifecycleExpiration:          false,
-			PublicAccess:                 false,
-			StorageClassArchive:          false,
-			StorageClassInfrequentAccess: false,
-			Labels:                       false,
+			Versioning:                   true,
+			LifecycleExpiration:          true,
+			PublicAccess:                 true,
+			StorageClassArchive:          true,
+			StorageClassInfrequentAccess: true,
+			Labels:                       true,
 		},
 	}
 }

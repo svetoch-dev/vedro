@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -86,7 +85,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	providerConfig.Condition.ObservedGeneration = bucket.Generation
 
 	if !providerConfig.IsOk() {
-		patchErr := r.patchBucketStatus(ctx, req, func(b *vedrov1alpha1.Bucket) {
+		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
 		})
 
@@ -108,7 +107,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonProviderConfigError
 		bucket.Condition.Message = err.Error()
-		patchErr := r.patchBucketStatus(ctx, req, func(b *vedrov1alpha1.Bucket) {
+		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
 			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
@@ -134,7 +133,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
 		bucket.Condition.Message = "unsupported features found"
-		patchErr := r.patchBucketStatus(ctx, req, func(b *vedrov1alpha1.Bucket) {
+		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
 			b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
@@ -148,13 +147,32 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
+	//check that spec is valid
 	validationResult := provider.Bucket().ValidateBucketSpec(bucket.Spec)
 
 	if !validationResult.Valid {
+		log.Info("spec is invalid")
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketInvalidSpec
 		bucket.Condition.Message = validationResult.Message
-		patchErr := r.patchBucketStatus(ctx, req, func(b *vedrov1alpha1.Bucket) {
+		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
+			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
+	//Ensure that spec and bucket match
+	result, err := provider.Bucket().EnsureBucket(ctx, bucket.Spec)
+
+	if err != nil {
+		log.Error(err, "EnsureBucket failed")
+		bucket.Condition.Status = metav1.ConditionFalse
+		bucket.Condition.Reason = conditions.ReasonBucketEnsureError
+		bucket.Condition.Message = err.Error()
+		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
 		if patchErr != nil {
@@ -168,10 +186,9 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	bucket.Condition.Reason = conditions.ReasonBucketReconciled
 	bucket.Condition.Message = "Bucket Reconciled"
 
-	patchErr := r.patchBucketStatus(ctx, req, func(b *vedrov1alpha1.Bucket) {
-		b.Status.ObservedGeneration = bucket.Generation
-		b.Status.ExternalName = bucket.Name
-		b.Status.Location = bucket.Spec.Location
+	patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
+		b.Status.ExternalName = result.ExternalName
+		b.Status.Location = result.Location
 		b.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
 		b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 		meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
@@ -181,7 +198,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ReconcileError(ctx, patchErr, "patch error")
 	}
 
-	log.Info(fmt.Sprintf("status success %q", providerConfig.Name))
+	log.Info("reconciled success")
 
 	return Reconciled()
 }
@@ -189,6 +206,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func (r *BucketReconciler) patchBucketStatus(
 	ctx context.Context,
 	req ctrl.Request,
+	observedGeneration int64,
 	mutate func(bucket *vedrov1alpha1.Bucket),
 ) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -200,6 +218,7 @@ func (r *BucketReconciler) patchBucketStatus(
 
 		original := bucket.DeepCopy()
 
+		bucket.Status.ObservedGeneration = observedGeneration
 		mutate(&bucket)
 
 		if reflect.DeepEqual(original.Status, bucket.Status) {
@@ -247,9 +266,11 @@ func (r *BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
 			&vedrov1alpha1.Bucket{},
-			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}), //Reconcile only when generation changes
 		).
 		Watches(
+			//Watch ProviderConfig for changes and queue events for
+			//buckets that reference it
 			&vedrov1alpha1.ProviderConfig{},
 			handler.EnqueueRequestsFromMapFunc(r.findBucketsForProviderConfig),
 		).

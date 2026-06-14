@@ -21,11 +21,11 @@ import (
 )
 
 const (
-	BucketUnsupportedVersioning          UnsupportedFeatureReason = "BucketUnsupportedVersioning"
-	BucketUnsupportedLabels              UnsupportedFeatureReason = "BucketUnsupportedLabels"
-	BucketUnsupportedPublicAccess        UnsupportedFeatureReason = "BucketUnsupportedPublicAccess"
-	BucketUnsupportedStorageClass        UnsupportedFeatureReason = "BucketUnsupportedStorageClass"
-	BucketUnsupportedLifecycleExpiration UnsupportedFeatureReason = "BucketUnsupportedLifecycleExpiration"
+	BucketUnsupportedVersioning             UnsupportedFeatureReason = "BucketUnsupportedVersioning"
+	BucketUnsupportedLabels                 UnsupportedFeatureReason = "BucketUnsupportedLabels"
+	BucketUnsupportedPublicAccessPrevention UnsupportedFeatureReason = "BucketUnsupportedPublicAccessPrevention"
+	BucketUnsupportedStorageClass           UnsupportedFeatureReason = "BucketUnsupportedStorageClass"
+	BucketUnsupportedLifecycleExpiration    UnsupportedFeatureReason = "BucketUnsupportedLifecycleExpiration"
 )
 
 type BucketStorageClass string
@@ -50,6 +50,14 @@ type BucketVersioningSpec struct {
 type BucketLifecycleSpec struct {
 	// +optional
 	Rules []BucketLifecycleRule `json:"rules,omitempty"`
+}
+
+type BucketAppliedState struct {
+	PublicAccessPrevention *bool                 `json:"publicAccessPrevention,omitempty"`
+	Versioning             *BucketVersioningSpec `json:"versioning,omitempty"`
+	Lifecycle              *BucketLifecycleSpec  `json:"lifecycle,omitempty"`
+	StorageClass           BucketStorageClass    `json:"storageClass,omitempty"`
+	Labels                 map[string]string     `json:"labels,omitempty"`
 }
 
 type BucketLifecycleRule struct {
@@ -108,10 +116,10 @@ type BucketSpec struct {
 	// +optional
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 
-	// PublicAccess controls whether the bucket may be publicly accessible.
+	// PublicAccessPrevention controls whether the bucket may be publicly accessible.
 	//
 	// +optional
-	PublicAccess *bool `json:"publicAccess,omitempty"`
+	PublicAccessPrevention *bool `json:"publicAccessPrevention,omitempty"`
 
 	// Versioning configures object versioning.
 	//
@@ -156,6 +164,11 @@ type BucketStatus struct {
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Applied is the applied bucket attributes
+	//
+	// +optional
+	Applied *BucketAppliedState `json:"applied,omitempty"`
 
 	// List of unsupported features set on Bucket resource
 	//

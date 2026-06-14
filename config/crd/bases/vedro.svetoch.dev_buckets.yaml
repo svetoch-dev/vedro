@@ -127,9 +127,9 @@ spec:
                 required:
                 - name
                 type: object
-              publicAccess:
-                description: PublicAccess controls whether the bucket may be publicly
-                  accessible.
+              publicAccessPrevention:
+                description: PublicAccessPrevention controls whether the bucket may
+                  be publicly accessible.
                 type: boolean
               storageClass:
                 default: Standard
@@ -163,6 +163,58 @@ spec:
             type: object
           status:
             properties:
+              applied:
+                description: Applied is the applied bucket attributes
+                properties:
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  lifecycle:
+                    properties:
+                      rules:
+                        items:
+                          properties:
+                            action:
+                              description: Action describes what happens to matching
+                                objects.
+                              enum:
+                              - Delete
+                              type: string
+                            ageDays:
+                              description: AgeDays matches objects older than this
+                                many days.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            enabled:
+                              description: Enabled controls whether this lifecycle
+                                rule should be active.
+                              type: boolean
+                            name:
+                              description: Name is a stable identifier for this lifecycle
+                                rule.
+                              minLength: 1
+                              type: string
+                          required:
+                          - enabled
+                          - name
+                          type: object
+                        type: array
+                    type: object
+                  publicAccessPrevention:
+                    type: boolean
+                  storageClass:
+                    type: string
+                  versioning:
+                    properties:
+                      enabled:
+                        description: Enabled controls bucket object versioning.
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                type: object
               conditions:
                 description: Conditions represent the latest available observations
                   of the bucket state.

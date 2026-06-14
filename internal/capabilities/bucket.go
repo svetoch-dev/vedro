@@ -50,11 +50,11 @@ func ValidateBucketCapabilities(
 		})
 	}
 
-	if spec.PublicAccess != nil && !caps.PublicAccess {
+	if spec.PublicAccessPrevention != nil && !caps.PublicAccessPrevention {
 		unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{
-			Field:   "spec.PublicAccess",
-			Message: "PublicAccess is not supported by this provider",
-			Reason:  vedrov1alpha1.BucketUnsupportedPublicAccess,
+			Field:   "spec.PublicAccessPrevention",
+			Message: "PublicAccessPrevention is not supported by this provider",
+			Reason:  vedrov1alpha1.BucketUnsupportedPublicAccessPrevention,
 		})
 	}
 

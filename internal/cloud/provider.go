@@ -10,6 +10,8 @@ import (
 type BucketState struct {
 	ExternalName string
 	Location     string
+
+	Applied *vedrov1alpha1.BucketAppliedState
 }
 
 type Provider interface {
@@ -24,7 +26,7 @@ type Capabilities struct {
 type BucketCapabilities struct {
 	Versioning                   bool
 	LifecycleExpiration          bool
-	PublicAccess                 bool
+	PublicAccessPrevention       bool
 	StorageClassArchive          bool
 	StorageClassInfrequentAccess bool
 	Labels                       bool
@@ -35,7 +37,7 @@ type BucketProvider interface {
 
 	EnsureBucket(
 		ctx context.Context,
-		spec vedrov1alpha1.BucketSpec,
+		spec vedrov1alpha1.Bucket,
 	) (*BucketState, error)
 
 	DeleteBucket(

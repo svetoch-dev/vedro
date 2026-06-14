@@ -24,6 +24,10 @@ var (
 		vedrov1alpha1.BucketStorageClassInfrequentAccess: "NEARLINE",
 		vedrov1alpha1.BucketStorageClassArchive:          "ARCHIVE",
 	}
+	publicAccessPreventionMapping = map[bool]storage.PublicAccessPrevention{
+		false: storage.PublicAccessPreventionInherited,
+		true:  storage.PublicAccessPreventionEnforced,
+	}
 )
 
 func validateBucketLocation(location string) validation.ValidationResult {
@@ -94,12 +98,21 @@ func (b *Bucket) ValidateBucketSpec(spec vedrov1alpha1.BucketSpec) validation.Va
 	return valid()
 }
 
-func (b *Bucket) EnsureBucket(ctx context.Context, spec vedrov1alpha1.BucketSpec) (*cloud.BucketState, error) {
+func (b *Bucket) EnsureBucket(ctx context.Context, cr vedrov1alpha1.Bucket) (*cloud.BucketState, error) {
+	spec := cr.Spec
+	status := cr.Status
 	bucket := b.client.Bucket(spec.Name)
+
 	normalizedLocation := strings.ToUpper(spec.Location)
+
 	storageClass, ok := storageClassMapping[spec.StorageClass]
 	if !ok {
-		return nil, fmt.Errorf("spec.StroageClass %s doesnt map to any bucket StorageClass", spec.StorageClass)
+		return nil, fmt.Errorf("spec.StorageClass %s doesnt map to any bucket StorageClass", spec.StorageClass)
+	}
+
+	var publicAccessPrevention storage.PublicAccessPrevention
+	if spec.PublicAccessPrevention != nil {
+		publicAccessPrevention = publicAccessPreventionMapping[*spec.PublicAccessPrevention]
 	}
 
 	attrs, err := bucket.Attrs(ctx)
@@ -109,9 +122,18 @@ func (b *Bucket) EnsureBucket(ctx context.Context, spec vedrov1alpha1.BucketSpec
 			Location:     spec.Location,
 			StorageClass: storageClass,
 		}
+		appliedByCreate := vedrov1alpha1.BucketAppliedState{
+			StorageClass: spec.StorageClass,
+		}
 
 		if spec.Versioning != nil {
 			createAttrs.VersioningEnabled = spec.Versioning.Enabled
+			appliedByCreate.Versioning = spec.Versioning
+		}
+
+		if spec.PublicAccessPrevention != nil {
+			createAttrs.PublicAccessPrevention = publicAccessPrevention
+			appliedByCreate.PublicAccessPrevention = spec.PublicAccessPrevention
 		}
 
 		if err := bucket.Create(ctx, b.projectId, &createAttrs); err != nil {
@@ -121,6 +143,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, spec vedrov1alpha1.BucketSpec
 		return &cloud.BucketState{
 			ExternalName: spec.Name,
 			Location:     normalizedLocation,
+			Applied:      &appliedByCreate,
 		}, nil
 	}
 
@@ -138,15 +161,27 @@ func (b *Bucket) EnsureBucket(ctx context.Context, spec vedrov1alpha1.BucketSpec
 	}
 
 	updateAttrs := storage.BucketAttrsToUpdate{}
+	appliedByUpdate := vedrov1alpha1.BucketAppliedState{}
+	if status.Applied != nil {
+		appliedByUpdate = *status.Applied
+	}
 	needsUpdate := false
 
 	if spec.StorageClass != "" && attrs.StorageClass != storageClass {
 		updateAttrs.StorageClass = storageClass
+		appliedByUpdate.StorageClass = spec.StorageClass
 		needsUpdate = true
 	}
 
 	if spec.Versioning != nil && attrs.VersioningEnabled != spec.Versioning.Enabled {
 		updateAttrs.VersioningEnabled = spec.Versioning.Enabled
+		appliedByUpdate.Versioning = spec.Versioning
+		needsUpdate = true
+	}
+
+	if spec.PublicAccessPrevention != nil && attrs.PublicAccessPrevention != publicAccessPrevention {
+		updateAttrs.PublicAccessPrevention = publicAccessPrevention
+		appliedByUpdate.PublicAccessPrevention = spec.PublicAccessPrevention
 		needsUpdate = true
 	}
 
@@ -160,6 +195,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, spec vedrov1alpha1.BucketSpec
 	return &cloud.BucketState{
 		ExternalName: spec.Name,
 		Location:     attrs.Location,
+		Applied:      &appliedByUpdate,
 	}, nil
 }
 

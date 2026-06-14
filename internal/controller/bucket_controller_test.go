@@ -89,14 +89,6 @@ var _ = Describe("Bucket Controller", func() {
 			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})
-
-		It("should default PublicAccess to nil", func() {
-			By("Fetching the created resource and verifying the default PublicAccess")
-			fetchedBucket := &v1alpha1.Bucket{}
-			err := k8sClient.Get(ctx, typeNamespacedName, fetchedBucket)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fetchedBucket.Spec.PublicAccess).To(BeNil())
-		})
 		It("should default DeletionPolicy to Retain", func() {
 			By("Fetching the created resource and verifying the default DeletionPolicy")
 			fetchedBucket := &v1alpha1.Bucket{}

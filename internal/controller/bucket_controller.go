@@ -165,7 +165,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	//Ensure that spec and bucket match
-	result, err := provider.Bucket().EnsureBucket(ctx, bucket.Spec)
+	result, err := provider.Bucket().EnsureBucket(ctx, bucket.Bucket)
 
 	if err != nil {
 		log.Error(err, "EnsureBucket failed")
@@ -189,6 +189,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
 		b.Status.ExternalName = result.ExternalName
 		b.Status.Location = result.Location
+		b.Status.Applied = result.Applied
 		b.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
 		b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 		meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)

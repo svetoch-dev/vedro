@@ -11,10 +11,9 @@ spec:
     name: providerconfig-sample-gcp
 
   location: europe-west1
-  name: app-logs-dev
 
   deletionPolicy: Retain
-  publicAccess: false
+  publicAccessPrevention: false
 
   versioning:
     enabled: true

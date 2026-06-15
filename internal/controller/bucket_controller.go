@@ -66,11 +66,6 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ReconcileIgnoreNotFound(ctx, bucket.Error, "unable to fetch bucket")
 	}
 
-	// If Name in spec is not set, use the resource name.
-	if bucket.Spec.Name == "" {
-		bucket.Spec.Name = bucket.Name
-	}
-
 	providerConfig := resolvers.ProviderConfigResolver{
 		KubeClient: r.Client,
 		Log:        log,
@@ -148,7 +143,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	//check that spec is valid
-	validationResult := provider.Bucket().ValidateBucketSpec(bucket.Spec)
+	validationResult := provider.Bucket().ValidateBucketSpec(bucket.Bucket)
 
 	if !validationResult.Valid {
 		log.Info("spec is invalid")

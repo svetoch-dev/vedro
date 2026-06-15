@@ -33,7 +33,7 @@ type BucketCapabilities struct {
 }
 
 type BucketProvider interface {
-	ValidateBucketSpec(spec vedrov1alpha1.BucketSpec) validation.ValidationResult
+	ValidateBucketSpec(spec vedrov1alpha1.Bucket) validation.ValidationResult
 
 	EnsureBucket(
 		ctx context.Context,

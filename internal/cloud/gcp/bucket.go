@@ -80,8 +80,12 @@ func validateBucketName(name string) validation.ValidationResult {
 	return valid()
 }
 
-func setGCSLabels(desiredLabels map[string]string, setLabels map[string]string, attrs *storage.BucketAttrsToUpdate) {
-	if desiredLabels == nil {
+func setGCSLabels(
+	desiredLabels map[string]string,
+	actualLabels map[string]string,
+	attrs *storage.BucketAttrsToUpdate,
+) {
+	if attrs == nil {
 		return
 	}
 
@@ -89,27 +93,34 @@ func setGCSLabels(desiredLabels map[string]string, setLabels map[string]string, 
 		attrs.SetLabel(k, v)
 	}
 
-	if setLabels == nil {
-		return
-	}
-
-	for sk, _ := range setLabels {
-		found := false
-		for dk, _ := range desiredLabels {
-			if sk == dk {
-				found = true
-				break
-			}
-		}
-		if !found {
-			attrs.DeleteLabel(sk)
+	for k := range actualLabels {
+		if _, ok := desiredLabels[k]; !ok {
+			attrs.DeleteLabel(k)
 		}
 	}
+}
 
+// Abstraction for tests
+type storageClient interface {
+	Bucket(name string) bucketHandle
+}
+
+type bucketHandle interface {
+	Attrs(ctx context.Context) (*storage.BucketAttrs, error)
+	Create(ctx context.Context, projectID string, attrs *storage.BucketAttrs) error
+	Update(ctx context.Context, uattrs storage.BucketAttrsToUpdate) (*storage.BucketAttrs, error)
+}
+
+type storageClientAdapter struct {
+	client *storage.Client
+}
+
+func (a *storageClientAdapter) Bucket(name string) bucketHandle {
+	return a.client.Bucket(name)
 }
 
 type Bucket struct {
-	client    *storage.Client
+	client    storageClient
 	projectId string
 }
 
@@ -140,13 +151,11 @@ func (b *Bucket) ValidateBucketSpec(bckt vedrov1alpha1.Bucket) validation.Valida
 func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*cloud.BucketState, error) {
 	spec := bckt.Spec
 	status := bckt.Status
-
 	bucketName := helpers.BucketNameFromCR(bckt)
 
 	bucket := b.client.Bucket(bucketName)
 
 	normalizedLocation := strings.ToUpper(spec.Location)
-
 	storageClass, ok := storageClassMapping[spec.StorageClass]
 	if !ok {
 		return nil, fmt.Errorf("spec.StorageClass %s doesnt map to any bucket StorageClass", spec.StorageClass)
@@ -157,6 +166,11 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 		publicAccessPrevention = publicAccessPreventionMapping[*spec.PublicAccessPrevention]
 	}
 
+	applied := vedrov1alpha1.BucketAppliedState{}
+	if status.Applied != nil {
+		applied = *status.Applied
+	}
+
 	attrs, err := bucket.Attrs(ctx)
 
 	if errors.Is(err, storage.ErrBucketNotExist) {
@@ -164,23 +178,21 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 			Location:     spec.Location,
 			StorageClass: storageClass,
 		}
-		appliedByCreate := vedrov1alpha1.BucketAppliedState{
-			StorageClass: spec.StorageClass,
-		}
+		applied.StorageClass = spec.StorageClass
 
-		if spec.Labels != nil {
+		if len(spec.Labels) > 0 {
 			createAttrs.Labels = spec.Labels
-			appliedByCreate.Labels = spec.Labels
+			applied.Labels = spec.Labels
 		}
 
 		if spec.Versioning != nil {
 			createAttrs.VersioningEnabled = spec.Versioning.Enabled
-			appliedByCreate.Versioning = spec.Versioning
+			applied.Versioning = spec.Versioning
 		}
 
 		if spec.PublicAccessPrevention != nil {
 			createAttrs.PublicAccessPrevention = publicAccessPrevention
-			appliedByCreate.PublicAccessPrevention = spec.PublicAccessPrevention
+			applied.PublicAccessPrevention = spec.PublicAccessPrevention
 		}
 
 		if err := bucket.Create(ctx, b.projectId, &createAttrs); err != nil {
@@ -190,7 +202,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 		return &cloud.BucketState{
 			ExternalName: bucketName,
 			Location:     normalizedLocation,
-			Applied:      &appliedByCreate,
+			Applied:      &applied,
 		}, nil
 	}
 
@@ -208,33 +220,29 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 	}
 
 	updateAttrs := storage.BucketAttrsToUpdate{}
-	appliedByUpdate := vedrov1alpha1.BucketAppliedState{}
-	if status.Applied != nil {
-		appliedByUpdate = *status.Applied
-	}
 	needsUpdate := false
 
-	if spec.Labels != nil && !maps.Equal(attrs.Labels, spec.Labels) {
-		setGCSLabels(spec.Labels, status.Applied.Labels, &updateAttrs)
-		appliedByUpdate.Labels = spec.Labels
+	if !maps.Equal(applied.Labels, spec.Labels) {
+		setGCSLabels(spec.Labels, applied.Labels, &updateAttrs)
+		applied.Labels = spec.Labels
 		needsUpdate = true
 	}
 
-	if spec.StorageClass != "" && attrs.StorageClass != storageClass {
+	if attrs.StorageClass != storageClass {
 		updateAttrs.StorageClass = storageClass
-		appliedByUpdate.StorageClass = spec.StorageClass
+		applied.StorageClass = spec.StorageClass
 		needsUpdate = true
 	}
 
 	if spec.Versioning != nil && attrs.VersioningEnabled != spec.Versioning.Enabled {
 		updateAttrs.VersioningEnabled = spec.Versioning.Enabled
-		appliedByUpdate.Versioning = spec.Versioning
+		applied.Versioning = spec.Versioning
 		needsUpdate = true
 	}
 
 	if spec.PublicAccessPrevention != nil && attrs.PublicAccessPrevention != publicAccessPrevention {
 		updateAttrs.PublicAccessPrevention = publicAccessPrevention
-		appliedByUpdate.PublicAccessPrevention = spec.PublicAccessPrevention
+		applied.PublicAccessPrevention = spec.PublicAccessPrevention
 		needsUpdate = true
 	}
 
@@ -248,7 +256,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 	return &cloud.BucketState{
 		ExternalName: bucketName,
 		Location:     attrs.Location,
-		Applied:      &appliedByUpdate,
+		Applied:      &applied,
 	}, nil
 }
 

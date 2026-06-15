@@ -165,8 +165,6 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 	var publicAccessPrevention storage.PublicAccessPrevention
 	if spec.PublicAccessPrevention != nil {
 		publicAccessPrevention = publicAccessPreventionMapping[*spec.PublicAccessPrevention]
-	} else {
-		publicAccessPrevention = publicAccessPreventionMapping[false]
 	}
 
 	var versioning bool
@@ -195,10 +193,12 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 		applied.Labels = spec.Labels
 
 		createAttrs.VersioningEnabled = versioning
-		applied.Versioning = spec.Versioning
+		applied.Versioning = &vedrov1alpha1.BucketVersioningSpec{Enabled: versioning}
 
-		createAttrs.PublicAccessPrevention = publicAccessPrevention
-		applied.PublicAccessPrevention = spec.PublicAccessPrevention
+		if spec.PublicAccessPrevention != nil {
+			createAttrs.PublicAccessPrevention = publicAccessPrevention
+			applied.PublicAccessPrevention = spec.PublicAccessPrevention
+		}
 
 		if err := bucket.Create(ctx, b.projectId, &createAttrs); err != nil {
 			return nil, fmt.Errorf("create bucket %q: %w", bucketName, err)
@@ -241,11 +241,11 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 
 	if attrs.VersioningEnabled != versioning {
 		updateAttrs.VersioningEnabled = versioning
-		applied.Versioning = spec.Versioning
+		applied.Versioning = &vedrov1alpha1.BucketVersioningSpec{Enabled: versioning}
 		needsUpdate = true
 	}
 
-	if attrs.PublicAccessPrevention != publicAccessPrevention {
+	if spec.PublicAccessPrevention != nil && attrs.PublicAccessPrevention != publicAccessPrevention {
 		updateAttrs.PublicAccessPrevention = publicAccessPrevention
 		applied.PublicAccessPrevention = spec.PublicAccessPrevention
 		needsUpdate = true

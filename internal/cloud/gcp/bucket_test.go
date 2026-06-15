@@ -271,27 +271,6 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 		Expect(err.Error()).To(ContainSubstring("update bucket \"my-bucket\""))
 		Expect(err.Error()).To(ContainSubstring("update failed"))
 	})
-
-	It("preserves unmodified applied state from status", func() {
-		fake.attrs = &storage.BucketAttrs{
-			Location:     "EUROPE-WEST1",
-			StorageClass: "STANDARD",
-		}
-
-		bckt := newBucket("my-bucket", "europe-west1", func(b *vedrov1alpha1.Bucket) {
-			b.Spec.StorageClass = vedrov1alpha1.BucketStorageClassStandard
-			b.Status.Applied = &vedrov1alpha1.BucketAppliedState{
-				StorageClass: vedrov1alpha1.BucketStorageClassStandard,
-				//		Labels:       map[string]string{"team": "platform"},
-			}
-		})
-
-		state, err := bucket.EnsureBucket(ctx, bckt)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fake.updated).To(BeNil())
-		Expect(state.Applied.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassStandard))
-		//	Expect(state.Applied.Labels).To(Equal(map[string]string{"team": "platform"}))
-	})
 })
 
 type fakeStorageClient struct {

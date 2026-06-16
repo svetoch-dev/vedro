@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: gramal/vedro
-  newTag: v0.0.17-9
+  newTag: v0.0.17-10

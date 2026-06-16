@@ -222,10 +222,14 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 		Expect(lErr).NotTo(HaveOccurred())
 		Expect(gcsLifeCycle.Rules).NotTo(BeEmpty())
 
+		actualLifeCycle := gcsLifeCycle
+		actualLifeCycle.Rules = make([]storage.LifecycleRule, len(gcsLifeCycle.Rules))
+		copy(actualLifeCycle.Rules, gcsLifeCycle.Rules)
+
 		fake.attrs = &storage.BucketAttrs{
 			Location:     "EUROPE-WEST1",
 			StorageClass: "STANDARD",
-			Lifecycle:    gcsLifeCycle,
+			Lifecycle:    actualLifeCycle,
 		}
 
 		fake.attrs.Lifecycle.Rules[0].Condition.AgeInDays = int64(100000)

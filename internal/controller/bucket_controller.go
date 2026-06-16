@@ -26,11 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -262,7 +260,6 @@ func (r *BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
 			&vedrov1alpha1.Bucket{},
-			builder.WithPredicates(predicate.GenerationChangedPredicate{}), //Reconcile only when generation changes
 		).
 		Watches(
 			//Watch ProviderConfig for changes and queue events for

@@ -13,3 +13,7 @@ func BucketNameFromCR(bckt vedrov1alpha1.Bucket) string {
 
 	return bucketName
 }
+
+func Ptr[T interface{}](v T) *T {
+	return &v
+}

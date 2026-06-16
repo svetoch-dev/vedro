@@ -85,7 +85,7 @@ spec:
                         ageDays:
                           description: AgeDays matches objects older than this many
                             days.
-                          format: int32
+                          format: int64
                           minimum: 1
                           type: integer
                         enabled:
@@ -98,8 +98,8 @@ spec:
                           minLength: 1
                           type: string
                       required:
+                      - action
                       - enabled
-                      - name
                       type: object
                     type: array
                 type: object
@@ -184,7 +184,7 @@ spec:
                             ageDays:
                               description: AgeDays matches objects older than this
                                 many days.
-                              format: int32
+                              format: int64
                               minimum: 1
                               type: integer
                             enabled:
@@ -197,8 +197,8 @@ spec:
                               minLength: 1
                               type: string
                           required:
+                          - action
                           - enabled
-                          - name
                           type: object
                         type: array
                     type: object

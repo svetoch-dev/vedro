@@ -64,20 +64,20 @@ type BucketLifecycleRule struct {
 	// Name is a stable identifier for this lifecycle rule.
 	//
 	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
+	// +optional
+	Name string `json:"name,omitempty"`
 
 	// Enabled controls whether this lifecycle rule should be active.
 	Enabled bool `json:"enabled"`
 
 	// AgeDays matches objects older than this many days.
 	//
-	// +optional
 	// +kubebuilder:validation:Minimum=1
-	AgeDays *int32 `json:"ageDays"`
+	// +optional
+	AgeDays *int64 `json:"ageDays"`
 
 	// Action describes what happens to matching objects.
 	//
-	// +optional
 	// +kubebuilder:validation:Enum=Delete
 	Action BucketLifecycleAction `json:"action"`
 }

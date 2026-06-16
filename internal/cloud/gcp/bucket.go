@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -29,6 +30,9 @@ var (
 	publicAccessPreventionMapping = map[bool]storage.PublicAccessPrevention{
 		false: storage.PublicAccessPreventionInherited,
 		true:  storage.PublicAccessPreventionEnforced,
+	}
+	lifeCycleMapping = map[vedrov1alpha1.BucketLifecycleAction]string{
+		vedrov1alpha1.BucketLifecycleActionDelete: storage.DeleteAction,
 	}
 )
 
@@ -98,6 +102,46 @@ func setGCSLabels(
 			attrs.DeleteLabel(k)
 		}
 	}
+}
+
+func convertToGCSLifeCycle(lifeCycle vedrov1alpha1.BucketLifecycleSpec) (storage.Lifecycle, error) {
+	gcsLifeCycle := storage.Lifecycle{}
+
+	for index, rule := range lifeCycle.Rules {
+		if !rule.Enabled {
+			continue
+		}
+
+		actionType, ok := lifeCycleMapping[rule.Action]
+		if !ok {
+			return gcsLifeCycle, fmt.Errorf(
+				"lifecycle.rules[%d].action %s doesn't map to any GCS lifecycle action",
+				index,
+				rule.Action,
+			)
+		}
+
+		gcsAction := storage.LifecycleAction{
+			Type: actionType,
+		}
+
+		var condition *storage.LifecycleCondition
+
+		if rule.AgeDays != nil {
+			condition = &storage.LifecycleCondition{
+				AgeInDays: *rule.AgeDays,
+			}
+		}
+
+		if condition != nil {
+			gcsLifeCycle.Rules = append(gcsLifeCycle.Rules, storage.LifecycleRule{
+				Action:    gcsAction,
+				Condition: *condition,
+			})
+		}
+	}
+
+	return gcsLifeCycle, nil
 }
 
 // Abstraction for tests
@@ -174,6 +218,16 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 		versioning = false
 	}
 
+	var gcsLifeCycle storage.Lifecycle
+
+	if spec.Lifecycle != nil {
+		var err error
+		gcsLifeCycle, err = convertToGCSLifeCycle(*spec.Lifecycle)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	applied := vedrov1alpha1.BucketAppliedState{}
 	if status.Applied != nil {
 		applied = *status.Applied
@@ -183,17 +237,18 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 
 	if errors.Is(err, storage.ErrBucketNotExist) {
 		createAttrs := storage.BucketAttrs{
-			Location:     spec.Location,
-			StorageClass: storageClass,
+			Location:          spec.Location,
+			StorageClass:      storageClass,
+			Labels:            spec.Labels,
+			VersioningEnabled: versioning,
 		}
 
 		applied.StorageClass = spec.StorageClass
-
-		createAttrs.Labels = spec.Labels
 		applied.Labels = spec.Labels
-
-		createAttrs.VersioningEnabled = versioning
 		applied.Versioning = &vedrov1alpha1.BucketVersioningSpec{Enabled: versioning}
+
+		createAttrs.Lifecycle = gcsLifeCycle
+		applied.Lifecycle = spec.Lifecycle
 
 		if spec.PublicAccessPrevention != nil {
 			createAttrs.PublicAccessPrevention = publicAccessPrevention
@@ -248,6 +303,12 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 	if spec.PublicAccessPrevention != nil && attrs.PublicAccessPrevention != publicAccessPrevention {
 		updateAttrs.PublicAccessPrevention = publicAccessPrevention
 		applied.PublicAccessPrevention = spec.PublicAccessPrevention
+		needsUpdate = true
+	}
+
+	if !reflect.DeepEqual(gcsLifeCycle, attrs.Lifecycle) {
+		updateAttrs.Lifecycle = &gcsLifeCycle
+		applied.Lifecycle = spec.Lifecycle
 		needsUpdate = true
 	}
 

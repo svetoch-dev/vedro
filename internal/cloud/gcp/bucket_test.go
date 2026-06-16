@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"errors"
+	"reflect"
 
 	"cloud.google.com/go/storage"
 	. "github.com/onsi/ginkgo/v2"
@@ -10,7 +11,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	"github.com/svetoch-dev/vedro/internal/helpers"
 )
+
+var lifecycle = vedrov1alpha1.BucketLifecycleSpec{
+	Rules: []vedrov1alpha1.BucketLifecycleRule{
+		vedrov1alpha1.BucketLifecycleRule{
+			Enabled: true,
+			AgeDays: helpers.Ptr(int64(2)),
+			Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+		},
+	},
+}
 
 var _ = Describe("Bucket.EnsureBucket", func() {
 	var (
@@ -72,15 +84,22 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.Labels = map[string]string{"env": "prod"}
 			b.Spec.Versioning = &vedrov1alpha1.BucketVersioningSpec{Enabled: true}
 			b.Spec.PublicAccessPrevention = &publicAccessPrevention
+			b.Spec.Lifecycle = &lifecycle
 		})
 
 		state, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
+
+		gcsLifeCycle, lErr := convertToGCSLifeCycle(lifecycle)
+		Expect(lErr).NotTo(HaveOccurred())
+		Expect(gcsLifeCycle.Rules).NotTo(BeEmpty())
+
 		Expect(fake.created).NotTo(BeNil())
 		Expect(fake.created.Location).To(Equal("us-central1"))
 		Expect(fake.created.StorageClass).To(Equal("ARCHIVE"))
 		Expect(fake.created.Labels).To(Equal(map[string]string{"env": "prod"}))
 		Expect(fake.created.VersioningEnabled).To(BeTrue())
+		Expect(reflect.DeepEqual(fake.created.Lifecycle, gcsLifeCycle)).To(BeTrue())
 		Expect(fake.created.PublicAccessPrevention).To(Equal(storage.PublicAccessPreventionEnforced))
 		Expect(state.Applied.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassArchive))
 		Expect(state.Applied.Labels).To(Equal(map[string]string{"env": "prod"}))
@@ -175,6 +194,52 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 		Expect(fake.updated).NotTo(BeNil())
 		Expect(fake.updated.StorageClass).To(Equal("NEARLINE"))
 		Expect(state.Applied.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassInfrequentAccess))
+	})
+	It("updates lifecycle when its empty", func() {
+		gcsLifeCycle, lErr := convertToGCSLifeCycle(lifecycle)
+		Expect(lErr).NotTo(HaveOccurred())
+		Expect(gcsLifeCycle.Rules).NotTo(BeEmpty())
+
+		fake.attrs = &storage.BucketAttrs{
+			Location:     "EUROPE-WEST1",
+			StorageClass: "STANDARD",
+			//Lifecycle: gcsLifeCycle,
+		}
+
+		bckt := newBucket("my-bucket", "europe-west1", func(b *vedrov1alpha1.Bucket) {
+			b.Spec.StorageClass = vedrov1alpha1.BucketStorageClassStandard
+			b.Spec.Lifecycle = &lifecycle
+		})
+
+		state, err := bucket.EnsureBucket(ctx, bckt)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fake.updated).NotTo(BeNil())
+		Expect(reflect.DeepEqual(*fake.updated.Lifecycle, gcsLifeCycle)).To(BeTrue())
+		Expect(reflect.DeepEqual(*state.Applied.Lifecycle, lifecycle)).To(BeTrue())
+	})
+	It("updates lifecycle when it differs", func() {
+		gcsLifeCycle, lErr := convertToGCSLifeCycle(lifecycle)
+		Expect(lErr).NotTo(HaveOccurred())
+		Expect(gcsLifeCycle.Rules).NotTo(BeEmpty())
+
+		fake.attrs = &storage.BucketAttrs{
+			Location:     "EUROPE-WEST1",
+			StorageClass: "STANDARD",
+			Lifecycle:    gcsLifeCycle,
+		}
+
+		fake.attrs.Lifecycle.Rules[0].Condition.AgeInDays = int64(100000)
+
+		bckt := newBucket("my-bucket", "europe-west1", func(b *vedrov1alpha1.Bucket) {
+			b.Spec.StorageClass = vedrov1alpha1.BucketStorageClassStandard
+			b.Spec.Lifecycle = &lifecycle
+		})
+
+		state, err := bucket.EnsureBucket(ctx, bckt)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fake.updated).NotTo(BeNil())
+		Expect(reflect.DeepEqual(*fake.updated.Lifecycle, gcsLifeCycle)).To(BeTrue())
+		Expect(reflect.DeepEqual(*state.Applied.Lifecycle, lifecycle)).To(BeTrue())
 	})
 
 	It("updates versioning when it differs", func() {
@@ -323,6 +388,10 @@ func (f *fakeBucketHandle) Update(ctx context.Context, uattrs storage.BucketAttr
 		}
 		if uattrs.PublicAccessPrevention != storage.PublicAccessPreventionUnknown {
 			f.attrs.PublicAccessPrevention = uattrs.PublicAccessPrevention
+		}
+
+		if uattrs.Lifecycle != nil {
+			f.attrs.Lifecycle = *uattrs.Lifecycle
 		}
 	}
 

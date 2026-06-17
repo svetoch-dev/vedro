@@ -479,6 +479,132 @@ var _ = Describe("Bucket.DeleteBucket", func() {
 	})
 })
 
+var _ = Describe("Bucket.ValidateBucketSpec", func() {
+	var bucket *Bucket
+
+	BeforeEach(func() {
+		bucket = &Bucket{}
+	})
+
+	It("returns valid for a correct bucket spec", func() {
+		bckt := newTestBucket("my-bucket", "europe-west1")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeTrue())
+	})
+
+	It("returns valid when spec.name is used", func() {
+		bckt := newTestBucket("cr-name", "us-central1", func(b *vedrov1alpha1.Bucket) {
+			b.Spec.Name = "actual-bucket-name"
+		})
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeTrue())
+	})
+
+	It("returns an error when spec.name is changed after creation", func() {
+		bckt := newTestBucket("cr-name", "us-central1", func(b *vedrov1alpha1.Bucket) {
+			b.Spec.Name = "new-name"
+			b.Status.ExternalName = "old-name"
+		})
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("spec.name cannot be changed"))
+	})
+
+	It("returns an error when metadata.name is used after spec.name was used", func() {
+		bckt := newTestBucket("cr-name", "us-central1", func(b *vedrov1alpha1.Bucket) {
+			b.Spec.Name = ""
+			b.Status.ExternalName = "old-spec-name"
+		})
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("metadata.name cannot be used"))
+	})
+
+	It("returns an error when location is empty", func() {
+		bckt := newTestBucket("my-bucket", "")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("location is an empty string"))
+	})
+
+	It("returns an error for an unsupported location", func() {
+		bckt := newTestBucket("my-bucket", "mars")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("unsupported bucket location"))
+	})
+
+	It("accepts multi-region locations", func() {
+		bckt := newTestBucket("my-bucket", "us")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeTrue())
+	})
+
+	It("accepts dual-region locations", func() {
+		bckt := newTestBucket("my-bucket", "NAM4")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeTrue())
+	})
+
+	It("returns an error when the bucket name is too short", func() {
+		bckt := newTestBucket("ab", "europe-west1")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("bucket name must be 3-63 characters"))
+	})
+
+	It("returns an error when the bucket name contains uppercase letters", func() {
+		bckt := newTestBucket("My-Bucket", "europe-west1")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("bucket name must be 3-63 characters"))
+	})
+
+	It("returns an error when the bucket name contains consecutive dots", func() {
+		bckt := newTestBucket("my..bucket", "europe-west1")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("consecutive dots"))
+	})
+
+	It("returns an error when the bucket name has dots next to dashes", func() {
+		bckt := newTestBucket("my.-bucket", "europe-west1")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("dots next to dashes"))
+	})
+
+	It("returns an error when the bucket name uses a reserved google prefix", func() {
+		bckt := newTestBucket("google-bucket", "europe-west1")
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("reserved Google-related names"))
+	})
+
+	It("returns an error when spec.name is invalid", func() {
+		bckt := newTestBucket("cr-name", "europe-west1", func(b *vedrov1alpha1.Bucket) {
+			b.Spec.Name = "INVALID"
+		})
+
+		result := bucket.ValidateBucketSpec(bckt)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("bucket name must be 3-63 characters"))
+	})
+})
+
 type fakeStorageClient struct {
 	bucket bucketHandle
 }

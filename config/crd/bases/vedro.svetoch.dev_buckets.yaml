@@ -20,7 +20,7 @@ spec:
     - jsonPath: .spec.providerRef.name
       name: Provider
       type: string
-    - jsonPath: .spec.name
+    - jsonPath: .status.externalName
       name: Bucket
       type: string
     - jsonPath: .spec.location

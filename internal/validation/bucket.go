@@ -8,7 +8,9 @@ import (
 )
 
 var (
-	regionalPattern = regexp.MustCompile(`^[A-Z]+-[A-Z]+[0-9]+$`)
+	// Matches regional names like europe-west1, us-central1, us-east-1, cn-hongkong
+	regionalPattern   = regexp.MustCompile(`^[a-z]+(?:-[a-z]+)*(?:-?[0-9]+)?$`)
+	bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
 )
 
 func ValidateBucketNameImmutability(bckt vedrov1alpha1.Bucket) ValidationResult {
@@ -26,23 +28,49 @@ func ValidateBucketNameImmutability(bckt vedrov1alpha1.Bucket) ValidationResult 
 	return Valid()
 }
 
-func ValidateBucketLocation(location string, fn func(location string) ValidationResult) ValidationResult {
+func ValidateBucketLocation(location string, fn func(location string) *ValidationResult) ValidationResult {
 	if location == "" {
-		return invalid("location is an empty string")
-	}
-
-	normalized := strings.ToUpper(location)
-
-	// Allow normal regional names like europe-west1, us-central1.
-	if !regionalPattern.MatchString(normalized) {
-		return invalid("unsupported bucket location")
+		return Invalid("location is an empty string")
 	}
 
 	// per provider validation
 	v := fn(location)
 
-	if v.Valid {
-		return v
+	if v != nil {
+		return *v
 	}
 
+	if !regionalPattern.MatchString(location) {
+		return Invalid("unsupported bucket location")
+	}
+
+	return Valid()
+}
+
+func ValidateBucketName(name string, fn func(name string) *ValidationResult) ValidationResult {
+	if name == "" {
+		return Invalid("name is an empty string")
+	}
+
+	v := fn(name)
+
+	if v != nil {
+		return *v
+	}
+
+	if !bucketNamePattern.MatchString(name) {
+		return Invalid(
+			"bucket name must be 3-63 characters, contain only lowercase letters, numbers, dots, underscores, and dashes, and start/end with a letter or number",
+		)
+	}
+
+	if strings.Contains(name, "..") {
+		return Invalid("bucket name must not contain consecutive dots")
+	}
+
+	if strings.Contains(name, ".-") || strings.Contains(name, "-.") {
+		return Invalid("bucket name must not contain dots next to dashes")
+	}
+
+	return Valid()
 }

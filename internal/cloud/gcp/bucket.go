@@ -22,11 +22,8 @@ import (
 )
 
 var (
-	invalid             = validation.Invalid
-	valid               = validation.Valid
-	regionalPattern     = regexp.MustCompile(`^[A-Z]+-[A-Z]+[0-9]+$`)
 	dualRegionPattern   = regexp.MustCompile(`^[A-Z]+[0-9]+$`)
-	bucketNamePattern   = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
+	regionalPattern     = regexp.MustCompile(`^[a-z]+(-[a-z]+)+[0-9]+$`)
 	storageClassMapping = map[vedrov1alpha1.BucketStorageClass]string{
 		vedrov1alpha1.BucketStorageClassStandard:         "STANDARD",
 		vedrov1alpha1.BucketStorageClassInfrequentAccess: "NEARLINE",
@@ -41,52 +38,39 @@ var (
 	}
 )
 
-func validateBucketLocation(location string) validation.ValidationResult {
-	if location == "" {
-		return invalid("location is an empty string")
-	}
-
+func validateGCSLocation(location string) *validation.ValidationResult {
 	normalized := strings.ToUpper(location)
 
 	// Known multi-regions.
 	switch normalized {
 	case "US", "EU", "ASIA":
-		return valid()
-	}
-
-	// Allow normal regional names like europe-west1, us-central1.
-	if regionalPattern.MatchString(normalized) {
-		return valid()
+		v := validation.Valid()
+		return &v
 	}
 
 	// Allow predefined dual-region IDs like NAM4, EUR4, ASIA1.
 	if dualRegionPattern.MatchString(normalized) {
-		return valid()
+		v := validation.Valid()
+		return &v
 	}
 
-	return invalid("unsupported bucket location")
+	// Allow regional locations like europe-west1, us-central1.
+	if regionalPattern.MatchString(location) {
+		v := validation.Valid()
+		return &v
+	}
+
+	v := validation.Invalid("unsupported bucket location")
+	return &v
 }
 
-func validateBucketName(name string) validation.ValidationResult {
-	if !bucketNamePattern.MatchString(name) {
-		return invalid(
-			"bucket name must be 3-63 characters, contain only lowercase letters, numbers, dots, underscores, and dashes, and start/end with a letter or number",
-		)
-	}
-
-	if strings.Contains(name, "..") {
-		return invalid("bucket name must not contain consecutive dots")
-	}
-
-	if strings.Contains(name, ".-") || strings.Contains(name, "-.") {
-		return invalid("bucket name must not contain dots next to dashes")
-	}
-
+func validateGCSName(name string) *validation.ValidationResult {
 	if strings.HasPrefix(name, "goog") || strings.Contains(name, "google") {
-		return invalid("bucket name must not use reserved Google-related names")
+		v := validation.Invalid("bucket name must not use reserved Google-related names")
+		return &v
 	}
 
-	return valid()
+	return nil
 }
 
 func setGCSLabels(
@@ -234,19 +218,19 @@ func (b *Bucket) ValidateBucketSpec(bckt vedrov1alpha1.Bucket) validation.Valida
 		return v
 	}
 
-	v = validateBucketLocation(spec.Location)
+	v = validation.ValidateBucketLocation(spec.Location, validateGCSLocation)
 
 	if !v.Valid {
 		return v
 	}
 
 	bucketName := helpers.BucketNameFromCR(bckt)
-	v = validateBucketName(bucketName)
+	v = validation.ValidateBucketName(bucketName, validateGCSName)
 	if !v.Valid {
 		return v
 	}
 
-	return valid()
+	return validation.Valid()
 }
 
 func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*cloud.BucketState, error) {

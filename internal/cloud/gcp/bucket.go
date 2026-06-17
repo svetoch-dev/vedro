@@ -158,9 +158,18 @@ type bucketHandle interface {
 	Attrs(ctx context.Context) (*storage.BucketAttrs, error)
 	Create(ctx context.Context, projectID string, attrs *storage.BucketAttrs) error
 	Update(ctx context.Context, uattrs storage.BucketAttrsToUpdate) (*storage.BucketAttrs, error)
-	Objects(ctx context.Context, q *storage.Query) *storage.ObjectIterator
+	Objects(ctx context.Context, q *storage.Query) objectIterator
 	Delete(ctx context.Context) error
-	Object(name string) *storage.ObjectHandle
+	Object(name string) objectHandle
+}
+
+type objectHandle interface {
+	Generation(gen int64) objectHandle
+	Delete(ctx context.Context) error
+}
+
+type objectIterator interface {
+	Next() (*storage.ObjectAttrs, error)
 }
 
 type storageClientAdapter struct {
@@ -168,7 +177,47 @@ type storageClientAdapter struct {
 }
 
 func (a *storageClientAdapter) Bucket(name string) bucketHandle {
-	return a.client.Bucket(name)
+	return &realBucketHandle{bh: a.client.Bucket(name)}
+}
+
+type realBucketHandle struct {
+	bh *storage.BucketHandle
+}
+
+func (r *realBucketHandle) Attrs(ctx context.Context) (*storage.BucketAttrs, error) {
+	return r.bh.Attrs(ctx)
+}
+
+func (r *realBucketHandle) Create(ctx context.Context, projectID string, attrs *storage.BucketAttrs) error {
+	return r.bh.Create(ctx, projectID, attrs)
+}
+
+func (r *realBucketHandle) Update(ctx context.Context, uattrs storage.BucketAttrsToUpdate) (*storage.BucketAttrs, error) {
+	return r.bh.Update(ctx, uattrs)
+}
+
+func (r *realBucketHandle) Objects(ctx context.Context, q *storage.Query) objectIterator {
+	return r.bh.Objects(ctx, q)
+}
+
+func (r *realBucketHandle) Delete(ctx context.Context) error {
+	return r.bh.Delete(ctx)
+}
+
+func (r *realBucketHandle) Object(name string) objectHandle {
+	return &realObjectHandle{oh: r.bh.Object(name)}
+}
+
+type realObjectHandle struct {
+	oh *storage.ObjectHandle
+}
+
+func (r *realObjectHandle) Generation(gen int64) objectHandle {
+	return &realObjectHandle{oh: r.oh.Generation(gen)}
+}
+
+func (r *realObjectHandle) Delete(ctx context.Context) error {
+	return r.oh.Delete(ctx)
 }
 
 type Bucket struct {

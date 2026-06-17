@@ -9,8 +9,7 @@ metadata:
 spec:
   providerRef:
     name: providerconfig-sample-gcp
-
-  location: europe-west1
+  location: europe-west-1
 
   deletionPolicy: Retain
   publicAccessPrevention: false

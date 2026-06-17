@@ -185,7 +185,7 @@ type BucketStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced,categories=vedro
 // +kubebuilder:printcolumn:name="Provider",type=string,JSONPath=`.spec.providerRef.name`
-// +kubebuilder:printcolumn:name="Bucket",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="Bucket",type=string,JSONPath=`.status.externalName`
 // +kubebuilder:printcolumn:name="Location",type=string,JSONPath=`.spec.location`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`

@@ -4,8 +4,11 @@ go 1.26.0
 
 require (
 	cloud.google.com/go/storage v1.62.3
+	github.com/gammazero/workerpool v1.2.1
+	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
+	google.golang.org/api v0.274.0
 	k8s.io/api v0.33.12
 	k8s.io/apimachinery v0.33.12
 	k8s.io/client-go v0.33.12
@@ -38,9 +41,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.1 // indirect
 	github.com/gammazero/deque v1.2.1 // indirect
-	github.com/gammazero/workerpool v1.2.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
-	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.2 // indirect
@@ -112,7 +113,6 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.45.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
-	google.golang.org/api v0.274.0 // indirect
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect

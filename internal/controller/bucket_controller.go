@@ -161,6 +161,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err := r.Update(ctx, &bucket.Bucket); err != nil {
 			return ReconcileError(ctx, err, "remove finalizer error")
 		}
+		return Reconciled()
 	}
 
 	//check bucket capabilities

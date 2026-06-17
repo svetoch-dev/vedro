@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,21 +28,26 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/capabilities"
+	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	"github.com/svetoch-dev/vedro/internal/resolvers"
 )
 
+const bucketFinalizer = "bucket.vedro.svetoch.dev/finalizer"
+
 // BucketReconciler reconciles a Bucket object
 type BucketReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	provider cloud.Provider
 }
 
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=buckets,verbs=get;list;watch;create;update;patch;delete
@@ -49,7 +55,6 @@ type BucketReconciler struct {
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=buckets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=providerconfigs,verbs=get;list;watch
 func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
 	log := log.FromContext(ctx)
 	bucket := resolvers.BucketResolver{
 		KubeClient: r.Client,
@@ -62,6 +67,13 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if !bucket.IsOk() {
 		return ReconcileIgnoreNotFound(ctx, bucket.Error, "unable to fetch bucket")
+	}
+
+	if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
+		controllerutil.AddFinalizer(&bucket.Bucket, bucketFinalizer)
+		if err := r.Update(ctx, &bucket.Bucket); err != nil {
+			return ReconcileError(ctx, err, "add finalizer error")
+		}
 	}
 
 	providerConfig := resolvers.ProviderConfigResolver{
@@ -115,6 +127,41 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	providerConfig.Condition.Status = metav1.ConditionTrue
 	providerConfig.Condition.Reason = conditions.ReasonProviderConfigReconciled
 	providerConfig.Condition.Message = "ProviderConfig Reconciled"
+
+	// when cr gets deleted metadata.deletionTimestamp
+	// is set to current timestamp. If its not in process
+	// of being deleted metadata.deletionTimestamp == 0
+	if !bucket.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
+			log.Info("bucket is being deleted, but finalizer is not set; skipping deletion handling")
+			return Reconciled()
+		}
+
+		if bucket.Spec.DeletionPolicy == vedrov1alpha1.DeletionPolicyDelete {
+			log.Info("deleling bucket and all of its objects")
+			err := provider.Bucket().DeleteBucket(ctx, bucket.Bucket)
+			if err != nil {
+				bucket.Condition.Status = metav1.ConditionFalse
+				bucket.Condition.Reason = conditions.ReasonBucketDeleteError
+				bucket.Condition.Message = err.Error()
+
+				patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
+					meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+				})
+				if patchErr != nil {
+					return ReconcileError(ctx, patchErr, "patch error")
+				}
+				return ReconcileErrorRAfter(ctx, err, time.Second*10, "unable to delete external bucket")
+			}
+		} else {
+			log.Info("skipping cloud bucket deletion because deletionPolicy is Retain")
+		}
+
+		controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
+		if err := r.Update(ctx, &bucket.Bucket); err != nil {
+			return ReconcileError(ctx, err, "remove finalizer error")
+		}
+	}
 
 	//check bucket capabilities
 	caps := provider.Capabilities().Bucket
@@ -192,7 +239,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ReconcileError(ctx, patchErr, "patch error")
 	}
 
-	log.Info("reconciled success")
+	log.Info("reconcile success")
 
 	return Reconciled()
 }

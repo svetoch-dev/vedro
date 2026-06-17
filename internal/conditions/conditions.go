@@ -17,6 +17,7 @@ const (
 	ReasonBucketInvalidSpec         = "BucketInvalidSpec"
 	ReasonBucketEnsureError         = "BucketEnsureError"
 	ReasonBucketReconciled          = "Reconciled"
+	ReasonBucketDeleteError         = "BucketDeleteError"
 )
 
 // Condition reasons for ProviderConfig resources.

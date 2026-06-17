@@ -42,6 +42,6 @@ type BucketProvider interface {
 
 	DeleteBucket(
 		ctx context.Context,
-		status vedrov1alpha1.BucketStatus,
+		status vedrov1alpha1.Bucket,
 	) error
 }

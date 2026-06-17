@@ -7,13 +7,18 @@ import (
 	"maps"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/storage"
+	"github.com/gammazero/workerpool"
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/validation"
+	"google.golang.org/api/googleapi"
+	"google.golang.org/api/iterator"
 )
 
 var (
@@ -153,6 +158,9 @@ type bucketHandle interface {
 	Attrs(ctx context.Context) (*storage.BucketAttrs, error)
 	Create(ctx context.Context, projectID string, attrs *storage.BucketAttrs) error
 	Update(ctx context.Context, uattrs storage.BucketAttrsToUpdate) (*storage.BucketAttrs, error)
+	Objects(ctx context.Context, q *storage.Query) *storage.ObjectIterator
+	Delete(ctx context.Context) error
+	Object(name string) *storage.ObjectHandle
 }
 
 type storageClientAdapter struct {
@@ -326,6 +334,81 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 	}, nil
 }
 
-func (b *Bucket) DeleteBucket(ctx context.Context, status vedrov1alpha1.BucketStatus) error {
+func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) error {
+	bucketName := helpers.BucketNameFromCR(bckt)
+
+	// Extra check to be super sure
+	if bckt.Spec.DeletionPolicy != vedrov1alpha1.DeletionPolicyDelete {
+		return nil
+	}
+
+	bh := b.client.Bucket(bucketName)
+
+	// err that we will return if object deletion fails
+	var deleteObjectError error
+	// error mutex for syncing concurrent changes to error var
+	var errM sync.Mutex
+
+	// New pool with workers equal number of CPU
+	workers := runtime.NumCPU() - 1
+	if workers < 1 {
+		workers = 1
+	}
+	wp := workerpool.New(workers)
+
+	// Semaphore channel allowing up to 2000 uncompleted deletion tasks in the queue
+	sem := make(chan struct{}, 2000)
+
+	it := bh.Objects(ctx, &storage.Query{
+		Versions: true,
+	})
+
+	for {
+		objAttrs, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("list objects: %w", err)
+		}
+
+		// queue task
+		sem <- struct{}{}
+
+		wp.Submit(func() {
+			// dequeue task. Defer only accepts callable so wrap it in func
+			defer func() { <-sem }()
+			err := bh.Object(objAttrs.Name).Generation(objAttrs.Generation).Delete(ctx)
+			if err != nil {
+				errM.Lock()
+				defer errM.Unlock()
+				var gErr *googleapi.Error
+				if errors.As(err, &gErr) && gErr.Code == 404 {
+					return
+				}
+				if deleteObjectError == nil {
+					deleteObjectError = err
+				}
+
+			}
+		})
+	}
+
+	wp.StopWait()
+
+	if deleteObjectError != nil {
+		return fmt.Errorf("could not delete bucket because object deletion failed: %w", deleteObjectError)
+	}
+
+	err := bh.Delete(ctx)
+	if err != nil {
+		var gErr *googleapi.Error
+		if errors.As(err, &gErr) && gErr.Code == 404 {
+			return nil
+		}
+
+		return fmt.Errorf("could not delete bucket because of error: %w", err)
+	}
+
 	return nil
 }

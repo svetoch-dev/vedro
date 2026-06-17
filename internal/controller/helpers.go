@@ -2,6 +2,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -24,6 +26,29 @@ func ReconcileError(ctx context.Context, err error, msg string, keysAndValues ..
 	log.FromContext(ctx).Error(err, msg, keysAndValues...)
 
 	return reconcile.Result{}, err
+}
+
+func ReconcileErrorRAfter(
+	ctx context.Context,
+	err error,
+	duration time.Duration,
+	msg string,
+	keysAndValues ...any,
+) (reconcile.Result, error) {
+	if err == nil {
+		return Reconciled()
+	}
+
+	if msg == "" {
+		msg = fmt.Sprintf("reconcile failed. Requeuing after %v", duration)
+	}
+
+	log.FromContext(ctx).Error(err, msg, keysAndValues...)
+
+	return reconcile.Result{
+		Requeue:      true,
+		RequeueAfter: duration,
+	}, err
 }
 
 func ReconcileIgnoreNotFound(ctx context.Context, err error, msg string, keysAndValues ...any) (reconcile.Result, error) {

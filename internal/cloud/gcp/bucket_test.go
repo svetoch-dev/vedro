@@ -487,7 +487,7 @@ var _ = Describe("Bucket.ValidateBucketSpec", func() {
 	})
 
 	It("returns valid for a correct bucket spec", func() {
-		bckt := newTestBucket("my-bucket", "europe-west1")
+		bckt := newTestBucket("my-bucket", "europe-west-1")
 
 		result := bucket.ValidateBucketSpec(bckt)
 		Expect(result.Valid).To(BeTrue())

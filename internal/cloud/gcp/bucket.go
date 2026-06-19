@@ -23,7 +23,6 @@ import (
 
 var (
 	dualRegionPattern   = regexp.MustCompile(`^[A-Z]+[0-9]+$`)
-	regionalPattern     = regexp.MustCompile(`^[a-z]+(-[a-z]+)+[0-9]+$`)
 	storageClassMapping = map[vedrov1alpha1.BucketStorageClass]string{
 		vedrov1alpha1.BucketStorageClassStandard:         "STANDARD",
 		vedrov1alpha1.BucketStorageClassInfrequentAccess: "NEARLINE",
@@ -54,14 +53,7 @@ func validateGCSLocation(location string) *validation.ValidationResult {
 		return &v
 	}
 
-	// Allow regional locations like europe-west1, us-central1.
-	if regionalPattern.MatchString(location) {
-		v := validation.Valid()
-		return &v
-	}
-
-	v := validation.Invalid("unsupported bucket location")
-	return &v
+	return nil
 }
 
 func validateGCSName(name string) *validation.ValidationResult {

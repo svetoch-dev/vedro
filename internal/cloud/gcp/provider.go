@@ -5,10 +5,16 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/storage"
+	"google.golang.org/api/option"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
+	"github.com/svetoch-dev/vedro/internal/helpers"
+)
+
+const (
+	gcpCredentialsSecretKey = "key"
 )
 
 type Provider struct {
@@ -44,39 +50,20 @@ func newClient(
 	switch cfg.Spec.Method {
 	case vedrov1alpha1.AuthMethodWorkloadIdentity:
 		return storage.NewClient(ctx)
+	case vedrov1alpha1.AuthMethodStaticCredentials:
+		secretRef := cfg.Spec.CredentialsSecretRef
+		if secretRef == nil {
+			return nil, fmt.Errorf("spec.credentialsSecretRef is required when auth.method is Secret")
+		}
 
-		//	case vedrov1alpha1.ProviderAuthMethodSecret:
-		//		secretRef := cfg.Spec.CredentialsSecretRef
-		//		if secretRef == nil {
-		//			return nil, fmt.Errorf("spec.credentialsSecretRef is required when auth.method is Secret")
-		//		}
-		//
-		//		var secret corev1.Secret
-		//		err := kubeClient.Get(ctx, client.ObjectKey{
-		//			Name:      secretRef.Name,
-		//			Namespace: secretRef.Namespace,
-		//		}, &secret)
-		//		if err != nil {
-		//			return nil, fmt.Errorf("get credentials secret %s/%s: %w",
-		//				secretRef.Namespace,
-		//				secretRef.Name,
-		//				err,
-		//			)
-		//		}
-		//
-		//		key := "key"
-		//
-		//		credentialsJSON, ok := secret.Data[key]
-		//		if !ok {
-		//			return nil, fmt.Errorf("credentials secret %s/%s does not contain key %q",
-		//				secretRef.Namespace,
-		//				secretRef.Name,
-		//				key,
-		//			)
-		//		}
-		//
-		//		return storage.NewClient(ctx, option.WithCredentialsJSON(credentialsJSON))
-		//
+		data, err := helpers.GetSecretData(ctx, kubeClient, *secretRef, gcpCredentialsSecretKey)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return storage.NewClient(ctx, option.WithCredentialsJSON(data[gcpCredentialsSecretKey]))
+
 	default:
 		return nil, fmt.Errorf("unsupported provider auth method %q", cfg.Spec.Method)
 	}

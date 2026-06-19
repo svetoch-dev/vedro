@@ -7,7 +7,7 @@ metadata:
   name: providerconfig-sample-gcp
 spec:
   type: GCP
-  projectId: "dexfinance-internal"
+  projectId: "kitchenhub-internal"
   region: europe-west2
   method: StaticCredentials
   credentialsSecretRef:

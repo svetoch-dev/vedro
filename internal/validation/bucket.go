@@ -9,7 +9,7 @@ import (
 
 var (
 	// Matches regional names like europe-west1, us-central1, us-east-1, cn-hongkong
-	regionalPattern   = regexp.MustCompile(`^[a-z]+(?:-[a-z]+)*(?:-?[0-9]+)?$`)
+	regionalPattern   = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)+$`)
 	bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
 )
 

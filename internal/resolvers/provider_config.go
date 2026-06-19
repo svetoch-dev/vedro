@@ -13,7 +13,7 @@ import (
 )
 
 type ResourceResolver interface {
-	Populate(ctx context.Context, name types.NamespacedName)
+	Resolve(ctx context.Context, name types.NamespacedName)
 	IsOk() bool
 }
 

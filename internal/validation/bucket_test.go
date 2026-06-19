@@ -126,7 +126,7 @@ func TestValidateBucketLocation(t *testing.T) {
 		},
 		{
 			name:     "provider rejects location",
-			location: "mars",
+			location: "somewhere",
 			fn:       rejectAll,
 			valid:    false,
 			message:  "provider rejected location",
@@ -139,7 +139,7 @@ func TestValidateBucketLocation(t *testing.T) {
 		},
 		{
 			name:     "provider defers to generic unsupported location",
-			location: "Mars",
+			location: "Somewhere",
 			fn:       deferToGeneric,
 			valid:    false,
 			message:  "unsupported bucket location",
@@ -217,7 +217,7 @@ func TestValidateBucketName(t *testing.T) {
 
 		{
 			name:  "valid name",
-			input: "my-bucket-name",
+			input: "valid-name",
 			fn:    deferToGeneric,
 			valid: true,
 		},

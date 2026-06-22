@@ -35,8 +35,10 @@ func New(
 	p := &Provider{}
 
 	p.bucket = &Bucket{
-		client:    &storageClientAdapter{client: client},
-		projectId: cfg.Spec.ProjectId,
+		api: &bucketAPI{
+			projectID: cfg.Spec.ProjectId,
+			client:    client,
+		},
 	}
 
 	return p, nil

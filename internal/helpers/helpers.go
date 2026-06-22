@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	"github.com/svetoch-dev/vedro/internal/cloud"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -59,4 +60,22 @@ func GetSecretData(
 	}
 
 	return data, nil
+}
+
+func FindKeyByValue[K comparable, V comparable](
+	m map[K]V,
+	target V,
+) (K, bool) {
+	for k, v := range m {
+		if v == target {
+			return k, true
+		}
+	}
+
+	var null K
+	return null, false
+}
+
+func PatchTo[T any](value T) cloud.Change[T] {
+	return cloud.Change[T]{Set: true, Value: value}
 }

@@ -54,7 +54,7 @@ type BucketReconciler struct {
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=buckets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=buckets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=buckets/finalizers,verbs=update
-// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=providerconfigs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=providerconfigs,verbs=create;update;get;list;watch
 
 func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
@@ -230,9 +230,9 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	bucket.Condition.Message = "Bucket Reconciled"
 
 	patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
-		b.Status.ExternalName = result.ExternalName
+		b.Status.ExternalName = result.Name
 		b.Status.Location = result.Location
-		b.Status.Applied = result.Applied
+		b.Status.Applied = result.Properties
 		b.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
 		b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 		meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)

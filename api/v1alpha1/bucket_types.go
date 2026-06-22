@@ -42,22 +42,22 @@ const (
 	BucketLifecycleActionDelete BucketLifecycleAction = "Delete"
 )
 
-type BucketVersioningSpec struct {
+type BucketVersioning struct {
 	// Enabled controls bucket object versioning.
 	Enabled bool `json:"enabled"`
 }
 
-type BucketLifecycleSpec struct {
+type BucketLifecycle struct {
 	// +optional
 	Rules []BucketLifecycleRule `json:"rules,omitempty"`
 }
 
-type BucketAppliedState struct {
-	PublicAccessPrevention *bool                 `json:"publicAccessPrevention,omitempty"`
-	Versioning             *BucketVersioningSpec `json:"versioning,omitempty"`
-	Lifecycle              *BucketLifecycleSpec  `json:"lifecycle,omitempty"`
-	StorageClass           BucketStorageClass    `json:"storageClass,omitempty"`
-	Labels                 map[string]string     `json:"labels,omitempty"`
+type BucketProperties struct {
+	PublicAccessPrevention *bool              `json:"publicAccessPrevention,omitempty"`
+	Versioning             *BucketVersioning  `json:"versioning,omitempty"`
+	Lifecycle              *BucketLifecycle   `json:"lifecycle,omitempty"`
+	StorageClass           BucketStorageClass `json:"storageClass,omitempty"`
+	Labels                 map[string]string  `json:"labels,omitempty"`
 }
 
 type BucketLifecycleRule struct {
@@ -124,12 +124,12 @@ type BucketSpec struct {
 	// Versioning configures object versioning.
 	//
 	// +optional
-	Versioning *BucketVersioningSpec `json:"versioning,omitempty"`
+	Versioning *BucketVersioning `json:"versioning,omitempty"`
 
 	// Lifecycle configures object lifecycle rules.
 	//
 	// +optional
-	Lifecycle *BucketLifecycleSpec `json:"lifecycle,omitempty"`
+	Lifecycle *BucketLifecycle `json:"lifecycle,omitempty"`
 
 	// Labels are cloud provider labels/tags applied to the bucket.
 	//
@@ -168,7 +168,7 @@ type BucketStatus struct {
 	// Applied is the applied bucket attributes
 	//
 	// +optional
-	Applied *BucketAppliedState `json:"applied,omitempty"`
+	Applied *BucketProperties `json:"applied,omitempty"`
 
 	// List of unsupported features set on Bucket resource
 	//

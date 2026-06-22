@@ -67,15 +67,15 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.StorageClass = vedrov1alpha1.BucketStorageClassStandard
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.created).NotTo(BeNil())
 		Expect(fake.created.Location).To(Equal("europe-west1"))
 		Expect(fake.created.StorageClass).To(Equal("STANDARD"))
-		Expect(state.ExternalName).To(Equal("my-bucket"))
-		Expect(state.Location).To(Equal("EUROPE-WEST1"))
-		Expect(state.Applied).NotTo(BeNil())
-		Expect(state.Applied.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassStandard))
+		Expect(attrs.ExternalName).To(Equal("my-bucket"))
+		Expect(attrs.Location).To(Equal("EUROPE-WEST1"))
+		Expect(attrs.Properties).NotTo(BeNil())
+		Expect(attrs.Properties.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassStandard))
 	})
 
 	It("creates a bucket with all supported options", func() {
@@ -90,7 +90,7 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.Lifecycle = &lifecycle
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 
 		gcsLifeCycle, lErr := convertToGCSLifeCycle(lifecycle)
@@ -104,10 +104,10 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 		Expect(fake.created.VersioningEnabled).To(BeTrue())
 		Expect(reflect.DeepEqual(fake.created.Lifecycle, gcsLifeCycle)).To(BeTrue())
 		Expect(fake.created.PublicAccessPrevention).To(Equal(storage.PublicAccessPreventionEnforced))
-		Expect(state.Applied.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassArchive))
-		Expect(state.Applied.Labels).To(Equal(map[string]string{"env": "prod"}))
-		Expect(state.Applied.Versioning.Enabled).To(BeTrue())
-		Expect(*state.Applied.PublicAccessPrevention).To(BeTrue())
+		Expect(attrs.Properties.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassArchive))
+		Expect(attrs.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
+		Expect(attrs.Properties.Versioning.Enabled).To(BeTrue())
+		Expect(*attrs.Properties.PublicAccessPrevention).To(BeTrue())
 	})
 
 	It("returns an error when creating a bucket fails", func() {
@@ -149,7 +149,7 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 		Expect(err.Error()).To(ContainSubstring("Glacier"))
 	})
 
-	It("returns the existing state when the bucket already matches the spec", func() {
+	It("returns the existing attrs when the bucket already matches the spec", func() {
 		fake.attrs = &storage.BucketAttrs{
 			Location:     "EUROPE-WEST1",
 			StorageClass: "STANDARD",
@@ -159,11 +159,11 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.StorageClass = vedrov1alpha1.BucketStorageClassStandard
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.updated).To(BeNil())
-		Expect(state.ExternalName).To(Equal("my-bucket"))
-		Expect(state.Location).To(Equal("EUROPE-WEST1"))
+		Expect(attrs.ExternalName).To(Equal("my-bucket"))
+		Expect(attrs.Location).To(Equal("EUROPE-WEST1"))
 	})
 
 	It("returns an error when the existing bucket is in a different location", func() {
@@ -192,11 +192,11 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.StorageClass = vedrov1alpha1.BucketStorageClassInfrequentAccess
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.updated).NotTo(BeNil())
 		Expect(fake.updated.StorageClass).To(Equal("NEARLINE"))
-		Expect(state.Applied.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassInfrequentAccess))
+		Expect(attrs.Properties.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassInfrequentAccess))
 	})
 	It("updates lifecycle when its empty", func() {
 		gcsLifeCycle, lErr := convertToGCSLifeCycle(lifecycle)
@@ -214,11 +214,11 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.Lifecycle = &lifecycle
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.updated).NotTo(BeNil())
 		Expect(reflect.DeepEqual(*fake.updated.Lifecycle, gcsLifeCycle)).To(BeTrue())
-		Expect(reflect.DeepEqual(*state.Applied.Lifecycle, lifecycle)).To(BeTrue())
+		Expect(reflect.DeepEqual(*attrs.Properties.Lifecycle, lifecycle)).To(BeTrue())
 	})
 	It("updates lifecycle when it differs", func() {
 		gcsLifeCycle, lErr := convertToGCSLifeCycle(lifecycle)
@@ -242,11 +242,11 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.Lifecycle = &lifecycle
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.updated).NotTo(BeNil())
 		Expect(reflect.DeepEqual(*fake.updated.Lifecycle, gcsLifeCycle)).To(BeTrue())
-		Expect(reflect.DeepEqual(*state.Applied.Lifecycle, lifecycle)).To(BeTrue())
+		Expect(reflect.DeepEqual(*attrs.Properties.Lifecycle, lifecycle)).To(BeTrue())
 	})
 
 	It("updates versioning when it differs", func() {
@@ -261,11 +261,11 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.Versioning = &vedrov1alpha1.BucketVersioningSpec{Enabled: true}
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.updated).NotTo(BeNil())
 		Expect(fake.updated.VersioningEnabled).To(Equal(interface{}(true)))
-		Expect(state.Applied.Versioning.Enabled).To(BeTrue())
+		Expect(attrs.Properties.Versioning.Enabled).To(BeTrue())
 	})
 
 	It("updates labels when they differ", func() {
@@ -280,10 +280,10 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.Labels = map[string]string{"env": "prod"}
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.updated).NotTo(BeNil())
-		Expect(state.Applied.Labels).To(Equal(map[string]string{"env": "prod"}))
+		Expect(attrs.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
 	})
 
 	It("updates public access prevention when it differs", func() {
@@ -299,11 +299,11 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 			b.Spec.PublicAccessPrevention = &publicAccessPrevention
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.updated).NotTo(BeNil())
 		Expect(fake.updated.PublicAccessPrevention).To(Equal(storage.PublicAccessPreventionEnforced))
-		Expect(*state.Applied.PublicAccessPrevention).To(BeTrue())
+		Expect(*attrs.Properties.PublicAccessPrevention).To(BeTrue())
 	})
 
 	It("updates labels when spec.Labels is nil labels in status.Applied.Labels", func() {
@@ -315,16 +315,16 @@ var _ = Describe("Bucket.EnsureBucket", func() {
 
 		bckt := newTestBucket("my-bucket", "europe-west1", func(b *vedrov1alpha1.Bucket) {
 			b.Spec.StorageClass = vedrov1alpha1.BucketStorageClassStandard
-			b.Status.Applied = &vedrov1alpha1.BucketAppliedState{
+			b.Status.Applied = &vedrov1alpha1.BucketProperties{
 				StorageClass: vedrov1alpha1.BucketStorageClassStandard,
 				Labels:       map[string]string{"env": "dev"},
 			}
 		})
 
-		state, err := bucket.EnsureBucket(ctx, bckt)
+		attrs, err := bucket.EnsureBucket(ctx, bckt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fake.updated).NotTo(BeNil())
-		Expect(state.Applied.Labels).To(BeEmpty())
+		Expect(attrs.Properties.Labels).To(BeEmpty())
 	})
 
 	It("returns an error when updating the bucket fails", func() {

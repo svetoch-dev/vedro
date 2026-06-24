@@ -62,6 +62,7 @@ func GetSecretData(
 func AppliedState(
 	location string,
 	bckt vedrov1alpha1.Bucket,
+	caps cloud.BucketCapabilities,
 ) *cloud.BucketAttrs {
 	spec := bckt.Spec
 	bucketName := BucketNameFromCR(bckt)
@@ -72,9 +73,9 @@ func AppliedState(
 		Properties: &vedrov1alpha1.BucketProperties{
 			StorageClass:           spec.StorageClass,
 			Labels:                 maps.Clone(spec.Labels),
-			Versioning:             spec.Versioning.DeepCopy(),
-			PublicAccessPrevention: cloneBool(spec.PublicAccessPrevention),
-			Lifecycle:              spec.Lifecycle.DeepCopy(),
+			Versioning:             NormalizedBucketVersioning(spec.Versioning.DeepCopy()),
+			PublicAccessPrevention: NormalizedBucketPAP(cloneBool(spec.PublicAccessPrevention)),
+			Lifecycle:              NormalizedBucketLifecycle(spec.Lifecycle.DeepCopy(), caps),
 		},
 	}
 }
@@ -96,11 +97,32 @@ func NormalizedBucketPAP(pap *bool) *bool {
 	return pap
 }
 
-func NormalizedBucketLifecycle(lifecycle *vedrov1alpha1.BucketLifecycle) *vedrov1alpha1.BucketLifecycle {
+func NormalizedBucketLifecycle(
+	lifecycle *vedrov1alpha1.BucketLifecycle,
+	caps cloud.BucketCapabilities,
+) *vedrov1alpha1.BucketLifecycle {
+	normalized := &vedrov1alpha1.BucketLifecycle{}
 	if lifecycle == nil || len(lifecycle.Rules) == 0 {
-		return &vedrov1alpha1.BucketLifecycle{}
+		return normalized
 	}
-	return lifecycle
+
+	for _, rule := range lifecycle.Rules {
+		if !rule.Enabled {
+			continue
+		}
+		if !caps.Lifecycle.RuleNames {
+			normalized.Rules = append(normalized.Rules,
+				vedrov1alpha1.BucketLifecycleRule{
+					AgeDays: rule.AgeDays,
+					Action:  rule.Action,
+					Enabled: rule.Enabled,
+				},
+			)
+		} else {
+			normalized.Rules = append(normalized.Rules, rule)
+		}
+	}
+	return normalized
 }
 
 func cloneBool(value *bool) *bool {

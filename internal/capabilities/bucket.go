@@ -25,15 +25,6 @@ func lifecycleHasNamedRule(rules []vedrov1alpha1.BucketLifecycleRule) (bool, int
 	return false, 0
 }
 
-func lifecycleHasEnabledRule(rules []vedrov1alpha1.BucketLifecycleRule) (bool, int) {
-	for i, rule := range rules {
-		if rule.Enabled != nil {
-			return true, i
-		}
-	}
-	return false, 0
-}
-
 func ValidateBucketCapabilities(
 	caps cloud.BucketCapabilities,
 	spec vedrov1alpha1.BucketSpec,
@@ -72,14 +63,6 @@ func ValidateBucketCapabilities(
 				Field:   fmt.Sprintf("spec.lifecycle.rules[%d].Name", index),
 				Message: "Named lifecycle rules are not supported by this provider",
 				Reason:  vedrov1alpha1.BucketUnsupportedLifecycleNamed,
-			})
-		}
-		found, index = lifecycleHasEnabledRule(spec.Lifecycle.Rules)
-		if found && !caps.Lifecycle.RuleEnabledState {
-			unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{
-				Field:   fmt.Sprintf("spec.lifecycle.rules[%d].Enabled", index),
-				Message: "Enable/disable lifecycle rules are not supported by this provider",
-				Reason:  vedrov1alpha1.BucketUnsupportedLifecycleEnabled,
 			})
 		}
 	}

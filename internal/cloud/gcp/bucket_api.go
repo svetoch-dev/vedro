@@ -96,6 +96,9 @@ func toGCSLifeCycle(lifeCycle *vedrov1alpha1.BucketLifecycle) (storage.Lifecycle
 	}
 
 	for index, rule := range lifeCycle.Rules {
+		if !rule.Enabled {
+			continue
+		}
 		actionType, ok := lifeCycleActionMapping[rule.Action]
 		if !ok {
 			return gcsLifeCycle, fmt.Errorf(
@@ -136,6 +139,7 @@ func fromGCSLifeCycle(lifecycle storage.Lifecycle) vedrov1alpha1.BucketLifecycle
 			bucketLifeCycle.Rules = append(bucketLifeCycle.Rules, vedrov1alpha1.BucketLifecycleRule{
 				AgeDays: helpers.Ptr(rule.Condition.AgeInDays),
 				Action:  gcsLifeCycleActionMapping[rule.Action.Type],
+				Enabled: true,
 			})
 		}
 	}

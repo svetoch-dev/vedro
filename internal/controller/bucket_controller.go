@@ -181,21 +181,31 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if len(unsupported) > 0 {
 		logger.Info("Unsupported features found")
-		bucket.Condition.Status = metav1.ConditionFalse
-		bucket.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
-		bucket.Condition.Message = "unsupported features found"
-		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
-			b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
-			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
-		})
-		if patchErr != nil {
-			return ReconcileError(ctx, patchErr, "patch error")
-		}
 
 		if bucket.Spec.UnsupportedFeaturePolicy == vedrov1alpha1.UnsupportedFeaturePolicyFail {
 			logger.Info("UnsupportedFeaturePolicy set to Fail. stopping reconciliation")
+			bucket.Condition.Status = metav1.ConditionFalse
+			bucket.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
+			bucket.Condition.Message = "unsupported features found"
+			patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
+				b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
+				meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+			})
+			if patchErr != nil {
+				return ReconcileError(ctx, patchErr, "patch error")
+			}
+
 			return Reconciled()
 		}
+		if bucket.Spec.UnsupportedFeaturePolicy == vedrov1alpha1.UnsupportedFeaturePolicyWarn {
+			patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedrov1alpha1.Bucket) {
+				b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
+			})
+			if patchErr != nil {
+				return ReconcileError(ctx, patchErr, "patch error")
+			}
+		}
+
 	}
 
 	//check that spec is valid

@@ -31,10 +31,9 @@ type BucketCapabilities struct {
 }
 
 type LifecycleCapabilities struct {
-	Supported        bool
-	RuleNames        bool
-	RuleEnabledState bool
-	RuleExpiration   bool
+	Supported      bool
+	RuleNames      bool
+	RuleExpiration bool
 }
 
 type StorageClassCapabilities struct {

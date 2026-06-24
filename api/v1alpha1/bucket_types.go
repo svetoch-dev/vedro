@@ -71,8 +71,8 @@ type BucketLifecycleRule struct {
 	Name *string `json:"name,omitempty"`
 
 	// Enabled controls whether this lifecycle rule should be active.
-	// +optional
-	Enabled *bool `json:"enabled,omitempty"`
+	// +kubebuilder:default:=true
+	Enabled bool `json:"enabled"`
 
 	// AgeDays matches objects older than this many days.
 	//

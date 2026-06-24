@@ -59,6 +59,7 @@ var lifecycle = vedrov1alpha1.BucketLifecycle{
 		vedrov1alpha1.BucketLifecycleRule{
 			AgeDays: helpers.Ptr(int64(2)),
 			Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+			Enabled: true,
 		},
 	},
 }

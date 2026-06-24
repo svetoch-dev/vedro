@@ -89,6 +89,7 @@ spec:
                           minimum: 1
                           type: integer
                         enabled:
+                          default: true
                           description: Enabled controls whether this lifecycle rule
                             should be active.
                           type: boolean
@@ -99,6 +100,7 @@ spec:
                           type: string
                       required:
                       - action
+                      - enabled
                       type: object
                     type: array
                 type: object
@@ -187,6 +189,7 @@ spec:
                               minimum: 1
                               type: integer
                             enabled:
+                              default: true
                               description: Enabled controls whether this lifecycle
                                 rule should be active.
                               type: boolean
@@ -197,6 +200,7 @@ spec:
                               type: string
                           required:
                           - action
+                          - enabled
                           type: object
                         type: array
                     type: object

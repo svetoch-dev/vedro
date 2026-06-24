@@ -84,6 +84,9 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 	bucketName := helpers.BucketNameFromCR(bckt)
 	normalizedLocation := strings.ToUpper(spec.Location)
 
+	p := &Provider{}
+	caps := p.Capabilities().Bucket
+
 	attrs, err := b.api.GetBucket(ctx, bucketName)
 
 	if errors.Is(err, cloud.ErrBucketNotFound) {
@@ -91,9 +94,9 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 			Name:     bucketName,
 			Location: spec.Location,
 			Properties: &vedrov1alpha1.BucketProperties{
-				PublicAccessPrevention: spec.PublicAccessPrevention,
-				Versioning:             spec.Versioning,
-				Lifecycle:              spec.Lifecycle,
+				PublicAccessPrevention: helpers.NormalizedBucketPAP(spec.PublicAccessPrevention),
+				Versioning:             helpers.NormalizedBucketVersioning(spec.Versioning),
+				Lifecycle:              helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps),
 				StorageClass:           spec.StorageClass,
 				Labels:                 spec.Labels,
 			},
@@ -119,7 +122,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 		)
 	}
 
-	appliedState := helpers.AppliedState(attrs.Location, bckt)
+	appliedState := helpers.AppliedState(attrs.Location, bckt, caps)
 
 	patch := cloud.BucketPatch{}
 
@@ -131,25 +134,31 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 		patch.StorageClass = helpers.PatchTo(spec.StorageClass)
 	}
 
+	desiredVersioning := helpers.NormalizedBucketVersioning(spec.Versioning)
+
 	if !reflect.DeepEqual(
 		attrs.Properties.Versioning,
-		helpers.NormalizedBucketVersioning(spec.Versioning),
+		desiredVersioning,
 	) {
-		patch.Versioning = helpers.PatchTo(spec.Versioning)
+		patch.Versioning = helpers.PatchTo(desiredVersioning)
 	}
+
+	desiredPAP := helpers.NormalizedBucketPAP(spec.PublicAccessPrevention)
 
 	if !reflect.DeepEqual(
 		attrs.Properties.PublicAccessPrevention,
-		helpers.NormalizedBucketPAP(spec.PublicAccessPrevention),
+		desiredPAP,
 	) {
-		patch.PublicAccessPrevention = helpers.PatchTo(spec.PublicAccessPrevention)
+		patch.PublicAccessPrevention = helpers.PatchTo(desiredPAP)
 	}
+
+	desiredLifecycle := helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps)
 
 	if !reflect.DeepEqual(
 		attrs.Properties.Lifecycle,
-		helpers.NormalizedBucketLifecycle(spec.Lifecycle),
+		desiredLifecycle,
 	) {
-		patch.Lifecycle = helpers.PatchTo(spec.Lifecycle)
+		patch.Lifecycle = helpers.PatchTo(desiredLifecycle)
 	}
 
 	if patch.HasChanges() {

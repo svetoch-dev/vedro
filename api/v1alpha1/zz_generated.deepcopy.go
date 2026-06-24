@@ -83,11 +83,6 @@ func (in *BucketLifecycleRule) DeepCopyInto(out *BucketLifecycleRule) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.Enabled != nil {
-		in, out := &in.Enabled, &out.Enabled
-		*out = new(bool)
-		**out = **in
-	}
 	if in.AgeDays != nil {
 		in, out := &in.AgeDays, &out.AgeDays
 		*out = new(int64)

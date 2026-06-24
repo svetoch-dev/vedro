@@ -16,7 +16,6 @@ import (
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/validation"
-	"google.golang.org/api/googleapi"
 )
 
 var (
@@ -198,8 +197,7 @@ func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) er
 			if err != nil {
 				errM.Lock()
 				defer errM.Unlock()
-				var gErr *googleapi.Error
-				if errors.As(err, &gErr) && gErr.Code == 404 {
+				if errors.Is(err, cloud.ErrBucketObjectNotFound) {
 					return
 				}
 				if deleteObjectError == nil {
@@ -222,8 +220,11 @@ func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) er
 	}
 
 	err = b.api.DeleteBucket(ctx, bucketName)
+	if errors.Is(err, cloud.ErrBucketNotFound) {
+		return nil
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("could not delete bucket because of error: %w", err)
 	}
 
 	return nil

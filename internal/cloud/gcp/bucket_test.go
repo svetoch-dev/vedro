@@ -8,7 +8,6 @@ import (
 	"cloud.google.com/go/storage"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -446,7 +445,7 @@ var _ = Describe("Bucket.DeleteBucket", func() {
 				{Name: "obj-a", Generation: 1},
 			},
 		}
-		fake.objectDeleteErr = &googleapi.Error{Code: 404}
+		fake.objectDeleteErr = cloud.ErrBucketObjectNotFound
 		bckt := newDeleteBucket()
 
 		err := bucket.DeleteBucket(ctx, bckt)
@@ -455,7 +454,7 @@ var _ = Describe("Bucket.DeleteBucket", func() {
 	})
 
 	It("ignores 404 errors when deleting the bucket", func() {
-		fake.deleteErr = &googleapi.Error{Code: 404}
+		fake.deleteErr = cloud.ErrBucketNotFound
 		bckt := newDeleteBucket()
 
 		err := bucket.DeleteBucket(ctx, bckt)

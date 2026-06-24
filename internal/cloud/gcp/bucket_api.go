@@ -11,6 +11,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -272,6 +273,8 @@ func (a *bucketAPI) CreateBucket(ctx context.Context, name string, attrs cloud.B
 }
 
 func (a *bucketAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
+	log.FromContext(ctx).V(1).Info("Updating bucket")
+
 	currentAttrs, err := a.GetBucket(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("get bucket before patch: %w", err)

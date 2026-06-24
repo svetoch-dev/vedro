@@ -16,7 +16,7 @@ type BucketResolver struct {
 	vedrov1alpha1.Bucket
 
 	KubeClient client.Client
-	Log        logr.Logger
+	Logger     logr.Logger
 
 	Condition metav1.Condition
 	Error     error
@@ -32,7 +32,7 @@ func (o *BucketResolver) Resolve(
 ) {
 	o.Error = nil
 	o.Bucket = vedrov1alpha1.Bucket{}
-	o.Log.V(1).Info("getting bucket", "name", name.String())
+	o.Logger.V(1).Info("getting bucket")
 
 	o.Condition = metav1.Condition{
 		Type:   conditions.TypeReady,
@@ -44,12 +44,12 @@ func (o *BucketResolver) Resolve(
 		o.Error = err
 
 		if apierrors.IsNotFound(err) {
-			o.Log.Info("Bucket not found", "name", name.String())
+			o.Logger.Info("Bucket not found")
 			o.Condition.Reason = conditions.ReasonBucketNotFound
 			o.Condition.Message = "Bucket was not found"
 			return
 		}
-		o.Log.Error(err, "failed to get Bucket", "name", name.String())
+		o.Logger.Error(err, "failed to get Bucket")
 
 		o.Condition.Reason = conditions.ReasonBucketGetFailed
 		o.Condition.Message = err.Error()

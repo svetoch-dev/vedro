@@ -22,7 +22,7 @@ type ProviderConfigResolver struct {
 	vedrov1alpha1.ProviderConfig
 
 	KubeClient client.Client
-	Log        logr.Logger
+	Logger     logr.Logger
 
 	Condition metav1.Condition
 	Error     error
@@ -38,7 +38,7 @@ func (o *ProviderConfigResolver) Resolve(
 ) {
 	o.Error = nil
 	o.ProviderConfig = vedrov1alpha1.ProviderConfig{}
-	o.Log.V(1).Info("getting ProviderConfig", "name", name.String())
+	o.Logger.V(1).Info("getting ProviderConfig")
 
 	o.Condition = metav1.Condition{
 		Type: conditions.TypeProviderConfigReady,
@@ -51,12 +51,12 @@ func (o *ProviderConfigResolver) Resolve(
 		o.Condition.Status = metav1.ConditionFalse
 
 		if apierrors.IsNotFound(err) {
-			o.Log.Info("ProviderConfig not found", "name", name.String())
+			o.Logger.Info("ProviderConfig not found")
 			o.Condition.Reason = conditions.ReasonProviderConfigNotFound
 			o.Condition.Message = "ProviderConfig was not found"
 			return
 		}
-		o.Log.Error(err, "failed to get ProviderConfig", "name", name.String())
+		o.Logger.Error(err, "failed to get ProviderConfig")
 
 		o.Condition.Reason = conditions.ReasonProviderConfigGetFailed
 		o.Condition.Message = err.Error()

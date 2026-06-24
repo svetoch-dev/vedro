@@ -38,6 +38,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
 	"github.com/svetoch-dev/vedro/internal/conditions"
+	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/resolvers"
 )
 
@@ -57,10 +58,10 @@ type BucketReconciler struct {
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=providerconfigs,verbs=create;update;get;list;watch
 
 func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	bucket := resolvers.BucketResolver{
 		KubeClient: r.Client,
-		Log:        log,
+		Logger:     logger,
 	}
 
 	//Find bucket and set Conditions
@@ -71,6 +72,13 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ReconcileIgnoreNotFound(ctx, bucket.Error, "unable to fetch bucket")
 	}
 
+	logger = logger.WithValues(
+		"bucketName", helpers.BucketNameFromCR(bucket.Bucket),
+		"providerConfig", bucket.Spec.ProviderRef.Name,
+	)
+
+	ctx = log.IntoContext(ctx, logger)
+
 	if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
 		controllerutil.AddFinalizer(&bucket.Bucket, bucketFinalizer)
 		if err := r.Update(ctx, &bucket.Bucket); err != nil {
@@ -80,7 +88,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	providerConfig := resolvers.ProviderConfigResolver{
 		KubeClient: r.Client,
-		Log:        log,
+		Logger:     logger,
 	}
 
 	providerConfigName := types.NamespacedName{
@@ -107,7 +115,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	//If error change status conditions and end Reconcile
 	if err != nil {
-		log.Error(err, "Error in setting NewProvider", "ProviderConfig", providerConfig.Name)
+		logger.Error(err, "Error in setting NewProvider")
 		providerConfig.Condition.Status = metav1.ConditionFalse
 		providerConfig.Condition.Reason = conditions.ReasonProviderConfigError
 		providerConfig.Condition.Message = err.Error()
@@ -135,12 +143,12 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// of being deleted metadata.deletionTimestamp == 0
 	if !bucket.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
-			log.Info("bucket is being deleted, but finalizer is not set; skipping deletion handling")
+			logger.Info("bucket is being deleted, but finalizer is not set; skipping deletion handling")
 			return Reconciled()
 		}
 
 		if bucket.Spec.DeletionPolicy == vedrov1alpha1.DeletionPolicyDelete {
-			log.Info("deleling bucket and all of its objects")
+			logger.Info("deleling bucket and all of its objects")
 			err := provider.Bucket().DeleteBucket(ctx, bucket.Bucket)
 			if err != nil {
 				bucket.Condition.Status = metav1.ConditionFalse
@@ -156,7 +164,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				return ReconcileErrorRAfter(ctx, err, time.Second*10, "unable to delete external bucket")
 			}
 		} else {
-			log.Info("skipping cloud bucket deletion because deletionPolicy is Retain")
+			logger.Info("skipping cloud bucket deletion because deletionPolicy is Retain")
 		}
 
 		controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
@@ -172,7 +180,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	bucket.Status.UnsupportedFeatures = unsupported
 
 	if len(unsupported) > 0 {
-		log.Info("Unsupported features found")
+		logger.Info("Unsupported features found")
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
 		bucket.Condition.Message = "unsupported features found"
@@ -185,7 +193,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 
 		if bucket.Spec.UnsupportedFeaturePolicy == vedrov1alpha1.UnsupportedFeaturePolicyFail {
-			log.Info("UnsupportedFeaturePolicy set to Fail. stopping reconciliation")
+			logger.Info("UnsupportedFeaturePolicy set to Fail. stopping reconciliation")
 			return Reconciled()
 		}
 	}
@@ -194,7 +202,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	validationResult := provider.Bucket().ValidateBucketSpec(bucket.Bucket)
 
 	if !validationResult.Valid {
-		log.Info("spec is invalid")
+		logger.Info("spec is invalid")
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketInvalidSpec
 		bucket.Condition.Message = validationResult.Message
@@ -211,7 +219,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err := provider.Bucket().EnsureBucket(ctx, bucket.Bucket)
 
 	if err != nil {
-		log.Error(err, "EnsureBucket failed")
+		logger.Error(err, "EnsureBucket failed")
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketEnsureError
 		bucket.Condition.Message = err.Error()
@@ -242,7 +250,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ReconcileError(ctx, patchErr, "patch error")
 	}
 
-	log.Info("reconcile success")
+	logger.Info("reconcile success")
 
 	return Reconciled()
 }

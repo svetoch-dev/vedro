@@ -44,8 +44,8 @@ type Change[T any] struct {
 }
 
 type ObjectVersion struct {
-	Name       string
-	Generation int64
+	Name    string
+	Version int64
 }
 
 type BucketPatch struct {
@@ -69,10 +69,10 @@ type BucketAPI interface {
 	CreateBucket(ctx context.Context, name string, attrs BucketAttrs) error
 	UpdateBucket(ctx context.Context, name string, patch BucketPatch) (*BucketAttrs, error)
 
-	ListObjects(
+	ProcessObjects(
 		ctx context.Context,
 		bucket string,
-		process func(ObjectVersion) error,
+		process func(object ObjectVersion) error,
 	) error
 
 	DeleteObject(

@@ -26,6 +26,9 @@ const (
 	BucketUnsupportedPublicAccessPrevention UnsupportedFeatureReason = "BucketUnsupportedPublicAccessPrevention"
 	BucketUnsupportedStorageClass           UnsupportedFeatureReason = "BucketUnsupportedStorageClass"
 	BucketUnsupportedLifecycleExpiration    UnsupportedFeatureReason = "BucketUnsupportedLifecycleExpiration"
+	BucketUnsupportedLifecycle              UnsupportedFeatureReason = "BucketUnsupportedLifecycle"
+	BucketUnsupportedLifecycleNamed         UnsupportedFeatureReason = "BucketUnsupportedLifecycleNamed"
+	BucketUnsupportedLifecycleEnabled       UnsupportedFeatureReason = "BucketUnsupportedLifecycleEnabled"
 )
 
 type BucketStorageClass string
@@ -65,10 +68,11 @@ type BucketLifecycleRule struct {
 	//
 	// +kubebuilder:validation:MinLength=1
 	// +optional
-	Name string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty"`
 
 	// Enabled controls whether this lifecycle rule should be active.
-	Enabled bool `json:"enabled"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// AgeDays matches objects older than this many days.
 	//

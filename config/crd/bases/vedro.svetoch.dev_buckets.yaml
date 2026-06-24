@@ -99,7 +99,6 @@ spec:
                           type: string
                       required:
                       - action
-                      - enabled
                       type: object
                     type: array
                 type: object
@@ -198,7 +197,6 @@ spec:
                               type: string
                           required:
                           - action
-                          - enabled
                           type: object
                         type: array
                     type: object

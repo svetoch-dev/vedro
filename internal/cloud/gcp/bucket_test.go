@@ -16,7 +16,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/helpers"
 )
 
-func newTestBucket(name, location string, mods ...func(*vedrov1alpha1.Bucket)) vedrov1alpha1.Bucket {
+func newTestBucket(name string, location string, mods ...func(*vedrov1alpha1.Bucket)) vedrov1alpha1.Bucket {
 	b := vedrov1alpha1.Bucket{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -33,21 +33,30 @@ func newTestBucket(name, location string, mods ...func(*vedrov1alpha1.Bucket)) v
 }
 
 func newBucketAttrs(
-	name, location string,
+	name string,
+	location string,
 	storageClass vedrov1alpha1.BucketStorageClass,
 	mods ...func(*vedrov1alpha1.BucketProperties),
 ) *cloud.BucketAttrs {
-	properties := &vedrov1alpha1.BucketProperties{StorageClass: storageClass}
+	properties := &vedrov1alpha1.BucketProperties{
+		StorageClass:           storageClass,
+		PublicAccessPrevention: helpers.Ptr(false),
+		Lifecycle:              &vedrov1alpha1.BucketLifecycle{},
+		Versioning:             &vedrov1alpha1.BucketVersioning{Enabled: false},
+	}
 	for _, mod := range mods {
 		mod(properties)
 	}
-	return &cloud.BucketAttrs{Name: name, Location: location, Properties: properties}
+	return &cloud.BucketAttrs{
+		Name:       name,
+		Location:   location,
+		Properties: properties,
+	}
 }
 
 var lifecycle = vedrov1alpha1.BucketLifecycle{
 	Rules: []vedrov1alpha1.BucketLifecycleRule{
 		vedrov1alpha1.BucketLifecycleRule{
-			Enabled: true,
 			AgeDays: helpers.Ptr(int64(2)),
 			Action:  vedrov1alpha1.BucketLifecycleActionDelete,
 		},

@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
@@ -18,10 +19,6 @@ func BucketNameFromCR(bckt vedrov1alpha1.Bucket) string {
 	}
 
 	return bucketName
-}
-
-func Ptr[T interface{}](v T) *T {
-	return &v
 }
 
 func GetSecretData(
@@ -62,18 +59,61 @@ func GetSecretData(
 	return data, nil
 }
 
-func FindKeyByValue[K comparable, V comparable](
-	m map[K]V,
-	target V,
-) (K, bool) {
-	for k, v := range m {
-		if v == target {
-			return k, true
+func AppliedState(
+	location string,
+	bckt vedrov1alpha1.Bucket,
+) *cloud.BucketAttrs {
+	spec := bckt.Spec
+	bucketName := BucketNameFromCR(bckt)
+
+	return &cloud.BucketAttrs{
+		Name:     bucketName,
+		Location: location,
+		Properties: &vedrov1alpha1.BucketProperties{
+			StorageClass:           spec.StorageClass,
+			Labels:                 maps.Clone(spec.Labels),
+			Versioning:             spec.Versioning.DeepCopy(),
+			PublicAccessPrevention: cloneBool(spec.PublicAccessPrevention),
+			Lifecycle:              spec.Lifecycle.DeepCopy(),
+		},
+	}
+}
+
+func NormalizedBucketVersioning(ver *vedrov1alpha1.BucketVersioning) *vedrov1alpha1.BucketVersioning {
+	if ver == nil {
+		return &vedrov1alpha1.BucketVersioning{
+			Enabled: false,
 		}
 	}
+	return ver
+}
 
-	var null K
-	return null, false
+func NormalizedBucketPAP(pap *bool) *bool {
+	if pap == nil {
+		return Ptr(false)
+	}
+
+	return pap
+}
+
+func NormalizedBucketLifecycle(lifecycle *vedrov1alpha1.BucketLifecycle) *vedrov1alpha1.BucketLifecycle {
+	if lifecycle == nil || len(lifecycle.Rules) == 0 {
+		return &vedrov1alpha1.BucketLifecycle{}
+	}
+	return lifecycle
+}
+
+func cloneBool(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+
+	cloned := *value
+	return &cloned
+}
+
+func Ptr[T interface{}](v T) *T {
+	return &v
 }
 
 func PatchTo[T any](value T) cloud.Change[T] {

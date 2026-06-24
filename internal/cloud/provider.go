@@ -23,12 +23,23 @@ type Capabilities struct {
 }
 
 type BucketCapabilities struct {
-	Versioning                   bool
-	LifecycleExpiration          bool
-	PublicAccessPrevention       bool
-	StorageClassArchive          bool
-	StorageClassInfrequentAccess bool
-	Labels                       bool
+	Lifecycle              LifecycleCapabilities
+	StorageClass           StorageClassCapabilities
+	Versioning             bool
+	PublicAccessPrevention bool
+	Labels                 bool
+}
+
+type LifecycleCapabilities struct {
+	Supported        bool
+	RuleNames        bool
+	RuleEnabledState bool
+	RuleExpiration   bool
+}
+
+type StorageClassCapabilities struct {
+	Archive          bool
+	InfrequentAccess bool
 }
 
 type BucketAttrs struct {

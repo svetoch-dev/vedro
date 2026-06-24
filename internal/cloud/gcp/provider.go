@@ -74,12 +74,17 @@ func newClient(
 func (p *Provider) Capabilities() cloud.Capabilities {
 	return cloud.Capabilities{
 		Bucket: cloud.BucketCapabilities{
-			Versioning:                   true,
-			LifecycleExpiration:          true,
-			PublicAccessPrevention:       true,
-			StorageClassArchive:          true,
-			StorageClassInfrequentAccess: true,
-			Labels:                       true,
+			Versioning: true,
+			Lifecycle: cloud.LifecycleCapabilities{
+				Supported:      true,
+				RuleExpiration: true,
+			},
+			PublicAccessPrevention: true,
+			StorageClass: cloud.StorageClassCapabilities{
+				Archive:          true,
+				InfrequentAccess: true,
+			},
+			Labels: true,
 		},
 	}
 }

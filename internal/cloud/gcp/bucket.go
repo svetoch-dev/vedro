@@ -80,7 +80,6 @@ func (b *Bucket) ValidateBucketSpec(bckt vedrov1alpha1.Bucket) validation.Valida
 
 func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*cloud.BucketAttrs, error) {
 	spec := bckt.Spec
-	status := bckt.Status
 
 	bucketName := helpers.BucketNameFromCR(bckt)
 	normalizedLocation := strings.ToUpper(spec.Location)
@@ -120,13 +119,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 		)
 	}
 
-	appliedState := &cloud.BucketAttrs{
-		Name:     bucketName,
-		Location: attrs.Location,
-	}
-	if status.Applied != nil {
-		appliedState.Properties = status.Applied
-	}
+	appliedState := helpers.AppliedState(attrs.Location, bckt)
 
 	patch := cloud.BucketPatch{}
 
@@ -138,18 +131,24 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 		patch.StorageClass = helpers.PatchTo(spec.StorageClass)
 	}
 
-	if spec.Versioning != nil &&
-		!reflect.DeepEqual(attrs.Properties.Versioning, spec.Versioning) {
+	if !reflect.DeepEqual(
+		attrs.Properties.Versioning,
+		helpers.NormalizedBucketVersioning(spec.Versioning),
+	) {
 		patch.Versioning = helpers.PatchTo(spec.Versioning)
 	}
 
-	if spec.PublicAccessPrevention != nil &&
-		!reflect.DeepEqual(attrs.Properties.PublicAccessPrevention, spec.PublicAccessPrevention) {
+	if !reflect.DeepEqual(
+		attrs.Properties.PublicAccessPrevention,
+		helpers.NormalizedBucketPAP(spec.PublicAccessPrevention),
+	) {
 		patch.PublicAccessPrevention = helpers.PatchTo(spec.PublicAccessPrevention)
 	}
 
-	if spec.Lifecycle != nil &&
-		!reflect.DeepEqual(attrs.Properties.Lifecycle, spec.Lifecycle) {
+	if !reflect.DeepEqual(
+		attrs.Properties.Lifecycle,
+		helpers.NormalizedBucketLifecycle(spec.Lifecycle),
+	) {
 		patch.Lifecycle = helpers.PatchTo(spec.Lifecycle)
 	}
 

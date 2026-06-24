@@ -9,7 +9,25 @@ import (
 
 func lifecycleHasExpiredRule(rules []vedrov1alpha1.BucketLifecycleRule) (bool, int) {
 	for i, rule := range rules {
-		if rule.Enabled && rule.AgeDays != nil && rule.Action == vedrov1alpha1.BucketLifecycleActionDelete {
+		if rule.AgeDays != nil {
+			return true, i
+		}
+	}
+	return false, 0
+}
+
+func lifecycleHasNamedRule(rules []vedrov1alpha1.BucketLifecycleRule) (bool, int) {
+	for i, rule := range rules {
+		if rule.Name != nil {
+			return true, i
+		}
+	}
+	return false, 0
+}
+
+func lifecycleHasEnabledRule(rules []vedrov1alpha1.BucketLifecycleRule) (bool, int) {
+	for i, rule := range rules {
+		if rule.Enabled != nil {
 			return true, i
 		}
 	}
@@ -31,13 +49,37 @@ func ValidateBucketCapabilities(
 		})
 	}
 
-	if spec.Lifecycle != nil {
+	if spec.Lifecycle != nil && !caps.Lifecycle.Supported {
+		unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{
+			Field:   "spec.lifecycle",
+			Message: "Lifecycle is not supported by this provider",
+			Reason:  vedrov1alpha1.BucketUnsupportedLifecycle,
+		})
+	}
+
+	if spec.Lifecycle != nil && caps.Lifecycle.Supported {
 		found, index := lifecycleHasExpiredRule(spec.Lifecycle.Rules)
-		if found && !caps.LifecycleExpiration {
+		if found && !caps.Lifecycle.RuleExpiration {
 			unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{
 				Field:   fmt.Sprintf("spec.lifecycle.rules[%d].AgeDays", index),
 				Message: "Object expiration is not supported by this provider",
 				Reason:  vedrov1alpha1.BucketUnsupportedLifecycleExpiration,
+			})
+		}
+		found, index = lifecycleHasNamedRule(spec.Lifecycle.Rules)
+		if found && !caps.Lifecycle.RuleNames {
+			unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{
+				Field:   fmt.Sprintf("spec.lifecycle.rules[%d].Name", index),
+				Message: "Named lifecycle rules are not supported by this provider",
+				Reason:  vedrov1alpha1.BucketUnsupportedLifecycleNamed,
+			})
+		}
+		found, index = lifecycleHasEnabledRule(spec.Lifecycle.Rules)
+		if found && !caps.Lifecycle.RuleEnabledState {
+			unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{
+				Field:   fmt.Sprintf("spec.lifecycle.rules[%d].Enabled", index),
+				Message: "Enable/disable lifecycle rules are not supported by this provider",
+				Reason:  vedrov1alpha1.BucketUnsupportedLifecycleEnabled,
 			})
 		}
 	}
@@ -58,7 +100,7 @@ func ValidateBucketCapabilities(
 		})
 	}
 
-	if spec.StorageClass == vedrov1alpha1.BucketStorageClassInfrequentAccess && !caps.StorageClassInfrequentAccess {
+	if spec.StorageClass == vedrov1alpha1.BucketStorageClassInfrequentAccess && !caps.StorageClass.InfrequentAccess {
 		unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{
 			Field:   "spec.StorageClass",
 			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedrov1alpha1.BucketStorageClassInfrequentAccess),
@@ -66,7 +108,7 @@ func ValidateBucketCapabilities(
 		})
 	}
 
-	if spec.StorageClass == vedrov1alpha1.BucketStorageClassArchive && !caps.StorageClassArchive {
+	if spec.StorageClass == vedrov1alpha1.BucketStorageClassArchive && !caps.StorageClass.Archive {
 		unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{
 			Field:   "spec.StorageClass",
 			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedrov1alpha1.BucketStorageClassArchive),

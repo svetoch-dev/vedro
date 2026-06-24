@@ -30,10 +30,10 @@ var (
 		storage.PublicAccessPreventionEnforced:  helpers.Ptr(true),
 		storage.PublicAccessPreventionUnknown:   nil,
 	}
-	gcsLifeCycleMapping = map[string]vedrov1alpha1.BucketLifecycleAction{
+	gcsLifeCycleActionMapping = map[string]vedrov1alpha1.BucketLifecycleAction{
 		storage.DeleteAction: vedrov1alpha1.BucketLifecycleActionDelete,
 	}
-	lifeCycleMapping = map[vedrov1alpha1.BucketLifecycleAction]string{
+	lifeCycleActionMapping = map[vedrov1alpha1.BucketLifecycleAction]string{
 		vedrov1alpha1.BucketLifecycleActionDelete: storage.DeleteAction,
 	}
 )
@@ -95,11 +95,7 @@ func toGCSLifeCycle(lifeCycle *vedrov1alpha1.BucketLifecycle) (storage.Lifecycle
 	}
 
 	for index, rule := range lifeCycle.Rules {
-		if !rule.Enabled {
-			continue
-		}
-
-		actionType, ok := lifeCycleMapping[rule.Action]
+		actionType, ok := lifeCycleActionMapping[rule.Action]
 		if !ok {
 			return gcsLifeCycle, fmt.Errorf(
 				"lifecycle.rules[%d].action %s doesn't map to any GCS lifecycle action",
@@ -137,9 +133,8 @@ func fromGCSLifeCycle(lifecycle storage.Lifecycle) vedrov1alpha1.BucketLifecycle
 	for _, rule := range lifecycle.Rules {
 		if rule.Condition.AgeInDays > 0 && rule.Action.Type == storage.DeleteAction {
 			bucketLifeCycle.Rules = append(bucketLifeCycle.Rules, vedrov1alpha1.BucketLifecycleRule{
-				Enabled: true,
 				AgeDays: helpers.Ptr(rule.Condition.AgeInDays),
-				Action:  gcsLifeCycleMapping[rule.Action.Type],
+				Action:  gcsLifeCycleActionMapping[rule.Action.Type],
 			})
 		}
 	}
@@ -159,7 +154,7 @@ func fromGCSBucketAttrs(attrs storage.BucketAttrs) (*cloud.BucketAttrs, error) {
 		return nil, fmt.Errorf("gcs StorageClass %s doesnt map to any bucket StorageClass", attrs.StorageClass)
 	}
 
-	gcsLifeCycle := fromGCSLifeCycle(attrs.Lifecycle)
+	lifeCycle := fromGCSLifeCycle(attrs.Lifecycle)
 
 	return &cloud.BucketAttrs{
 		Name:     attrs.Name,
@@ -171,7 +166,7 @@ func fromGCSBucketAttrs(attrs storage.BucketAttrs) (*cloud.BucketAttrs, error) {
 			},
 			StorageClass: sc,
 			Labels:       attrs.Labels,
-			Lifecycle:    &gcsLifeCycle,
+			Lifecycle:    &lifeCycle,
 		},
 	}, nil
 }

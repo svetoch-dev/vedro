@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 
 	"cloud.google.com/go/storage"
 	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -77,6 +78,10 @@ func setGCSLabels(
 		return
 	}
 
+	if maps.Equal(desiredLabels, actualLabels) {
+		return
+	}
+
 	for k, v := range desiredLabels {
 		attrs.SetLabel(k, v)
 	}
@@ -114,7 +119,7 @@ func toGCSLifeCycle(lifeCycle *vedrov1alpha1.BucketLifecycle) (storage.Lifecycle
 
 		var condition *storage.LifecycleCondition
 
-		if rule.AgeDays != nil {
+		if rule.AgeDays != nil && *rule.AgeDays > 0 {
 			condition = &storage.LifecycleCondition{
 				AgeInDays: *rule.AgeDays,
 			}

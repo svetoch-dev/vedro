@@ -1,4 +1,20 @@
 apiVersion: vedro.svetoch.dev/v1alpha1
+kind: ProviderConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: vedro
+    app.kubernetes.io/managed-by: kustomize
+  name: providerconfig-sample-gcp
+spec:
+  type: GCP
+  projectId: "kitchenhub-internal"
+  region: europe-west2
+  method: StaticCredentials
+  credentialsSecretRef:
+    name: gcp-creds
+    namespace: vedro-system
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
 kind: Bucket
 metadata:
   labels:
@@ -19,8 +35,7 @@ spec:
 
   lifecycle:
     rules:
-      - name: delete-old-logs
-        enabled: true
+      - enabled: true
         ageDays: 90
         action: Delete
 

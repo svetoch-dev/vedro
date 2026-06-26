@@ -16,51 +16,6 @@ import (
 	// "github.com/svetoch-dev/vedro/internal/helpers"
 )
 
-var (
-	unsupportedFeatures = map[string]vedro.UnsupportedFeature{
-		"Versioning": vedro.UnsupportedFeature{
-			Field:   "spec.Versioning",
-			Message: "Versioning is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedVersioning,
-		},
-		"Lifecycle": vedro.UnsupportedFeature{
-			Field:   "spec.lifecycle",
-			Message: "Lifecycle is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLifecycle,
-		},
-		"LifecycleEpiration": vedro.UnsupportedFeature{
-			Field:   "spec.lifecycle.rules[%d].AgeDays",
-			Message: "Object expiration is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLifecycleExpiration,
-		},
-		"LifecycleNamed": vedro.UnsupportedFeature{
-			Field:   "spec.lifecycle.rules[%d].Name",
-			Message: "Named lifecycle rules are not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLifecycleNamed,
-		},
-		"Labels": vedro.UnsupportedFeature{
-			Field:   "spec.Labels",
-			Message: "Labels are not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLabels,
-		},
-		"PublicAccessPrevention": vedro.UnsupportedFeature{
-			Field:   "spec.PublicAccessPrevention",
-			Message: "PublicAccessPrevention is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedPublicAccessPrevention,
-		},
-		"StorageClassInfrequent": vedro.UnsupportedFeature{
-			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassInfrequentAccess),
-			Reason:  vedro.BucketUnsupportedStorageClass,
-		},
-		"StorageClassArchive": vedro.UnsupportedFeature{
-			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassArchive),
-			Reason:  vedro.BucketUnsupportedStorageClass,
-		},
-	}
-)
-
 var _ = Describe("ValidateBucketCapabilities", func() {
 
 	It("returns empty []UnsupportedFeature if spec is default", func() {

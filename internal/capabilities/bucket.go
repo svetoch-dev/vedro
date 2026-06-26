@@ -7,6 +7,51 @@ import (
 	"github.com/svetoch-dev/vedro/internal/cloud"
 )
 
+var (
+	unsupportedFeatures = map[string]vedro.UnsupportedFeature{
+		"Versioning": vedro.UnsupportedFeature{
+			Field:   "spec.Versioning",
+			Message: "Versioning is not supported by this provider",
+			Reason:  vedro.BucketUnsupportedVersioning,
+		},
+		"Lifecycle": vedro.UnsupportedFeature{
+			Field:   "spec.lifecycle",
+			Message: "Lifecycle is not supported by this provider",
+			Reason:  vedro.BucketUnsupportedLifecycle,
+		},
+		"LifecycleEpiration": vedro.UnsupportedFeature{
+			Field:   "spec.lifecycle.rules[%d].AgeDays",
+			Message: "Object expiration is not supported by this provider",
+			Reason:  vedro.BucketUnsupportedLifecycleExpiration,
+		},
+		"LifecycleNamed": vedro.UnsupportedFeature{
+			Field:   "spec.lifecycle.rules[%d].Name",
+			Message: "Named lifecycle rules are not supported by this provider",
+			Reason:  vedro.BucketUnsupportedLifecycleNamed,
+		},
+		"Labels": vedro.UnsupportedFeature{
+			Field:   "spec.Labels",
+			Message: "Labels are not supported by this provider",
+			Reason:  vedro.BucketUnsupportedLabels,
+		},
+		"PublicAccessPrevention": vedro.UnsupportedFeature{
+			Field:   "spec.PublicAccessPrevention",
+			Message: "PublicAccessPrevention is not supported by this provider",
+			Reason:  vedro.BucketUnsupportedPublicAccessPrevention,
+		},
+		"StorageClassInfrequent": vedro.UnsupportedFeature{
+			Field:   "spec.StorageClass",
+			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassInfrequentAccess),
+			Reason:  vedro.BucketUnsupportedStorageClass,
+		},
+		"StorageClassArchive": vedro.UnsupportedFeature{
+			Field:   "spec.StorageClass",
+			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassArchive),
+			Reason:  vedro.BucketUnsupportedStorageClass,
+		},
+	}
+)
+
 func lifecycleHasExpiredRule(rules []vedro.BucketLifecycleRule) (bool, int) {
 	for i, rule := range rules {
 		if rule.AgeDays != nil {
@@ -33,70 +78,42 @@ func ValidateBucketCapabilities(
 	var unsupported []vedro.UnsupportedFeature
 
 	if spec.Versioning != nil && !caps.Versioning {
-		unsupported = append(unsupported, vedro.UnsupportedFeature{
-			Field:   "spec.Versioning",
-			Message: "Versioning is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedVersioning,
-		})
+		unsupported = append(unsupported, unsupportedFeatures["Versioning"])
 	}
 
 	if spec.Lifecycle != nil && !caps.LifecycleSupported() {
-		unsupported = append(unsupported, vedro.UnsupportedFeature{
-			Field:   "spec.lifecycle",
-			Message: "Lifecycle is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLifecycle,
-		})
+		unsupported = append(unsupported, unsupportedFeatures["Lifecycle"])
 	}
 
 	if spec.Lifecycle != nil && caps.LifecycleSupported() {
 		found, index := lifecycleHasExpiredRule(spec.Lifecycle.Rules)
 		if found && !caps.Lifecycle.RuleExpiration {
-			unsupported = append(unsupported, vedro.UnsupportedFeature{
-				Field:   fmt.Sprintf("spec.lifecycle.rules[%d].AgeDays", index),
-				Message: "Object expiration is not supported by this provider",
-				Reason:  vedro.BucketUnsupportedLifecycleExpiration,
-			})
+			uf := unsupportedFeatures["LifecycleEpiration"]
+			uf.Field = fmt.Sprintf(uf.Field, index)
+			unsupported = append(unsupported, uf)
 		}
 		found, index = lifecycleHasNamedRule(spec.Lifecycle.Rules)
 		if found && !caps.Lifecycle.RuleNames {
-			unsupported = append(unsupported, vedro.UnsupportedFeature{
-				Field:   fmt.Sprintf("spec.lifecycle.rules[%d].Name", index),
-				Message: "Named lifecycle rules are not supported by this provider",
-				Reason:  vedro.BucketUnsupportedLifecycleNamed,
-			})
+			uf := unsupportedFeatures["LifecycleNamed"]
+			uf.Field = fmt.Sprintf(uf.Field, index)
+			unsupported = append(unsupported, uf)
 		}
 	}
 
 	if len(spec.Labels) > 0 && !caps.Labels {
-		unsupported = append(unsupported, vedro.UnsupportedFeature{
-			Field:   "spec.Labels",
-			Message: "Labels are not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLabels,
-		})
+		unsupported = append(unsupported, unsupportedFeatures["Labels"])
 	}
 
 	if spec.PublicAccessPrevention != nil && !caps.PublicAccessPrevention {
-		unsupported = append(unsupported, vedro.UnsupportedFeature{
-			Field:   "spec.PublicAccessPrevention",
-			Message: "PublicAccessPrevention is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedPublicAccessPrevention,
-		})
+		unsupported = append(unsupported, unsupportedFeatures["PublicAccessPrevention"])
 	}
 
 	if spec.StorageClass == vedro.BucketStorageClassInfrequentAccess && !caps.StorageClass.InfrequentAccess {
-		unsupported = append(unsupported, vedro.UnsupportedFeature{
-			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassInfrequentAccess),
-			Reason:  vedro.BucketUnsupportedStorageClass,
-		})
+		unsupported = append(unsupported, unsupportedFeatures["StorageClassInfrequent"])
 	}
 
 	if spec.StorageClass == vedro.BucketStorageClassArchive && !caps.StorageClass.Archive {
-		unsupported = append(unsupported, vedro.UnsupportedFeature{
-			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassArchive),
-			Reason:  vedro.BucketUnsupportedStorageClass,
-		})
+		unsupported = append(unsupported, unsupportedFeatures["StorageClassArchive"])
 	}
 
 	return unsupported

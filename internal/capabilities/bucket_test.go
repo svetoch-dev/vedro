@@ -31,7 +31,7 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 			Labels:                 true,
 		}
 		bucket := vedro.BucketSpec{
-			StorageClass:           "Standard",
+			StorageClass:           vedro.BucketStorageClassStandard,
 			PublicAccessPrevention: helpers.Ptr(true),
 			Versioning: &vedro.BucketVersioning{
 				Enabled: true,
@@ -146,6 +146,59 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 		unsupported := ValidateBucketCapabilities(caps, bucket)
 		Expect(unsupported).NotTo(BeEmpty())
 		Expect(unsupported).To(Equal(want))
+	})
+	It("unsupported/set StorageClass Archive/InfrequentAccess", func() {
+		bucket := vedro.BucketSpec{
+			StorageClass: vedro.BucketStorageClassArchive,
+		}
+		caps := cloud.BucketCapabilities{
+			StorageClass: cloud.StorageClassCapabilities{
+				Archive:          false,
+				InfrequentAccess: false,
+			},
+		}
+
+		wantArchive := []vedro.UnsupportedFeature{
+			unsupportedFeatures["StorageClassArchive"],
+		}
+		unsupported := ValidateBucketCapabilities(caps, bucket)
+
+		Expect(unsupported).NotTo(BeEmpty())
+		Expect(unsupported).To(Equal(wantArchive))
+
+		bucket = vedro.BucketSpec{
+			StorageClass: vedro.BucketStorageClassInfrequentAccess,
+		}
+		wantInfrequent := []vedro.UnsupportedFeature{
+			unsupportedFeatures["StorageClassInfrequent"],
+		}
+
+		unsupported = ValidateBucketCapabilities(caps, bucket)
+		Expect(unsupported).NotTo(BeEmpty())
+		Expect(unsupported).To(Equal(wantInfrequent))
+
+	})
+	It("supported/set StorageClass Archive/InfrequentAccess", func() {
+		bucket := vedro.BucketSpec{
+			StorageClass: vedro.BucketStorageClassArchive,
+		}
+		caps := cloud.BucketCapabilities{
+			StorageClass: cloud.StorageClassCapabilities{
+				Archive:          true,
+				InfrequentAccess: true,
+			},
+		}
+
+		unsupported := ValidateBucketCapabilities(caps, bucket)
+
+		Expect(unsupported).To(BeEmpty())
+
+		bucket = vedro.BucketSpec{
+			StorageClass: vedro.BucketStorageClassInfrequentAccess,
+		}
+		unsupported = ValidateBucketCapabilities(caps, bucket)
+
+		Expect(unsupported).To(BeEmpty())
 	})
 
 })

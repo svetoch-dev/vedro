@@ -47,8 +47,13 @@ const bucketFinalizer = "bucket.vedro.svetoch.dev/finalizer"
 // BucketReconciler reconciles a Bucket object
 type BucketReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	provider cloud.Provider
+	Scheme *runtime.Scheme
+	//Needed abstraction for tests
+	ProviderFactory func(
+		ctx context.Context,
+		cfg vedrov1alpha1.ProviderConfig,
+		kubeClient client.Client,
+	) (cloud.Provider, error)
 }
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
@@ -111,7 +116,12 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ReconcileIgnoreNotFound(ctx, providerConfig.Error, "unable to fetch ProviderConfig")
 	}
 
-	provider, err := registry.NewProvider(ctx, providerConfig.ProviderConfig, r.Client)
+	providerFactory := r.ProviderFactory
+	if providerFactory == nil {
+		providerFactory = registry.NewProvider
+	}
+
+	provider, err := providerFactory(ctx, providerConfig.ProviderConfig, r.Client)
 
 	//If error change status conditions and end Reconcile
 	if err != nil {

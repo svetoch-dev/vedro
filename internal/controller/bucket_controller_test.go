@@ -18,84 +18,416 @@ package controller
 
 import (
 	"context"
+	"errors"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	"github.com/svetoch-dev/vedro/internal/cloud"
+	"github.com/svetoch-dev/vedro/internal/conditions"
+	"github.com/svetoch-dev/vedro/internal/validation"
 )
 
-var _ = Describe("Bucket Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+var _ = Describe("BucketReconciler", func() {
+	var (
+		reconciler *BucketReconciler
+		provider   *fakeProvider
+	)
 
-		ctx := context.Background()
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+	BeforeEach(func() {
+		provider = &fakeProvider{
+			capabilities: cloud.Capabilities{
+				Bucket: cloud.BucketCapabilities{
+					Lifecycle: cloud.LifecycleCapabilities{
+						RuleNames:      true,
+						RuleExpiration: true,
+					},
+					StorageClass: cloud.StorageClassCapabilities{
+						Archive:          true,
+						InfrequentAccess: true,
+					},
+					Versioning:             true,
+					PublicAccessPrevention: true,
+					Labels:                 true,
+				},
+			},
+			bucket: &fakeBucketProvider{
+				validateResult: validation.Valid(),
+				ensureResult: &cloud.BucketAttrs{
+					Name:     "external-bucket",
+					Location: "europe-west1",
+					Properties: &vedrov1alpha1.BucketProperties{
+						StorageClass: vedrov1alpha1.BucketStorageClassStandard,
+						Labels: map[string]string{
+							"env": "test",
+						},
+					},
+				},
+			},
 		}
 
-		bucket := &v1alpha1.Bucket{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "vedro.svetoch.dev/v1alpha1",
-				Kind:       "Bucket",
+		reconciler = &BucketReconciler{
+			Client: k8sClient,
+			Scheme: k8sClient.Scheme(),
+			ProviderFactory: func(
+				ctx context.Context,
+				cfg vedrov1alpha1.ProviderConfig,
+				kubeClient client.Client,
+			) (cloud.Provider, error) {
+				return provider, nil
 			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      resourceName,
+		}
+	})
+
+	It("ignores missing Buckets", func() {
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      "missing-bucket",
 				Namespace: "default",
 			},
-			Spec: v1alpha1.BucketSpec{
-				ProviderRef: v1alpha1.ProviderConfigReference{
-					Name: "gcp-dev",
-				},
-				Location: "europe-west1",
-			},
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+	})
+
+	It("adds the finalizer and marks ProviderConfig missing", func() {
+		bucket := createBucket(ctx, "missing-provider", func(spec *vedrov1alpha1.BucketSpec) {
+			spec.ProviderRef.Name = "missing-provider"
+		})
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		Expect(fetched.Finalizers).To(ContainElement(bucketFinalizer))
+		Expect(fetched.Status.ObservedGeneration).To(Equal(fetched.Generation))
+
+		condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeProviderConfigReady)
+		Expect(condition).NotTo(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal(conditions.ReasonProviderConfigNotFound))
+	})
+
+	It("records provider factory errors", func() {
+		bucket := createBucket(ctx, "provider-factory-error")
+		createProviderConfig(ctx, "test-provider")
+		reconciler.ProviderFactory = func(
+			ctx context.Context,
+			cfg vedrov1alpha1.ProviderConfig,
+			kubeClient client.Client,
+		) (cloud.Provider, error) {
+			return nil, errors.New("provider setup failed")
 		}
 
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind Bucket")
-			err := k8sClient.Get(ctx, typeNamespacedName, bucket)
-			if err != nil && errors.IsNotFound(err) {
-				bucket.ResourceVersion = ""
-				Expect(k8sClient.Create(ctx, bucket)).To(Succeed())
-			}
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
 		})
 
-		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			fetchedBucket := &v1alpha1.Bucket{}
-			err := k8sClient.Get(ctx, typeNamespacedName, fetchedBucket)
-			Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
 
-			By("Cleanup the specific resource instance Bucket")
-			Expect(k8sClient.Delete(ctx, fetchedBucket)).To(Succeed())
-		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &BucketReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		providerCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeProviderConfigReady)
+		Expect(providerCondition).NotTo(BeNil())
+		Expect(providerCondition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(providerCondition.Reason).To(Equal(conditions.ReasonProviderConfigError))
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
-		})
-		It("should default DeletionPolicy to Retain", func() {
-			By("Fetching the created resource and verifying the default DeletionPolicy")
-			fetchedBucket := &v1alpha1.Bucket{}
-			err := k8sClient.Get(ctx, typeNamespacedName, fetchedBucket)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fetchedBucket.Spec.DeletionPolicy).To(Equal(v1alpha1.DeletionPolicyRetain))
+		readyCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(readyCondition.Reason).To(Equal(conditions.ReasonProviderConfigError))
+		Expect(provider.bucket.ensureCalls).To(Equal(0))
+	})
+
+	It("records invalid Bucket specs without ensuring the external bucket", func() {
+		bucket := createBucket(ctx, "invalid-spec")
+		createProviderConfig(ctx, "test-provider")
+		provider.bucket.validateResult = validation.Invalid("invalid location")
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
 		})
 
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(condition).NotTo(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal(conditions.ReasonBucketInvalidSpec))
+		Expect(condition.Message).To(Equal("invalid location"))
+		Expect(provider.bucket.ensureCalls).To(Equal(0))
+	})
+
+	It("fails fast when unsupported features are requested with Fail policy", func() {
+		bucket := createBucket(ctx, "unsupported-fail", func(spec *vedrov1alpha1.BucketSpec) {
+			spec.Versioning = &vedrov1alpha1.BucketVersioning{Enabled: true}
+			spec.UnsupportedFeaturePolicy = vedrov1alpha1.UnsupportedFeaturePolicyFail
+		})
+		createProviderConfig(ctx, "test-provider")
+		provider.capabilities.Bucket.Versioning = false
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		Expect(fetched.Status.UnsupportedFeatures).NotTo(BeEmpty())
+		condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(condition).NotTo(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal(conditions.ReasonBucketUnsupportedFeatures))
+		Expect(provider.bucket.ensureCalls).To(Equal(0))
+	})
+
+	It("warns about unsupported features and continues reconciling with Warn policy", func() {
+		bucket := createBucket(ctx, "unsupported-warn", func(spec *vedrov1alpha1.BucketSpec) {
+			spec.Versioning = &vedrov1alpha1.BucketVersioning{Enabled: true}
+			spec.UnsupportedFeaturePolicy = vedrov1alpha1.UnsupportedFeaturePolicyWarn
+		})
+		createProviderConfig(ctx, "test-provider")
+		provider.capabilities.Bucket.Versioning = false
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		Expect(fetched.Status.UnsupportedFeatures).NotTo(BeEmpty())
+		Expect(fetched.Status.ExternalName).To(Equal("external-bucket"))
+		Expect(provider.bucket.ensureCalls).To(Equal(1))
+	})
+
+	It("sets successful Bucket status after ensuring the external bucket", func() {
+		bucket := createBucket(ctx, "successful-reconcile")
+		createProviderConfig(ctx, "test-provider")
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		Expect(fetched.Status.ExternalName).To(Equal("external-bucket"))
+		Expect(fetched.Status.Location).To(Equal("europe-west1"))
+		Expect(fetched.Status.ObservedProvider).To(Equal("test-provider"))
+		Expect(fetched.Status.Applied).NotTo(BeNil())
+		Expect(fetched.Status.Applied.Labels).To(HaveKeyWithValue("env", "test"))
+
+		providerCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeProviderConfigReady)
+		Expect(providerCondition).NotTo(BeNil())
+		Expect(providerCondition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(providerCondition.Reason).To(Equal(conditions.ReasonProviderConfigReconciled))
+
+		readyCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(readyCondition.Reason).To(Equal(conditions.ReasonBucketReconciled))
+		Expect(provider.bucket.ensureCalls).To(Equal(1))
+	})
+
+	It("records ensure errors", func() {
+		bucket := createBucket(ctx, "ensure-error")
+		createProviderConfig(ctx, "test-provider")
+		provider.bucket.ensureErr = errors.New("ensure failed")
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(condition).NotTo(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal(conditions.ReasonBucketEnsureError))
+		Expect(condition.Message).To(Equal("ensure failed"))
+		Expect(provider.bucket.ensureCalls).To(Equal(1))
+	})
+
+	It("deletes the external bucket and removes the finalizer for Delete policy", func() {
+		bucket := createBucket(ctx, "delete-policy", func(spec *vedrov1alpha1.BucketSpec) {
+			spec.DeletionPolicy = vedrov1alpha1.DeletionPolicyDelete
+		})
+		createProviderConfig(ctx, "test-provider")
+		controllerutilAddFinalizer(ctx, bucket)
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(provider.bucket.deleteCalls).To(Equal(1))
+
+		fetched := &vedrov1alpha1.Bucket{}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(bucket), fetched)
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
 })
+
+type fakeProvider struct {
+	capabilities cloud.Capabilities
+	bucket       *fakeBucketProvider
+}
+
+func (p *fakeProvider) Capabilities() cloud.Capabilities {
+	return p.capabilities
+}
+
+func (p *fakeProvider) Bucket() cloud.BucketProvider {
+	return p.bucket
+}
+
+type fakeBucketProvider struct {
+	validateResult validation.ValidationResult
+	ensureResult   *cloud.BucketAttrs
+	ensureErr      error
+	deleteErr      error
+	ensureCalls    int
+	deleteCalls    int
+}
+
+func (p *fakeBucketProvider) ValidateBucketSpec(spec vedrov1alpha1.Bucket) validation.ValidationResult {
+	return p.validateResult
+}
+
+func (p *fakeBucketProvider) EnsureBucket(
+	ctx context.Context,
+	spec vedrov1alpha1.Bucket,
+) (*cloud.BucketAttrs, error) {
+	p.ensureCalls++
+	return p.ensureResult, p.ensureErr
+}
+
+func (p *fakeBucketProvider) DeleteBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) error {
+	p.deleteCalls++
+	return p.deleteErr
+}
+
+func createBucket(
+	ctx context.Context,
+	name string,
+	mutators ...func(*vedrov1alpha1.BucketSpec),
+) *vedrov1alpha1.Bucket {
+	bucket := &vedrov1alpha1.Bucket{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "vedro.svetoch.dev/v1alpha1",
+			Kind:       "Bucket",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+		},
+		Spec: vedrov1alpha1.BucketSpec{
+			ProviderRef: vedrov1alpha1.ProviderConfigReference{
+				Name: "test-provider",
+			},
+			Location:                 "europe-west1",
+			StorageClass:             vedrov1alpha1.BucketStorageClassStandard,
+			DeletionPolicy:           vedrov1alpha1.DeletionPolicyRetain,
+			UnsupportedFeaturePolicy: vedrov1alpha1.UnsupportedFeaturePolicyFail,
+		},
+	}
+
+	for _, mutate := range mutators {
+		mutate(&bucket.Spec)
+	}
+
+	Expect(k8sClient.Create(ctx, bucket)).To(Succeed())
+	DeferCleanup(func() {
+		cleanupBucket(ctx, client.ObjectKeyFromObject(bucket))
+	})
+
+	return bucket
+}
+
+func createProviderConfig(ctx context.Context, name string) *vedrov1alpha1.ProviderConfig {
+	providerConfig := &vedrov1alpha1.ProviderConfig{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "vedro.svetoch.dev/v1alpha1",
+			Kind:       "ProviderConfig",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: vedrov1alpha1.ProviderConfigSpec{
+			Type:      vedrov1alpha1.ProviderTypeGCP,
+			ProjectId: "test-project",
+			Region:    "europe-west1",
+			Method:    vedrov1alpha1.AuthMethodWorkloadIdentity,
+		},
+	}
+
+	Expect(k8sClient.Create(ctx, providerConfig)).To(Succeed())
+	DeferCleanup(func() {
+		cleanupProviderConfig(ctx, client.ObjectKeyFromObject(providerConfig))
+	})
+
+	return providerConfig
+}
+
+func getBucket(ctx context.Context, key client.ObjectKey) *vedrov1alpha1.Bucket {
+	bucket := &vedrov1alpha1.Bucket{}
+	Expect(k8sClient.Get(ctx, key, bucket)).To(Succeed())
+	return bucket
+}
+
+func cleanupBucket(ctx context.Context, key client.ObjectKey) {
+	bucket := &vedrov1alpha1.Bucket{}
+	err := k8sClient.Get(ctx, key, bucket)
+	if apierrors.IsNotFound(err) {
+		return
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	bucket.Finalizers = nil
+	Expect(k8sClient.Update(ctx, bucket)).To(Succeed())
+	err = k8sClient.Delete(ctx, bucket)
+	if err != nil {
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	}
+}
+
+func cleanupProviderConfig(ctx context.Context, key client.ObjectKey) {
+	providerConfig := &vedrov1alpha1.ProviderConfig{}
+	err := k8sClient.Get(ctx, key, providerConfig)
+	if apierrors.IsNotFound(err) {
+		return
+	}
+	Expect(err).NotTo(HaveOccurred())
+	err = k8sClient.Delete(ctx, providerConfig)
+	if err != nil {
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	}
+}
+
+func controllerutilAddFinalizer(ctx context.Context, bucket *vedrov1alpha1.Bucket) {
+	fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+	fetched.Finalizers = append(fetched.Finalizers, bucketFinalizer)
+	Expect(k8sClient.Update(ctx, fetched)).To(Succeed())
+}

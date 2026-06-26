@@ -40,7 +40,7 @@ func ValidateBucketCapabilities(
 		})
 	}
 
-	if spec.Lifecycle != nil && !caps.Lifecycle.Supported {
+	if spec.Lifecycle != nil && !caps.LifecycleSupported() {
 		unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{
 			Field:   "spec.lifecycle",
 			Message: "Lifecycle is not supported by this provider",
@@ -48,7 +48,7 @@ func ValidateBucketCapabilities(
 		})
 	}
 
-	if spec.Lifecycle != nil && caps.Lifecycle.Supported {
+	if spec.Lifecycle != nil && caps.LifecycleSupported() {
 		found, index := lifecycleHasExpiredRule(spec.Lifecycle.Rules)
 		if found && !caps.Lifecycle.RuleExpiration {
 			unsupported = append(unsupported, vedrov1alpha1.UnsupportedFeature{

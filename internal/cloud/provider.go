@@ -31,7 +31,6 @@ type BucketCapabilities struct {
 }
 
 type LifecycleCapabilities struct {
-	Supported      bool
 	RuleNames      bool
 	RuleExpiration bool
 }
@@ -39,6 +38,10 @@ type LifecycleCapabilities struct {
 type StorageClassCapabilities struct {
 	Archive          bool
 	InfrequentAccess bool
+}
+
+func (bc BucketCapabilities) LifecycleSupported() bool {
+	return bc.Lifecycle.RuleExpiration
 }
 
 type BucketAttrs struct {

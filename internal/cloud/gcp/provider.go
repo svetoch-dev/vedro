@@ -76,7 +76,6 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 		Bucket: cloud.BucketCapabilities{
 			Versioning: true,
 			Lifecycle: cloud.LifecycleCapabilities{
-				Supported:      true,
 				RuleExpiration: true,
 			},
 			PublicAccessPrevention: true,

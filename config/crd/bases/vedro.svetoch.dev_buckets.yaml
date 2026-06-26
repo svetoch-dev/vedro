@@ -137,8 +137,9 @@ spec:
                 description: bucket storage class
                 enum:
                 - Standard
-                - InfrequentAccess
-                - Archive
+                - Warm
+                - Cold
+                - Ice
                 type: string
               unsupportedFeaturePolicy:
                 default: Fail

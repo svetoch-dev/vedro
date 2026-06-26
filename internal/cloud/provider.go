@@ -36,8 +36,9 @@ type LifecycleCapabilities struct {
 }
 
 type StorageClassCapabilities struct {
-	Archive          bool
-	InfrequentAccess bool
+	Ice  bool
+	Cold bool
+	Warm bool
 }
 
 func (bc BucketCapabilities) LifecycleSupported() bool {

@@ -438,7 +438,7 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 		Expect(result.Location).To(Equal("EUROPE-WEST1"))
 		Expect(result.Properties).NotTo(BeNil())
 
-		Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassInfrequentAccess))
+		Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassWarm))
 		Expect(result.Properties.PublicAccessPrevention).To(Equal(helpers.Ptr(true)))
 		Expect(result.Properties.Versioning).To(Equal(&vedro.BucketVersioning{Enabled: true}))
 		Expect(result.Properties.Labels).To(Equal(map[string]string{"env": "prod", "team": "data"}))
@@ -481,19 +481,30 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 		Expect(result.Properties.PublicAccessPrevention).To(BeNil())
 	})
 
-	It("maps COLDLINE and ARCHIVE storage classes to Archive", func() {
-		for _, gcsClass := range []string{"COLDLINE", "ARCHIVE"} {
-			in := storage.BucketAttrs{
-				Name:         "my-bucket",
-				Location:     "EUROPE-WEST1",
-				StorageClass: gcsClass,
-			}
-
-			result, err := fromGCSBucketAttrs(in)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassArchive))
+	It("maps COLDLINE storage class to Cold", func() {
+		in := storage.BucketAttrs{
+			Name:         "my-bucket",
+			Location:     "EUROPE-WEST1",
+			StorageClass: "COLDLINE",
 		}
+
+		result, err := fromGCSBucketAttrs(in)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassCold))
+	})
+
+	It("maps ARCHIVE storage class to Ice", func() {
+		in := storage.BucketAttrs{
+			Name:         "my-bucket",
+			Location:     "EUROPE-WEST1",
+			StorageClass: "ARCHIVE",
+		}
+
+		result, err := fromGCSBucketAttrs(in)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassIce))
 	})
 
 	It("returns an empty (non-nil) lifecycle when the GCS lifecycle has no rules", func() {
@@ -580,7 +591,7 @@ var _ = Describe("toGCSBucketAttrs", func() {
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
 			Properties: &vedro.BucketProperties{
-				StorageClass:           vedro.BucketStorageClassInfrequentAccess,
+				StorageClass:           vedro.BucketStorageClassWarm,
 				PublicAccessPrevention: helpers.Ptr(true),
 				Versioning:             &vedro.BucketVersioning{Enabled: true},
 				Labels:                 map[string]string{"env": "prod", "team": "data"},
@@ -627,12 +638,12 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		Expect(result.StorageClass).To(Equal("STANDARD"))
 	})
 
-	It("maps the archive storage class to ARCHIVE", func() {
+	It("maps the ice storage class to ARCHIVE", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
 			Properties: &vedro.BucketProperties{
-				StorageClass: vedro.BucketStorageClassArchive,
+				StorageClass: vedro.BucketStorageClassIce,
 			},
 		}
 
@@ -640,6 +651,21 @@ var _ = Describe("toGCSBucketAttrs", func() {
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(result.StorageClass).To(Equal("ARCHIVE"))
+	})
+
+	It("maps the cold storage class to COLDLINE", func() {
+		in := cloud.BucketAttrs{
+			Name:     "my-bucket",
+			Location: "EUROPE-WEST1",
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClassCold,
+			},
+		}
+
+		result, err := toGCSBucketAttrs(in)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.StorageClass).To(Equal("COLDLINE"))
 	})
 
 	It("maps a nil public access prevention to inherited", func() {
@@ -780,13 +806,24 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("sets the storage class when the patch storage class is set", func() {
 		patch := cloud.BucketPatch{
-			StorageClass: helpers.PatchTo(vedro.BucketStorageClassArchive),
+			StorageClass: helpers.PatchTo(vedro.BucketStorageClassIce),
 		}
 
 		update, err := patchGCSBucketAttrs(patch, currentAttrs)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(update.StorageClass).To(Equal("ARCHIVE"))
+	})
+
+	It("sets the cold storage class when the patch storage class is set", func() {
+		patch := cloud.BucketPatch{
+			StorageClass: helpers.PatchTo(vedro.BucketStorageClassCold),
+		}
+
+		update, err := patchGCSBucketAttrs(patch, currentAttrs)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(update.StorageClass).To(Equal("COLDLINE"))
 	})
 
 	It("returns an error when the patch storage class does not map", func() {
@@ -924,7 +961,7 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("maps all set fields at once", func() {
 		patch := cloud.BucketPatch{
-			StorageClass:           helpers.PatchTo(vedro.BucketStorageClassArchive),
+			StorageClass:           helpers.PatchTo(vedro.BucketStorageClassIce),
 			Versioning:             helpers.PatchTo(&vedro.BucketVersioning{Enabled: true}),
 			PublicAccessPrevention: helpers.PatchTo(helpers.Ptr(true)),
 			Lifecycle: helpers.PatchTo(&vedro.BucketLifecycle{

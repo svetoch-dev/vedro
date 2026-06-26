@@ -79,7 +79,7 @@ func BucketProviderTests(cfg Config) bool {
 
 			publicAccessPrevention := true
 			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassArchive
+				b.Spec.StorageClass = vedro.BucketStorageClassIce
 				b.Spec.Labels = map[string]string{"env": "prod"}
 				b.Spec.Versioning = &vedro.BucketVersioning{Enabled: true}
 				b.Spec.PublicAccessPrevention = &publicAccessPrevention
@@ -91,12 +91,12 @@ func BucketProviderTests(cfg Config) bool {
 
 			Expect(fake.Created).NotTo(BeNil())
 			Expect(fake.Created.Location).To(Equal(cfg.Location))
-			Expect(fake.Created.Properties.StorageClass).To(Equal(vedro.BucketStorageClassArchive))
+			Expect(fake.Created.Properties.StorageClass).To(Equal(vedro.BucketStorageClassIce))
 			Expect(fake.Created.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
 			Expect(fake.Created.Properties.Versioning.Enabled).To(BeTrue())
 			Expect(fake.Created.Properties.Lifecycle).To(Equal(&Lifecycle))
 			Expect(*fake.Created.Properties.PublicAccessPrevention).To(BeTrue())
-			Expect(attrs.Properties.StorageClass).To(Equal(vedro.BucketStorageClassArchive))
+			Expect(attrs.Properties.StorageClass).To(Equal(vedro.BucketStorageClassIce))
 			Expect(attrs.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
 			Expect(attrs.Properties.Versioning.Enabled).To(BeTrue())
 			Expect(*attrs.Properties.PublicAccessPrevention).To(BeTrue())
@@ -166,16 +166,16 @@ func BucketProviderTests(cfg Config) bool {
 			)
 
 			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassInfrequentAccess
+				b.Spec.StorageClass = vedro.BucketStorageClassWarm
 			})
 
 			attrs, err := bucket.EnsureBucket(ctx, bckt)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fake.Updated).NotTo(BeNil())
 			Expect(fake.Updated.StorageClass).To(Equal(
-				helpers.PatchTo(vedro.BucketStorageClassInfrequentAccess),
+				helpers.PatchTo(vedro.BucketStorageClassWarm),
 			))
-			Expect(attrs.Properties.StorageClass).To(Equal(vedro.BucketStorageClassInfrequentAccess))
+			Expect(attrs.Properties.StorageClass).To(Equal(vedro.BucketStorageClassWarm))
 		})
 
 		It("updates lifecycle when its empty", func() {
@@ -309,7 +309,7 @@ func BucketProviderTests(cfg Config) bool {
 			fake.UpdateErr = errors.New("update failed")
 
 			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassInfrequentAccess
+				b.Spec.StorageClass = vedro.BucketStorageClassWarm
 			})
 
 			_, err := bucket.EnsureBucket(ctx, bckt)

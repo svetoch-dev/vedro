@@ -18,14 +18,15 @@ import (
 var (
 	gcsStorageClassMapping = map[string]vedro.BucketStorageClass{
 		"STANDARD": vedro.BucketStorageClassStandard,
-		"NEARLINE": vedro.BucketStorageClassInfrequentAccess,
-		"COLDLINE": vedro.BucketStorageClassArchive,
-		"ARCHIVE":  vedro.BucketStorageClassArchive,
+		"NEARLINE": vedro.BucketStorageClassWarm,
+		"COLDLINE": vedro.BucketStorageClassCold,
+		"ARCHIVE":  vedro.BucketStorageClassIce,
 	}
 	storageClassMapping = map[vedro.BucketStorageClass]string{
-		vedro.BucketStorageClassStandard:         "STANDARD",
-		vedro.BucketStorageClassInfrequentAccess: "NEARLINE",
-		vedro.BucketStorageClassArchive:          "ARCHIVE",
+		vedro.BucketStorageClassStandard: "STANDARD",
+		vedro.BucketStorageClassWarm:     "NEARLINE",
+		vedro.BucketStorageClassCold:     "COLDLINE",
+		vedro.BucketStorageClassIce:      "ARCHIVE",
 	}
 	gcsPublicAccessPreventionMapping = map[storage.PublicAccessPrevention]*bool{
 		storage.PublicAccessPreventionInherited: helpers.Ptr(false),

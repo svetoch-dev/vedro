@@ -34,9 +34,10 @@ const (
 type BucketStorageClass string
 
 const (
-	BucketStorageClassStandard         BucketStorageClass = "Standard"
-	BucketStorageClassInfrequentAccess BucketStorageClass = "InfrequentAccess"
-	BucketStorageClassArchive          BucketStorageClass = "Archive"
+	BucketStorageClassStandard BucketStorageClass = "Standard"
+	BucketStorageClassWarm     BucketStorageClass = "Warm"
+	BucketStorageClassCold     BucketStorageClass = "Cold"
+	BucketStorageClassIce      BucketStorageClass = "Ice"
 )
 
 type BucketLifecycleAction string
@@ -107,7 +108,7 @@ type BucketSpec struct {
 
 	// bucket storage class
 	//
-	// +kubebuilder:validation:Enum=Standard;InfrequentAccess;Archive
+	// +kubebuilder:validation:Enum=Standard;Warm;Cold;Ice
 	// +kubebuilder:default:=Standard
 	// +optional
 	StorageClass BucketStorageClass `json:"storageClass,omitempty"`

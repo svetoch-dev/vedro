@@ -29,6 +29,7 @@ spec:
 
   deletionPolicy: Retain
   publicAccessPrevention: false
+  storageClass: Standard
 
   versioning:
     enabled: true

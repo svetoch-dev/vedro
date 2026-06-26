@@ -50,8 +50,9 @@ var _ = Describe("BucketReconciler", func() {
 						RuleExpiration: true,
 					},
 					StorageClass: cloud.StorageClassCapabilities{
-						Archive:          true,
-						InfrequentAccess: true,
+						Ice:  true,
+						Cold: true,
+						Warm: true,
 					},
 					Versioning:             true,
 					PublicAccessPrevention: true,

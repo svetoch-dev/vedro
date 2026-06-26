@@ -39,14 +39,19 @@ var (
 			Message: "PublicAccessPrevention is not supported by this provider",
 			Reason:  vedro.BucketUnsupportedPublicAccessPrevention,
 		},
-		"StorageClassInfrequent": vedro.UnsupportedFeature{
+		"StorageClassWarm": vedro.UnsupportedFeature{
 			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassInfrequentAccess),
+			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassWarm),
 			Reason:  vedro.BucketUnsupportedStorageClass,
 		},
-		"StorageClassArchive": vedro.UnsupportedFeature{
+		"StorageClassIce": vedro.UnsupportedFeature{
 			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassArchive),
+			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassIce),
+			Reason:  vedro.BucketUnsupportedStorageClass,
+		},
+		"StorageClassCold": vedro.UnsupportedFeature{
+			Field:   "spec.StorageClass",
+			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassCold),
 			Reason:  vedro.BucketUnsupportedStorageClass,
 		},
 	}
@@ -108,12 +113,16 @@ func ValidateBucketCapabilities(
 		unsupported = append(unsupported, unsupportedFeatures["PublicAccessPrevention"])
 	}
 
-	if spec.StorageClass == vedro.BucketStorageClassInfrequentAccess && !caps.StorageClass.InfrequentAccess {
-		unsupported = append(unsupported, unsupportedFeatures["StorageClassInfrequent"])
+	if spec.StorageClass == vedro.BucketStorageClassWarm && !caps.StorageClass.Warm {
+		unsupported = append(unsupported, unsupportedFeatures["StorageClassWarm"])
 	}
 
-	if spec.StorageClass == vedro.BucketStorageClassArchive && !caps.StorageClass.Archive {
-		unsupported = append(unsupported, unsupportedFeatures["StorageClassArchive"])
+	if spec.StorageClass == vedro.BucketStorageClassIce && !caps.StorageClass.Ice {
+		unsupported = append(unsupported, unsupportedFeatures["StorageClassIce"])
+	}
+
+	if spec.StorageClass == vedro.BucketStorageClassCold && !caps.StorageClass.Cold {
+		unsupported = append(unsupported, unsupportedFeatures["StorageClassCold"])
 	}
 
 	return unsupported

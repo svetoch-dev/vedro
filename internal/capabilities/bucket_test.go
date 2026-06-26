@@ -147,45 +147,57 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 		Expect(unsupported).NotTo(BeEmpty())
 		Expect(unsupported).To(Equal(want))
 	})
-	It("unsupported/set StorageClass Archive/InfrequentAccess", func() {
+	It("unsupported/set StorageClass Ice/Warm", func() {
 		bucket := vedro.BucketSpec{
-			StorageClass: vedro.BucketStorageClassArchive,
+			StorageClass: vedro.BucketStorageClassIce,
 		}
 		caps := cloud.BucketCapabilities{
 			StorageClass: cloud.StorageClassCapabilities{
-				Archive:          false,
-				InfrequentAccess: false,
+				Ice:  false,
+				Cold: false,
+				Warm: false,
 			},
 		}
 
-		wantArchive := []vedro.UnsupportedFeature{
-			unsupportedFeatures["StorageClassArchive"],
+		wantIce := []vedro.UnsupportedFeature{
+			unsupportedFeatures["StorageClassIce"],
 		}
 		unsupported := ValidateBucketCapabilities(caps, bucket)
 
 		Expect(unsupported).NotTo(BeEmpty())
-		Expect(unsupported).To(Equal(wantArchive))
+		Expect(unsupported).To(Equal(wantIce))
 
 		bucket = vedro.BucketSpec{
-			StorageClass: vedro.BucketStorageClassInfrequentAccess,
+			StorageClass: vedro.BucketStorageClassWarm,
 		}
 		wantInfrequent := []vedro.UnsupportedFeature{
-			unsupportedFeatures["StorageClassInfrequent"],
+			unsupportedFeatures["StorageClassWarm"],
 		}
 
 		unsupported = ValidateBucketCapabilities(caps, bucket)
 		Expect(unsupported).NotTo(BeEmpty())
 		Expect(unsupported).To(Equal(wantInfrequent))
 
+		bucket = vedro.BucketSpec{
+			StorageClass: vedro.BucketStorageClassCold,
+		}
+		wantCold := []vedro.UnsupportedFeature{
+			unsupportedFeatures["StorageClassCold"],
+		}
+
+		unsupported = ValidateBucketCapabilities(caps, bucket)
+		Expect(unsupported).NotTo(BeEmpty())
+		Expect(unsupported).To(Equal(wantCold))
 	})
-	It("supported/set StorageClass Archive/InfrequentAccess", func() {
+	It("supported/set StorageClass Ice/Warm", func() {
 		bucket := vedro.BucketSpec{
-			StorageClass: vedro.BucketStorageClassArchive,
+			StorageClass: vedro.BucketStorageClassIce,
 		}
 		caps := cloud.BucketCapabilities{
 			StorageClass: cloud.StorageClassCapabilities{
-				Archive:          true,
-				InfrequentAccess: true,
+				Ice:  true,
+				Cold: true,
+				Warm: true,
 			},
 		}
 
@@ -194,7 +206,14 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 		Expect(unsupported).To(BeEmpty())
 
 		bucket = vedro.BucketSpec{
-			StorageClass: vedro.BucketStorageClassInfrequentAccess,
+			StorageClass: vedro.BucketStorageClassWarm,
+		}
+		unsupported = ValidateBucketCapabilities(caps, bucket)
+
+		Expect(unsupported).To(BeEmpty())
+
+		bucket = vedro.BucketSpec{
+			StorageClass: vedro.BucketStorageClassCold,
 		}
 		unsupported = ValidateBucketCapabilities(caps, bucket)
 

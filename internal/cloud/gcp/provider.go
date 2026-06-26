@@ -80,8 +80,9 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 			},
 			PublicAccessPrevention: true,
 			StorageClass: cloud.StorageClassCapabilities{
-				Archive:          true,
-				InfrequentAccess: true,
+				Ice:  true,
+				Cold: true,
+				Warm: true,
 			},
 			Labels: true,
 		},

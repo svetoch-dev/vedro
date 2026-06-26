@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/gammazero/workerpool"
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/validation"
@@ -54,7 +54,7 @@ type Bucket struct {
 	api cloud.BucketAPI
 }
 
-func (b *Bucket) ValidateBucketSpec(bckt vedrov1alpha1.Bucket) validation.ValidationResult {
+func (b *Bucket) ValidateBucketSpec(bckt vedro.Bucket) validation.ValidationResult {
 	spec := bckt.Spec
 
 	v := validation.ValidateBucketNameImmutability(bckt)
@@ -78,7 +78,7 @@ func (b *Bucket) ValidateBucketSpec(bckt vedrov1alpha1.Bucket) validation.Valida
 	return validation.Valid()
 }
 
-func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*cloud.BucketAttrs, error) {
+func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.BucketAttrs, error) {
 	spec := bckt.Spec
 
 	bucketName := helpers.BucketNameFromCR(bckt)
@@ -93,7 +93,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 		createAttrs := cloud.BucketAttrs{
 			Name:     bucketName,
 			Location: spec.Location,
-			Properties: &vedrov1alpha1.BucketProperties{
+			Properties: &vedro.BucketProperties{
 				PublicAccessPrevention: helpers.NormalizedBucketPAP(spec.PublicAccessPrevention),
 				Versioning:             helpers.NormalizedBucketVersioning(spec.Versioning),
 				Lifecycle:              helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps),
@@ -172,10 +172,10 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) (*
 	return appliedState, nil
 }
 
-func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) error {
+func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedro.Bucket) error {
 	bucketName := helpers.BucketNameFromCR(bckt)
 
-	if bckt.Spec.DeletionPolicy != vedrov1alpha1.DeletionPolicyDelete {
+	if bckt.Spec.DeletionPolicy != vedro.DeletionPolicyDelete {
 		return nil
 	}
 

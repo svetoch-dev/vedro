@@ -37,7 +37,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -50,7 +50,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(vedrov1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vedro.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

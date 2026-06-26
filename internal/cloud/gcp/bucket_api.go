@@ -7,7 +7,7 @@ import (
 	"maps"
 
 	"cloud.google.com/go/storage"
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"google.golang.org/api/googleapi"
@@ -16,27 +16,27 @@ import (
 )
 
 var (
-	gcsStorageClassMapping = map[string]vedrov1alpha1.BucketStorageClass{
-		"STANDARD": vedrov1alpha1.BucketStorageClassStandard,
-		"NEARLINE": vedrov1alpha1.BucketStorageClassInfrequentAccess,
-		"COLDLINE": vedrov1alpha1.BucketStorageClassArchive,
-		"ARCHIVE":  vedrov1alpha1.BucketStorageClassArchive,
+	gcsStorageClassMapping = map[string]vedro.BucketStorageClass{
+		"STANDARD": vedro.BucketStorageClassStandard,
+		"NEARLINE": vedro.BucketStorageClassInfrequentAccess,
+		"COLDLINE": vedro.BucketStorageClassArchive,
+		"ARCHIVE":  vedro.BucketStorageClassArchive,
 	}
-	storageClassMapping = map[vedrov1alpha1.BucketStorageClass]string{
-		vedrov1alpha1.BucketStorageClassStandard:         "STANDARD",
-		vedrov1alpha1.BucketStorageClassInfrequentAccess: "NEARLINE",
-		vedrov1alpha1.BucketStorageClassArchive:          "ARCHIVE",
+	storageClassMapping = map[vedro.BucketStorageClass]string{
+		vedro.BucketStorageClassStandard:         "STANDARD",
+		vedro.BucketStorageClassInfrequentAccess: "NEARLINE",
+		vedro.BucketStorageClassArchive:          "ARCHIVE",
 	}
 	gcsPublicAccessPreventionMapping = map[storage.PublicAccessPrevention]*bool{
 		storage.PublicAccessPreventionInherited: helpers.Ptr(false),
 		storage.PublicAccessPreventionEnforced:  helpers.Ptr(true),
 		storage.PublicAccessPreventionUnknown:   nil,
 	}
-	gcsLifeCycleActionMapping = map[string]vedrov1alpha1.BucketLifecycleAction{
-		storage.DeleteAction: vedrov1alpha1.BucketLifecycleActionDelete,
+	gcsLifeCycleActionMapping = map[string]vedro.BucketLifecycleAction{
+		storage.DeleteAction: vedro.BucketLifecycleActionDelete,
 	}
-	lifeCycleActionMapping = map[vedrov1alpha1.BucketLifecycleAction]string{
-		vedrov1alpha1.BucketLifecycleActionDelete: storage.DeleteAction,
+	lifeCycleActionMapping = map[vedro.BucketLifecycleAction]string{
+		vedro.BucketLifecycleActionDelete: storage.DeleteAction,
 	}
 )
 
@@ -52,7 +52,7 @@ func publicAccessPreventionMapping(v *bool) storage.PublicAccessPrevention {
 	return storage.PublicAccessPreventionInherited
 }
 
-func versioningMapping(v *vedrov1alpha1.BucketVersioning) bool {
+func versioningMapping(v *vedro.BucketVersioning) bool {
 	if v == nil {
 		return false
 	}
@@ -93,7 +93,7 @@ func setGCSLabels(
 	}
 }
 
-func toGCSLifeCycle(lifeCycle *vedrov1alpha1.BucketLifecycle) (storage.Lifecycle, error) {
+func toGCSLifeCycle(lifeCycle *vedro.BucketLifecycle) (storage.Lifecycle, error) {
 	gcsLifeCycle := storage.Lifecycle{}
 
 	if lifeCycle == nil {
@@ -136,12 +136,12 @@ func toGCSLifeCycle(lifeCycle *vedrov1alpha1.BucketLifecycle) (storage.Lifecycle
 	return gcsLifeCycle, nil
 }
 
-func fromGCSLifeCycle(lifecycle storage.Lifecycle) vedrov1alpha1.BucketLifecycle {
-	var bucketLifeCycle vedrov1alpha1.BucketLifecycle
+func fromGCSLifeCycle(lifecycle storage.Lifecycle) vedro.BucketLifecycle {
+	var bucketLifeCycle vedro.BucketLifecycle
 
 	for _, rule := range lifecycle.Rules {
 		if rule.Condition.AgeInDays > 0 && rule.Action.Type == storage.DeleteAction {
-			bucketLifeCycle.Rules = append(bucketLifeCycle.Rules, vedrov1alpha1.BucketLifecycleRule{
+			bucketLifeCycle.Rules = append(bucketLifeCycle.Rules, vedro.BucketLifecycleRule{
 				AgeDays: helpers.Ptr(rule.Condition.AgeInDays),
 				Action:  gcsLifeCycleActionMapping[rule.Action.Type],
 				Enabled: true,
@@ -169,9 +169,9 @@ func fromGCSBucketAttrs(attrs storage.BucketAttrs) (*cloud.BucketAttrs, error) {
 	return &cloud.BucketAttrs{
 		Name:     attrs.Name,
 		Location: attrs.Location,
-		Properties: &vedrov1alpha1.BucketProperties{
+		Properties: &vedro.BucketProperties{
 			PublicAccessPrevention: pap,
-			Versioning: &vedrov1alpha1.BucketVersioning{
+			Versioning: &vedro.BucketVersioning{
 				Enabled: attrs.VersioningEnabled,
 			},
 			StorageClass: sc,

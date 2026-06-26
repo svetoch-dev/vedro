@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,7 +13,7 @@ import (
 )
 
 type BucketResolver struct {
-	vedrov1alpha1.Bucket
+	vedro.Bucket
 
 	KubeClient client.Client
 	Logger     logr.Logger
@@ -31,7 +31,7 @@ func (o *BucketResolver) Resolve(
 	name types.NamespacedName,
 ) {
 	o.Error = nil
-	o.Bucket = vedrov1alpha1.Bucket{}
+	o.Bucket = vedro.Bucket{}
 	o.Logger.V(1).Info("getting bucket")
 
 	o.Condition = metav1.Condition{

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 )
 
 var (
@@ -13,7 +13,7 @@ var (
 	bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
 )
 
-func ValidateBucketNameImmutability(bckt vedrov1alpha1.Bucket) ValidationResult {
+func ValidateBucketNameImmutability(bckt vedro.Bucket) ValidationResult {
 	spec := bckt.Spec
 	status := bckt.Status
 

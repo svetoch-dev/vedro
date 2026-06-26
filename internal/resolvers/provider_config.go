@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +19,7 @@ type ResourceResolver interface {
 
 // ProviderConfig
 type ProviderConfigResolver struct {
-	vedrov1alpha1.ProviderConfig
+	vedro.ProviderConfig
 
 	KubeClient client.Client
 	Logger     logr.Logger
@@ -37,7 +37,7 @@ func (o *ProviderConfigResolver) Resolve(
 	name types.NamespacedName,
 ) {
 	o.Error = nil
-	o.ProviderConfig = vedrov1alpha1.ProviderConfig{}
+	o.ProviderConfig = vedro.ProviderConfig{}
 	o.Logger.V(1).Info("getting ProviderConfig")
 
 	o.Condition = metav1.Condition{

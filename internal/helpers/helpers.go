@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"maps"
 
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func BucketNameFromCR(bckt vedrov1alpha1.Bucket) string {
+func BucketNameFromCR(bckt vedro.Bucket) string {
 	bucketName := bckt.Name
 
 	if bckt.Spec.Name != "" {
@@ -61,7 +61,7 @@ func GetSecretData(
 
 func AppliedState(
 	location string,
-	bckt vedrov1alpha1.Bucket,
+	bckt vedro.Bucket,
 	caps cloud.BucketCapabilities,
 ) *cloud.BucketAttrs {
 	spec := bckt.Spec
@@ -70,7 +70,7 @@ func AppliedState(
 	return &cloud.BucketAttrs{
 		Name:     bucketName,
 		Location: location,
-		Properties: &vedrov1alpha1.BucketProperties{
+		Properties: &vedro.BucketProperties{
 			StorageClass:           spec.StorageClass,
 			Labels:                 maps.Clone(spec.Labels),
 			Versioning:             NormalizedBucketVersioning(spec.Versioning.DeepCopy()),
@@ -80,9 +80,9 @@ func AppliedState(
 	}
 }
 
-func NormalizedBucketVersioning(ver *vedrov1alpha1.BucketVersioning) *vedrov1alpha1.BucketVersioning {
+func NormalizedBucketVersioning(ver *vedro.BucketVersioning) *vedro.BucketVersioning {
 	if ver == nil {
-		return &vedrov1alpha1.BucketVersioning{
+		return &vedro.BucketVersioning{
 			Enabled: false,
 		}
 	}
@@ -98,10 +98,10 @@ func NormalizedBucketPAP(pap *bool) *bool {
 }
 
 func NormalizedBucketLifecycle(
-	lifecycle *vedrov1alpha1.BucketLifecycle,
+	lifecycle *vedro.BucketLifecycle,
 	caps cloud.BucketCapabilities,
-) *vedrov1alpha1.BucketLifecycle {
-	normalized := &vedrov1alpha1.BucketLifecycle{}
+) *vedro.BucketLifecycle {
+	normalized := &vedro.BucketLifecycle{}
 	if lifecycle == nil || len(lifecycle.Rules) == 0 {
 		return normalized
 	}
@@ -112,7 +112,7 @@ func NormalizedBucketLifecycle(
 		}
 		if !caps.Lifecycle.RuleNames {
 			normalized.Rules = append(normalized.Rules,
-				vedrov1alpha1.BucketLifecycleRule{
+				vedro.BucketLifecycleRule{
 					AgeDays: rule.AgeDays,
 					Action:  rule.Action,
 					Enabled: rule.Enabled,

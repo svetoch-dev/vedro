@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"cloud.google.com/go/storage"
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 )
@@ -164,18 +164,18 @@ var _ = Describe("toGCSLifeCycle", func() {
 	})
 
 	It("returns an empty lifecycle when there are no rules", func() {
-		lifecycle, err := toGCSLifeCycle(&vedrov1alpha1.BucketLifecycle{})
+		lifecycle, err := toGCSLifeCycle(&vedro.BucketLifecycle{})
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(lifecycle.Rules).To(BeEmpty())
 	})
 
 	It("skips disabled rules", func() {
-		in := &vedrov1alpha1.BucketLifecycle{
-			Rules: []vedrov1alpha1.BucketLifecycleRule{
+		in := &vedro.BucketLifecycle{
+			Rules: []vedro.BucketLifecycleRule{
 				{
 					Enabled: false,
-					Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+					Action:  vedro.BucketLifecycleActionDelete,
 					AgeDays: helpers.Ptr(int64(30)),
 				},
 			},
@@ -188,11 +188,11 @@ var _ = Describe("toGCSLifeCycle", func() {
 	})
 
 	It("maps an enabled delete rule with an age condition", func() {
-		in := &vedrov1alpha1.BucketLifecycle{
-			Rules: []vedrov1alpha1.BucketLifecycleRule{
+		in := &vedro.BucketLifecycle{
+			Rules: []vedro.BucketLifecycleRule{
 				{
 					Enabled: true,
-					Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+					Action:  vedro.BucketLifecycleActionDelete,
 					AgeDays: helpers.Ptr(int64(30)),
 				},
 			},
@@ -209,11 +209,11 @@ var _ = Describe("toGCSLifeCycle", func() {
 	})
 
 	It("skips rules that have no age condition", func() {
-		in := &vedrov1alpha1.BucketLifecycle{
-			Rules: []vedrov1alpha1.BucketLifecycleRule{
+		in := &vedro.BucketLifecycle{
+			Rules: []vedro.BucketLifecycleRule{
 				{
 					Enabled: true,
-					Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+					Action:  vedro.BucketLifecycleActionDelete,
 					AgeDays: nil,
 				},
 			},
@@ -225,11 +225,11 @@ var _ = Describe("toGCSLifeCycle", func() {
 		Expect(lifecycle.Rules).To(BeEmpty())
 	})
 	It("skips rules that have age condition 0", func() {
-		in := &vedrov1alpha1.BucketLifecycle{
-			Rules: []vedrov1alpha1.BucketLifecycleRule{
+		in := &vedro.BucketLifecycle{
+			Rules: []vedro.BucketLifecycleRule{
 				{
 					Enabled: true,
-					Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+					Action:  vedro.BucketLifecycleActionDelete,
 					AgeDays: helpers.Ptr(int64(0)),
 				},
 			},
@@ -242,21 +242,21 @@ var _ = Describe("toGCSLifeCycle", func() {
 	})
 
 	It("appends multiple enabled rules preserving order", func() {
-		in := &vedrov1alpha1.BucketLifecycle{
-			Rules: []vedrov1alpha1.BucketLifecycleRule{
+		in := &vedro.BucketLifecycle{
+			Rules: []vedro.BucketLifecycleRule{
 				{
 					Enabled: true,
-					Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+					Action:  vedro.BucketLifecycleActionDelete,
 					AgeDays: helpers.Ptr(int64(10)),
 				},
 				{
 					Enabled: false,
-					Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+					Action:  vedro.BucketLifecycleActionDelete,
 					AgeDays: helpers.Ptr(int64(20)),
 				},
 				{
 					Enabled: true,
-					Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+					Action:  vedro.BucketLifecycleActionDelete,
 					AgeDays: helpers.Ptr(int64(30)),
 				},
 			},
@@ -271,11 +271,11 @@ var _ = Describe("toGCSLifeCycle", func() {
 	})
 
 	It("returns an error when an action does not map to a GCS lifecycle action", func() {
-		in := &vedrov1alpha1.BucketLifecycle{
-			Rules: []vedrov1alpha1.BucketLifecycleRule{
+		in := &vedro.BucketLifecycle{
+			Rules: []vedro.BucketLifecycleRule{
 				{
 					Enabled: true,
-					Action:  vedrov1alpha1.BucketLifecycleAction("Unknown"),
+					Action:  vedro.BucketLifecycleAction("Unknown"),
 					AgeDays: helpers.Ptr(int64(30)),
 				},
 			},
@@ -288,16 +288,16 @@ var _ = Describe("toGCSLifeCycle", func() {
 	})
 
 	It("reports the index of the offending rule", func() {
-		in := &vedrov1alpha1.BucketLifecycle{
-			Rules: []vedrov1alpha1.BucketLifecycleRule{
+		in := &vedro.BucketLifecycle{
+			Rules: []vedro.BucketLifecycleRule{
 				{
 					Enabled: true,
-					Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+					Action:  vedro.BucketLifecycleActionDelete,
 					AgeDays: helpers.Ptr(int64(10)),
 				},
 				{
 					Enabled: true,
-					Action:  vedrov1alpha1.BucketLifecycleAction("Unknown"),
+					Action:  vedro.BucketLifecycleAction("Unknown"),
 					AgeDays: helpers.Ptr(int64(30)),
 				},
 			},
@@ -331,7 +331,7 @@ var _ = Describe("fromGCSLifeCycle", func() {
 		Expect(result.Rules).To(HaveLen(1))
 		Expect(result.Rules[0].Enabled).To(BeTrue())
 		Expect(*result.Rules[0].AgeDays).To(Equal(int64(30)))
-		Expect(result.Rules[0].Action).To(Equal(vedrov1alpha1.BucketLifecycleActionDelete))
+		Expect(result.Rules[0].Action).To(Equal(vedro.BucketLifecycleActionDelete))
 	})
 
 	It("skips rules with a zero age condition", func() {
@@ -405,9 +405,9 @@ var _ = Describe("fromGCSLifeCycle", func() {
 
 		Expect(result.Rules).To(HaveLen(2))
 		Expect(*result.Rules[0].AgeDays).To(Equal(int64(10)))
-		Expect(result.Rules[0].Action).To(Equal(vedrov1alpha1.BucketLifecycleActionDelete))
+		Expect(result.Rules[0].Action).To(Equal(vedro.BucketLifecycleActionDelete))
 		Expect(*result.Rules[1].AgeDays).To(Equal(int64(30)))
-		Expect(result.Rules[1].Action).To(Equal(vedrov1alpha1.BucketLifecycleActionDelete))
+		Expect(result.Rules[1].Action).To(Equal(vedro.BucketLifecycleActionDelete))
 	})
 })
 
@@ -438,15 +438,15 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 		Expect(result.Location).To(Equal("EUROPE-WEST1"))
 		Expect(result.Properties).NotTo(BeNil())
 
-		Expect(result.Properties.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassInfrequentAccess))
+		Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassInfrequentAccess))
 		Expect(result.Properties.PublicAccessPrevention).To(Equal(helpers.Ptr(true)))
-		Expect(result.Properties.Versioning).To(Equal(&vedrov1alpha1.BucketVersioning{Enabled: true}))
+		Expect(result.Properties.Versioning).To(Equal(&vedro.BucketVersioning{Enabled: true}))
 		Expect(result.Properties.Labels).To(Equal(map[string]string{"env": "prod", "team": "data"}))
 
 		Expect(result.Properties.Lifecycle).NotTo(BeNil())
 		Expect(result.Properties.Lifecycle.Rules).To(HaveLen(1))
 		Expect(*result.Properties.Lifecycle.Rules[0].AgeDays).To(Equal(int64(30)))
-		Expect(result.Properties.Lifecycle.Rules[0].Action).To(Equal(vedrov1alpha1.BucketLifecycleActionDelete))
+		Expect(result.Properties.Lifecycle.Rules[0].Action).To(Equal(vedro.BucketLifecycleActionDelete))
 		Expect(result.Properties.Lifecycle.Rules[0].Enabled).To(BeTrue())
 	})
 
@@ -463,8 +463,8 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(*result.Properties.PublicAccessPrevention).To(BeFalse())
-		Expect(*result.Properties.Versioning).To(Equal(vedrov1alpha1.BucketVersioning{Enabled: false}))
-		Expect(result.Properties.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassStandard))
+		Expect(*result.Properties.Versioning).To(Equal(vedro.BucketVersioning{Enabled: false}))
+		Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassStandard))
 	})
 
 	It("maps an unknown public access prevention to nil", func() {
@@ -492,7 +492,7 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 			result, err := fromGCSBucketAttrs(in)
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Properties.StorageClass).To(Equal(vedrov1alpha1.BucketStorageClassArchive))
+			Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassArchive))
 		}
 	})
 
@@ -579,16 +579,16 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass:           vedrov1alpha1.BucketStorageClassInfrequentAccess,
+			Properties: &vedro.BucketProperties{
+				StorageClass:           vedro.BucketStorageClassInfrequentAccess,
 				PublicAccessPrevention: helpers.Ptr(true),
-				Versioning:             &vedrov1alpha1.BucketVersioning{Enabled: true},
+				Versioning:             &vedro.BucketVersioning{Enabled: true},
 				Labels:                 map[string]string{"env": "prod", "team": "data"},
-				Lifecycle: &vedrov1alpha1.BucketLifecycle{
-					Rules: []vedrov1alpha1.BucketLifecycleRule{
+				Lifecycle: &vedro.BucketLifecycle{
+					Rules: []vedro.BucketLifecycleRule{
 						{
 							Enabled: true,
-							Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+							Action:  vedro.BucketLifecycleActionDelete,
 							AgeDays: helpers.Ptr(int64(30)),
 						},
 					},
@@ -616,8 +616,8 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass: vedrov1alpha1.BucketStorageClassStandard,
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClassStandard,
 			},
 		}
 
@@ -631,8 +631,8 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass: vedrov1alpha1.BucketStorageClassArchive,
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClassArchive,
 			},
 		}
 
@@ -646,8 +646,8 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass:           vedrov1alpha1.BucketStorageClassStandard,
+			Properties: &vedro.BucketProperties{
+				StorageClass:           vedro.BucketStorageClassStandard,
 				PublicAccessPrevention: nil,
 			},
 		}
@@ -662,8 +662,8 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass:           vedrov1alpha1.BucketStorageClassStandard,
+			Properties: &vedro.BucketProperties{
+				StorageClass:           vedro.BucketStorageClassStandard,
 				PublicAccessPrevention: helpers.Ptr(false),
 			},
 		}
@@ -678,8 +678,8 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass: vedrov1alpha1.BucketStorageClassStandard,
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClassStandard,
 				Versioning:   nil,
 			},
 		}
@@ -694,9 +694,9 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass: vedrov1alpha1.BucketStorageClassStandard,
-				Versioning:   &vedrov1alpha1.BucketVersioning{Enabled: false},
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClassStandard,
+				Versioning:   &vedro.BucketVersioning{Enabled: false},
 			},
 		}
 
@@ -710,8 +710,8 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass: vedrov1alpha1.BucketStorageClassStandard,
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClassStandard,
 				Labels:       nil,
 			},
 		}
@@ -726,8 +726,8 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass: vedrov1alpha1.BucketStorageClassStandard,
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClassStandard,
 				Lifecycle:    nil,
 			},
 		}
@@ -742,8 +742,8 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
 			Location: "EUROPE-WEST1",
-			Properties: &vedrov1alpha1.BucketProperties{
-				StorageClass: vedrov1alpha1.BucketStorageClass("Unknown"),
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClass("Unknown"),
 			},
 		}
 
@@ -759,7 +759,7 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	BeforeEach(func() {
 		currentAttrs = &cloud.BucketAttrs{
-			Properties: &vedrov1alpha1.BucketProperties{
+			Properties: &vedro.BucketProperties{
 				Labels: map[string]string{"keep": "yes", "remove": "no"},
 			},
 		}
@@ -780,7 +780,7 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("sets the storage class when the patch storage class is set", func() {
 		patch := cloud.BucketPatch{
-			StorageClass: helpers.PatchTo(vedrov1alpha1.BucketStorageClassArchive),
+			StorageClass: helpers.PatchTo(vedro.BucketStorageClassArchive),
 		}
 
 		update, err := patchGCSBucketAttrs(patch, currentAttrs)
@@ -791,7 +791,7 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("returns an error when the patch storage class does not map", func() {
 		patch := cloud.BucketPatch{
-			StorageClass: helpers.PatchTo(vedrov1alpha1.BucketStorageClass("Unknown")),
+			StorageClass: helpers.PatchTo(vedro.BucketStorageClass("Unknown")),
 		}
 
 		update, err := patchGCSBucketAttrs(patch, currentAttrs)
@@ -802,7 +802,7 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("enables versioning when the patch versioning is set to enabled", func() {
 		patch := cloud.BucketPatch{
-			Versioning: helpers.PatchTo(&vedrov1alpha1.BucketVersioning{Enabled: true}),
+			Versioning: helpers.PatchTo(&vedro.BucketVersioning{Enabled: true}),
 		}
 
 		update, err := patchGCSBucketAttrs(patch, currentAttrs)
@@ -813,7 +813,7 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("disables versioning when the patch versioning is set to disabled", func() {
 		patch := cloud.BucketPatch{
-			Versioning: helpers.PatchTo(&vedrov1alpha1.BucketVersioning{Enabled: false}),
+			Versioning: helpers.PatchTo(&vedro.BucketVersioning{Enabled: false}),
 		}
 
 		update, err := patchGCSBucketAttrs(patch, currentAttrs)
@@ -824,7 +824,7 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("disables versioning when the patch versioning is nil", func() {
 		patch := cloud.BucketPatch{
-			Versioning: helpers.PatchTo[*vedrov1alpha1.BucketVersioning](nil),
+			Versioning: helpers.PatchTo[*vedro.BucketVersioning](nil),
 		}
 
 		update, err := patchGCSBucketAttrs(patch, currentAttrs)
@@ -868,11 +868,11 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("sets the lifecycle when the patch lifecycle is set", func() {
 		patch := cloud.BucketPatch{
-			Lifecycle: helpers.PatchTo(&vedrov1alpha1.BucketLifecycle{
-				Rules: []vedrov1alpha1.BucketLifecycleRule{
+			Lifecycle: helpers.PatchTo(&vedro.BucketLifecycle{
+				Rules: []vedro.BucketLifecycleRule{
 					{
 						Enabled: true,
-						Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+						Action:  vedro.BucketLifecycleActionDelete,
 						AgeDays: helpers.Ptr(int64(30)),
 					},
 				},
@@ -912,7 +912,7 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("does not touch labels when the patch labels are not set", func() {
 		patch := cloud.BucketPatch{
-			StorageClass: helpers.PatchTo(vedrov1alpha1.BucketStorageClassStandard),
+			StorageClass: helpers.PatchTo(vedro.BucketStorageClassStandard),
 		}
 
 		update, err := patchGCSBucketAttrs(patch, currentAttrs)
@@ -924,14 +924,14 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 
 	It("maps all set fields at once", func() {
 		patch := cloud.BucketPatch{
-			StorageClass:           helpers.PatchTo(vedrov1alpha1.BucketStorageClassArchive),
-			Versioning:             helpers.PatchTo(&vedrov1alpha1.BucketVersioning{Enabled: true}),
+			StorageClass:           helpers.PatchTo(vedro.BucketStorageClassArchive),
+			Versioning:             helpers.PatchTo(&vedro.BucketVersioning{Enabled: true}),
 			PublicAccessPrevention: helpers.PatchTo(helpers.Ptr(true)),
-			Lifecycle: helpers.PatchTo(&vedrov1alpha1.BucketLifecycle{
-				Rules: []vedrov1alpha1.BucketLifecycleRule{
+			Lifecycle: helpers.PatchTo(&vedro.BucketLifecycle{
+				Rules: []vedro.BucketLifecycleRule{
 					{
 						Enabled: true,
-						Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+						Action:  vedro.BucketLifecycleActionDelete,
 						AgeDays: helpers.Ptr(int64(10)),
 					},
 				},

@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	// 	"cloud.google.com/go/storage"
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	// "github.com/svetoch-dev/vedro/internal/cloud"
@@ -17,46 +17,46 @@ import (
 )
 
 var (
-	unsupportedFeatures = map[string]vedrov1alpha1.UnsupportedFeature{
-		"Versioning": vedrov1alpha1.UnsupportedFeature{
+	unsupportedFeatures = map[string]vedro.UnsupportedFeature{
+		"Versioning": vedro.UnsupportedFeature{
 			Field:   "spec.Versioning",
 			Message: "Versioning is not supported by this provider",
-			Reason:  vedrov1alpha1.BucketUnsupportedVersioning,
+			Reason:  vedro.BucketUnsupportedVersioning,
 		},
-		"Lifecycle": vedrov1alpha1.UnsupportedFeature{
+		"Lifecycle": vedro.UnsupportedFeature{
 			Field:   "spec.lifecycle",
 			Message: "Lifecycle is not supported by this provider",
-			Reason:  vedrov1alpha1.BucketUnsupportedLifecycle,
+			Reason:  vedro.BucketUnsupportedLifecycle,
 		},
-		"LifecycleEpiration": vedrov1alpha1.UnsupportedFeature{
+		"LifecycleEpiration": vedro.UnsupportedFeature{
 			Field:   "spec.lifecycle.rules[%d].AgeDays",
 			Message: "Object expiration is not supported by this provider",
-			Reason:  vedrov1alpha1.BucketUnsupportedLifecycleExpiration,
+			Reason:  vedro.BucketUnsupportedLifecycleExpiration,
 		},
-		"LifecycleNamed": vedrov1alpha1.UnsupportedFeature{
+		"LifecycleNamed": vedro.UnsupportedFeature{
 			Field:   "spec.lifecycle.rules[%d].Name",
 			Message: "Named lifecycle rules are not supported by this provider",
-			Reason:  vedrov1alpha1.BucketUnsupportedLifecycleNamed,
+			Reason:  vedro.BucketUnsupportedLifecycleNamed,
 		},
-		"Labels": vedrov1alpha1.UnsupportedFeature{
+		"Labels": vedro.UnsupportedFeature{
 			Field:   "spec.Labels",
 			Message: "Labels are not supported by this provider",
-			Reason:  vedrov1alpha1.BucketUnsupportedLabels,
+			Reason:  vedro.BucketUnsupportedLabels,
 		},
-		"PublicAccessPrevention": vedrov1alpha1.UnsupportedFeature{
+		"PublicAccessPrevention": vedro.UnsupportedFeature{
 			Field:   "spec.PublicAccessPrevention",
 			Message: "PublicAccessPrevention is not supported by this provider",
-			Reason:  vedrov1alpha1.BucketUnsupportedPublicAccessPrevention,
+			Reason:  vedro.BucketUnsupportedPublicAccessPrevention,
 		},
-		"StorageClassInfrequent": vedrov1alpha1.UnsupportedFeature{
+		"StorageClassInfrequent": vedro.UnsupportedFeature{
 			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedrov1alpha1.BucketStorageClassInfrequentAccess),
-			Reason:  vedrov1alpha1.BucketUnsupportedStorageClass,
+			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassInfrequentAccess),
+			Reason:  vedro.BucketUnsupportedStorageClass,
 		},
-		"StorageClassArchive": vedrov1alpha1.UnsupportedFeature{
+		"StorageClassArchive": vedro.UnsupportedFeature{
 			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedrov1alpha1.BucketStorageClassArchive),
-			Reason:  vedrov1alpha1.BucketUnsupportedStorageClass,
+			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassArchive),
+			Reason:  vedro.BucketUnsupportedStorageClass,
 		},
 	}
 )
@@ -65,7 +65,7 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 
 	It("returns empty []UnsupportedFeature if spec is default", func() {
 		caps := cloud.BucketCapabilities{}
-		bucket := vedrov1alpha1.BucketSpec{}
+		bucket := vedro.BucketSpec{}
 		unsupported := ValidateBucketCapabilities(caps, bucket)
 		Expect(unsupported).To(BeEmpty())
 	})
@@ -75,10 +75,10 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 			PublicAccessPrevention: true,
 			Labels:                 true,
 		}
-		bucket := vedrov1alpha1.BucketSpec{
+		bucket := vedro.BucketSpec{
 			StorageClass:           "Standard",
 			PublicAccessPrevention: helpers.Ptr(true),
-			Versioning: &vedrov1alpha1.BucketVersioning{
+			Versioning: &vedro.BucketVersioning{
 				Enabled: true,
 			},
 			Labels: map[string]string{
@@ -94,17 +94,17 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 			PublicAccessPrevention: false,
 			Labels:                 false,
 		}
-		bucket := vedrov1alpha1.BucketSpec{
+		bucket := vedro.BucketSpec{
 			StorageClass:           "Standard",
 			PublicAccessPrevention: helpers.Ptr(true),
-			Versioning: &vedrov1alpha1.BucketVersioning{
+			Versioning: &vedro.BucketVersioning{
 				Enabled: true,
 			},
 			Labels: map[string]string{
 				"some": "label",
 			},
 		}
-		want := []vedrov1alpha1.UnsupportedFeature{
+		want := []vedro.UnsupportedFeature{
 			unsupportedFeatures["Versioning"],
 			unsupportedFeatures["Labels"],
 			unsupportedFeatures["PublicAccessPrevention"],
@@ -121,14 +121,14 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 				RuleExpiration: true,
 			},
 		}
-		bucket := vedrov1alpha1.BucketSpec{
-			Lifecycle: &vedrov1alpha1.BucketLifecycle{
-				Rules: []vedrov1alpha1.BucketLifecycleRule{
+		bucket := vedro.BucketSpec{
+			Lifecycle: &vedro.BucketLifecycle{
+				Rules: []vedro.BucketLifecycleRule{
 					{
 						Name:    helpers.Ptr("name"),
 						Enabled: true,
 						AgeDays: helpers.Ptr(int64(12)),
-						Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+						Action:  vedro.BucketLifecycleActionDelete,
 					},
 				},
 			},
@@ -137,14 +137,14 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 		Expect(unsupported).To(BeEmpty())
 	})
 	It("unsupported/set Lifecycle with expiration rules", func() {
-		bucket := vedrov1alpha1.BucketSpec{
-			Lifecycle: &vedrov1alpha1.BucketLifecycle{
-				Rules: []vedrov1alpha1.BucketLifecycleRule{
+		bucket := vedro.BucketSpec{
+			Lifecycle: &vedro.BucketLifecycle{
+				Rules: []vedro.BucketLifecycleRule{
 					{
 						Name:    helpers.Ptr("name"),
 						Enabled: true,
 						AgeDays: helpers.Ptr(int64(12)),
-						Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+						Action:  vedro.BucketLifecycleActionDelete,
 					},
 				},
 			},
@@ -155,7 +155,7 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 			},
 		}
 
-		want := []vedrov1alpha1.UnsupportedFeature{
+		want := []vedro.UnsupportedFeature{
 			unsupportedFeatures["Lifecycle"],
 		}
 		unsupported := ValidateBucketCapabilities(caps, bucket)
@@ -163,14 +163,14 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 		Expect(unsupported).To(Equal(want))
 	})
 	It("unsupported/set Lifecycle with named rules", func() {
-		bucket := vedrov1alpha1.BucketSpec{
-			Lifecycle: &vedrov1alpha1.BucketLifecycle{
-				Rules: []vedrov1alpha1.BucketLifecycleRule{
+		bucket := vedro.BucketSpec{
+			Lifecycle: &vedro.BucketLifecycle{
+				Rules: []vedro.BucketLifecycleRule{
 					{
 						Name:    helpers.Ptr("name"),
 						Enabled: true,
 						AgeDays: helpers.Ptr(int64(12)),
-						Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+						Action:  vedro.BucketLifecycleActionDelete,
 					},
 				},
 			},
@@ -185,7 +185,7 @@ var _ = Describe("ValidateBucketCapabilities", func() {
 		ufNamed := unsupportedFeatures["LifecycleNamed"]
 		ufNamed.Field = fmt.Sprintf(ufNamed.Field, 0)
 
-		want := []vedrov1alpha1.UnsupportedFeature{
+		want := []vedro.UnsupportedFeature{
 			ufNamed,
 		}
 		unsupported := ValidateBucketCapabilities(caps, bucket)

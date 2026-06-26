@@ -11,27 +11,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 )
 
 func TestBucketNameFromCR(t *testing.T) {
 	tests := []struct {
 		name     string
-		bucket   vedrov1alpha1.Bucket
+		bucket   vedro.Bucket
 		expected string
 	}{
 		{
 			name: "returns metadata.name when spec.name is empty",
-			bucket: vedrov1alpha1.Bucket{
+			bucket: vedro.Bucket{
 				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
 			},
 			expected: "cr-name",
 		},
 		{
 			name: "returns spec.name when set",
-			bucket: vedrov1alpha1.Bucket{
+			bucket: vedro.Bucket{
 				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
-				Spec:       vedrov1alpha1.BucketSpec{Name: "actual-bucket"},
+				Spec:       vedro.BucketSpec{Name: "actual-bucket"},
 			},
 			expected: "actual-bucket",
 		},

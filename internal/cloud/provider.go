@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/validation"
 )
 
@@ -48,7 +48,7 @@ type BucketAttrs struct {
 	Name     string
 	Location string
 
-	Properties *vedrov1alpha1.BucketProperties
+	Properties *vedro.BucketProperties
 }
 
 type Change[T any] struct {
@@ -62,11 +62,11 @@ type ObjectVersion struct {
 }
 
 type BucketPatch struct {
-	StorageClass           Change[vedrov1alpha1.BucketStorageClass]
+	StorageClass           Change[vedro.BucketStorageClass]
 	Labels                 Change[map[string]string]
-	Versioning             Change[*vedrov1alpha1.BucketVersioning]
+	Versioning             Change[*vedro.BucketVersioning]
 	PublicAccessPrevention Change[*bool]
-	Lifecycle              Change[*vedrov1alpha1.BucketLifecycle]
+	Lifecycle              Change[*vedro.BucketLifecycle]
 }
 
 func (p BucketPatch) HasChanges() bool {
@@ -98,15 +98,15 @@ type BucketAPI interface {
 }
 
 type BucketProvider interface {
-	ValidateBucketSpec(spec vedrov1alpha1.Bucket) validation.ValidationResult
+	ValidateBucketSpec(spec vedro.Bucket) validation.ValidationResult
 
 	EnsureBucket(
 		ctx context.Context,
-		spec vedrov1alpha1.Bucket,
+		spec vedro.Bucket,
 	) (*BucketAttrs, error)
 
 	DeleteBucket(
 		ctx context.Context,
-		bckt vedrov1alpha1.Bucket,
+		bckt vedro.Bucket,
 	) error
 }

@@ -4,14 +4,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	cloudtest "github.com/svetoch-dev/vedro/internal/cloud/test"
 )
 
 // newBucketCR is a small package-local helper so the GCP-specific specs
 // (ValidateBucketSpec, and the unmapped storage class case) stay concise.
-func newBucketCR(name string, location string, mods ...func(*vedrov1alpha1.Bucket)) vedrov1alpha1.Bucket {
+func newBucketCR(name string, location string, mods ...func(*vedro.Bucket)) vedro.Bucket {
 	return cloudtest.NewBucketCR(name, location, mods...)
 }
 

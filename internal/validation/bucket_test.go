@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,12 +28,12 @@ func TestInvalid(t *testing.T) {
 	}
 }
 
-func newBucket(name, specName, externalName string) vedrov1alpha1.Bucket {
-	return vedrov1alpha1.Bucket{
-		Spec: vedrov1alpha1.BucketSpec{
+func newBucket(name, specName, externalName string) vedro.Bucket {
+	return vedro.Bucket{
+		Spec: vedro.BucketSpec{
 			Name: specName,
 		},
-		Status: vedrov1alpha1.BucketStatus{
+		Status: vedro.BucketStatus{
 			ExternalName: externalName,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -45,7 +45,7 @@ func newBucket(name, specName, externalName string) vedrov1alpha1.Bucket {
 func TestValidateBucketNameImmutability(t *testing.T) {
 	tests := []struct {
 		name    string
-		bucket  vedrov1alpha1.Bucket
+		bucket  vedro.Bucket
 		valid   bool
 		message string
 	}{

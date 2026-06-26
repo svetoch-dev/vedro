@@ -9,7 +9,7 @@ import (
 	"google.golang.org/api/iterator"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 )
@@ -17,14 +17,14 @@ import (
 func NewBucketCR(
 	name string,
 	location string,
-	mods ...func(*vedrov1alpha1.Bucket),
-) vedrov1alpha1.Bucket {
-	b := vedrov1alpha1.Bucket{
+	mods ...func(*vedro.Bucket),
+) vedro.Bucket {
+	b := vedro.Bucket{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: vedrov1alpha1.BucketSpec{
-			ProviderRef: vedrov1alpha1.ProviderConfigReference{Name: "some-provider"},
+		Spec: vedro.BucketSpec{
+			ProviderRef: vedro.ProviderConfigReference{Name: "some-provider"},
 			Location:    location,
 		},
 	}
@@ -37,14 +37,14 @@ func NewBucketCR(
 func NewBucketAttrs(
 	name string,
 	location string,
-	storageClass vedrov1alpha1.BucketStorageClass,
-	mods ...func(*vedrov1alpha1.BucketProperties),
+	storageClass vedro.BucketStorageClass,
+	mods ...func(*vedro.BucketProperties),
 ) *cloud.BucketAttrs {
-	properties := &vedrov1alpha1.BucketProperties{
+	properties := &vedro.BucketProperties{
 		StorageClass:           storageClass,
 		PublicAccessPrevention: helpers.Ptr(false),
-		Lifecycle:              &vedrov1alpha1.BucketLifecycle{},
-		Versioning:             &vedrov1alpha1.BucketVersioning{Enabled: false},
+		Lifecycle:              &vedro.BucketLifecycle{},
+		Versioning:             &vedro.BucketVersioning{Enabled: false},
 	}
 	for _, mod := range mods {
 		mod(properties)
@@ -56,11 +56,11 @@ func NewBucketAttrs(
 	}
 }
 
-var Lifecycle = vedrov1alpha1.BucketLifecycle{
-	Rules: []vedrov1alpha1.BucketLifecycleRule{
+var Lifecycle = vedro.BucketLifecycle{
+	Rules: []vedro.BucketLifecycleRule{
 		{
 			AgeDays: helpers.Ptr(int64(2)),
-			Action:  vedrov1alpha1.BucketLifecycleActionDelete,
+			Action:  vedro.BucketLifecycleActionDelete,
 			Enabled: true,
 		},
 	},
@@ -174,7 +174,7 @@ func (f *FakeBucketAPI) UpdateBucket(
 	}
 
 	if f.Attrs.Properties == nil {
-		f.Attrs.Properties = &vedrov1alpha1.BucketProperties{}
+		f.Attrs.Properties = &vedro.BucketProperties{}
 	}
 	if patch.StorageClass.Set {
 		f.Attrs.Properties.StorageClass = patch.StorageClass.Value

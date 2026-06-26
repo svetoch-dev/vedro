@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	vedrov1alpha1 "github.com/svetoch-dev/vedro/api/v1alpha1"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	"github.com/svetoch-dev/vedro/internal/validation"
@@ -63,8 +63,8 @@ var _ = Describe("BucketReconciler", func() {
 				ensureResult: &cloud.BucketAttrs{
 					Name:     "external-bucket",
 					Location: "europe-west1",
-					Properties: &vedrov1alpha1.BucketProperties{
-						StorageClass: vedrov1alpha1.BucketStorageClassStandard,
+					Properties: &vedro.BucketProperties{
+						StorageClass: vedro.BucketStorageClassStandard,
 						Labels: map[string]string{
 							"env": "test",
 						},
@@ -78,7 +78,7 @@ var _ = Describe("BucketReconciler", func() {
 			Scheme: k8sClient.Scheme(),
 			ProviderFactory: func(
 				ctx context.Context,
-				cfg vedrov1alpha1.ProviderConfig,
+				cfg vedro.ProviderConfig,
 				kubeClient client.Client,
 			) (cloud.Provider, error) {
 				return provider, nil
@@ -99,7 +99,7 @@ var _ = Describe("BucketReconciler", func() {
 	})
 
 	It("adds the finalizer and marks ProviderConfig missing", func() {
-		bucket := createBucket(ctx, "missing-provider", func(spec *vedrov1alpha1.BucketSpec) {
+		bucket := createBucket(ctx, "missing-provider", func(spec *vedro.BucketSpec) {
 			spec.ProviderRef.Name = "missing-provider"
 		})
 
@@ -125,7 +125,7 @@ var _ = Describe("BucketReconciler", func() {
 		createProviderConfig(ctx, "test-provider")
 		reconciler.ProviderFactory = func(
 			ctx context.Context,
-			cfg vedrov1alpha1.ProviderConfig,
+			cfg vedro.ProviderConfig,
 			kubeClient client.Client,
 		) (cloud.Provider, error) {
 			return nil, errors.New("provider setup failed")
@@ -173,9 +173,9 @@ var _ = Describe("BucketReconciler", func() {
 	})
 
 	It("fails fast when unsupported features are requested with Fail policy", func() {
-		bucket := createBucket(ctx, "unsupported-fail", func(spec *vedrov1alpha1.BucketSpec) {
-			spec.Versioning = &vedrov1alpha1.BucketVersioning{Enabled: true}
-			spec.UnsupportedFeaturePolicy = vedrov1alpha1.UnsupportedFeaturePolicyFail
+		bucket := createBucket(ctx, "unsupported-fail", func(spec *vedro.BucketSpec) {
+			spec.Versioning = &vedro.BucketVersioning{Enabled: true}
+			spec.UnsupportedFeaturePolicy = vedro.UnsupportedFeaturePolicyFail
 		})
 		createProviderConfig(ctx, "test-provider")
 		provider.capabilities.Bucket.Versioning = false
@@ -197,9 +197,9 @@ var _ = Describe("BucketReconciler", func() {
 	})
 
 	It("warns about unsupported features and continues reconciling with Warn policy", func() {
-		bucket := createBucket(ctx, "unsupported-warn", func(spec *vedrov1alpha1.BucketSpec) {
-			spec.Versioning = &vedrov1alpha1.BucketVersioning{Enabled: true}
-			spec.UnsupportedFeaturePolicy = vedrov1alpha1.UnsupportedFeaturePolicyWarn
+		bucket := createBucket(ctx, "unsupported-warn", func(spec *vedro.BucketSpec) {
+			spec.Versioning = &vedro.BucketVersioning{Enabled: true}
+			spec.UnsupportedFeaturePolicy = vedro.UnsupportedFeaturePolicyWarn
 		})
 		createProviderConfig(ctx, "test-provider")
 		provider.capabilities.Bucket.Versioning = false
@@ -269,8 +269,8 @@ var _ = Describe("BucketReconciler", func() {
 	})
 
 	It("deletes the external bucket and removes the finalizer for Delete policy", func() {
-		bucket := createBucket(ctx, "delete-policy", func(spec *vedrov1alpha1.BucketSpec) {
-			spec.DeletionPolicy = vedrov1alpha1.DeletionPolicyDelete
+		bucket := createBucket(ctx, "delete-policy", func(spec *vedro.BucketSpec) {
+			spec.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfig(ctx, "test-provider")
 		controllerutilAddFinalizer(ctx, bucket)
@@ -284,7 +284,7 @@ var _ = Describe("BucketReconciler", func() {
 		Expect(result).To(Equal(reconcile.Result{}))
 		Expect(provider.bucket.deleteCalls).To(Equal(1))
 
-		fetched := &vedrov1alpha1.Bucket{}
+		fetched := &vedro.Bucket{}
 		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(bucket), fetched)
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
@@ -312,19 +312,19 @@ type fakeBucketProvider struct {
 	deleteCalls    int
 }
 
-func (p *fakeBucketProvider) ValidateBucketSpec(spec vedrov1alpha1.Bucket) validation.ValidationResult {
+func (p *fakeBucketProvider) ValidateBucketSpec(spec vedro.Bucket) validation.ValidationResult {
 	return p.validateResult
 }
 
 func (p *fakeBucketProvider) EnsureBucket(
 	ctx context.Context,
-	spec vedrov1alpha1.Bucket,
+	spec vedro.Bucket,
 ) (*cloud.BucketAttrs, error) {
 	p.ensureCalls++
 	return p.ensureResult, p.ensureErr
 }
 
-func (p *fakeBucketProvider) DeleteBucket(ctx context.Context, bckt vedrov1alpha1.Bucket) error {
+func (p *fakeBucketProvider) DeleteBucket(ctx context.Context, bckt vedro.Bucket) error {
 	p.deleteCalls++
 	return p.deleteErr
 }
@@ -332,9 +332,9 @@ func (p *fakeBucketProvider) DeleteBucket(ctx context.Context, bckt vedrov1alpha
 func createBucket(
 	ctx context.Context,
 	name string,
-	mutators ...func(*vedrov1alpha1.BucketSpec),
-) *vedrov1alpha1.Bucket {
-	bucket := &vedrov1alpha1.Bucket{
+	mutators ...func(*vedro.BucketSpec),
+) *vedro.Bucket {
+	bucket := &vedro.Bucket{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "vedro.svetoch.dev/v1alpha1",
 			Kind:       "Bucket",
@@ -343,14 +343,14 @@ func createBucket(
 			Name:      name,
 			Namespace: "default",
 		},
-		Spec: vedrov1alpha1.BucketSpec{
-			ProviderRef: vedrov1alpha1.ProviderConfigReference{
+		Spec: vedro.BucketSpec{
+			ProviderRef: vedro.ProviderConfigReference{
 				Name: "test-provider",
 			},
 			Location:                 "europe-west1",
-			StorageClass:             vedrov1alpha1.BucketStorageClassStandard,
-			DeletionPolicy:           vedrov1alpha1.DeletionPolicyRetain,
-			UnsupportedFeaturePolicy: vedrov1alpha1.UnsupportedFeaturePolicyFail,
+			StorageClass:             vedro.BucketStorageClassStandard,
+			DeletionPolicy:           vedro.DeletionPolicyRetain,
+			UnsupportedFeaturePolicy: vedro.UnsupportedFeaturePolicyFail,
 		},
 	}
 
@@ -366,8 +366,8 @@ func createBucket(
 	return bucket
 }
 
-func createProviderConfig(ctx context.Context, name string) *vedrov1alpha1.ProviderConfig {
-	providerConfig := &vedrov1alpha1.ProviderConfig{
+func createProviderConfig(ctx context.Context, name string) *vedro.ProviderConfig {
+	providerConfig := &vedro.ProviderConfig{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "vedro.svetoch.dev/v1alpha1",
 			Kind:       "ProviderConfig",
@@ -375,11 +375,11 @@ func createProviderConfig(ctx context.Context, name string) *vedrov1alpha1.Provi
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: vedrov1alpha1.ProviderConfigSpec{
-			Type:      vedrov1alpha1.ProviderTypeGCP,
+		Spec: vedro.ProviderConfigSpec{
+			Type:      vedro.ProviderTypeGCP,
 			ProjectId: "test-project",
 			Region:    "europe-west1",
-			Method:    vedrov1alpha1.AuthMethodWorkloadIdentity,
+			Method:    vedro.AuthMethodWorkloadIdentity,
 		},
 	}
 
@@ -391,14 +391,14 @@ func createProviderConfig(ctx context.Context, name string) *vedrov1alpha1.Provi
 	return providerConfig
 }
 
-func getBucket(ctx context.Context, key client.ObjectKey) *vedrov1alpha1.Bucket {
-	bucket := &vedrov1alpha1.Bucket{}
+func getBucket(ctx context.Context, key client.ObjectKey) *vedro.Bucket {
+	bucket := &vedro.Bucket{}
 	Expect(k8sClient.Get(ctx, key, bucket)).To(Succeed())
 	return bucket
 }
 
 func cleanupBucket(ctx context.Context, key client.ObjectKey) {
-	bucket := &vedrov1alpha1.Bucket{}
+	bucket := &vedro.Bucket{}
 	err := k8sClient.Get(ctx, key, bucket)
 	if apierrors.IsNotFound(err) {
 		return
@@ -414,7 +414,7 @@ func cleanupBucket(ctx context.Context, key client.ObjectKey) {
 }
 
 func cleanupProviderConfig(ctx context.Context, key client.ObjectKey) {
-	providerConfig := &vedrov1alpha1.ProviderConfig{}
+	providerConfig := &vedro.ProviderConfig{}
 	err := k8sClient.Get(ctx, key, providerConfig)
 	if apierrors.IsNotFound(err) {
 		return
@@ -426,7 +426,7 @@ func cleanupProviderConfig(ctx context.Context, key client.ObjectKey) {
 	}
 }
 
-func controllerutilAddFinalizer(ctx context.Context, bucket *vedrov1alpha1.Bucket) {
+func controllerutilAddFinalizer(ctx context.Context, bucket *vedro.Bucket) {
 	fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
 	fetched.Finalizers = append(fetched.Finalizers, bucketFinalizer)
 	Expect(k8sClient.Update(ctx, fetched)).To(Succeed())

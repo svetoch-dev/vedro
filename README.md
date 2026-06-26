@@ -61,6 +61,13 @@ You can apply the samples (examples) from the config/sample:
 kubectl apply -k config/samples/
 ```
 
+The GCP sample can also be rendered with a project ID from your shell
+environment before applying it:
+
+```sh
+GCP_PROJECT_ID=<YOUR PROJECT ID> envsubst '${GCP_PROJECT_ID}' < config/samples/gcp.yaml | kubectl apply -f -
+```
+
 >**NOTE**: Ensure that the samples has default values to test it out.
 
 ### To Uninstall

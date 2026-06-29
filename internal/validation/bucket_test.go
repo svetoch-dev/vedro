@@ -46,6 +46,11 @@ func TestValidateCloudSpecificConfig(t *testing.T) {
 			return &v
 		}
 
+		if duration != 0 && (duration < 7*24*time.Hour || duration > 90*24*time.Hour) {
+			v := Invalid("retentionDuration must be 0 or between 7 and 90 days")
+			return &v
+		}
+
 		return nil
 	}
 
@@ -74,8 +79,22 @@ func TestValidateCloudSpecificConfig(t *testing.T) {
 		},
 		{
 			name:         "gcp config with gcp provider",
+			cfg:          gcpConfigWithDuration(7 * 24 * time.Hour),
+			providerType: vedro.ProviderTypeGCP,
+			valid:        true,
+		},
+		{
+			name:         "gcp config with gcp provider and nil cloud validator",
 			cfg:          gcpConfigWithDuration(24 * time.Hour),
 			providerType: vedro.ProviderTypeGCP,
+			valid:        true,
+		},
+		{
+			name: "yc config with yc provider",
+			cfg: &vedro.BucketCloudSpecificConfig{
+				Yc: &vedro.BucketYcConfig{},
+			},
+			providerType: vedro.ProviderTypeYandexCloud,
 			valid:        true,
 		},
 		{
@@ -86,6 +105,37 @@ func TestValidateCloudSpecificConfig(t *testing.T) {
 			providerType: vedro.ProviderTypeGCP,
 			valid:        false,
 			message:      "spec.cloudSpecificConfig.yc can only be used with provider type yc",
+		},
+		{
+			name:         "gcp config with yc provider",
+			cfg:          gcpConfigWithDuration(7 * 24 * time.Hour),
+			providerType: vedro.ProviderTypeYandexCloud,
+			valid:        false,
+			message:      "spec.cloudSpecificConfig.gcp can only be used with provider type gcp",
+		},
+		{
+			name: "config with unsupported provider",
+			cfg: &vedro.BucketCloudSpecificConfig{
+				Yc: &vedro.BucketYcConfig{},
+			},
+			providerType: vedro.ProviderType("unsupported"),
+			valid:        false,
+			message:      "spec.cloudSpecificConfig contains provider-specific settings unsupported by provider type",
+		},
+		{
+			name: "cloud validator error is returned before provider mismatch",
+			cfg: &vedro.BucketCloudSpecificConfig{
+				Gcp: &vedro.BucketGcpConfig{
+					SoftDeletePolicy: &vedro.SoftDeletePolicy{
+						RetentionDuration: metav1.Duration{Duration: 7 * time.Hour},
+					},
+				},
+				Yc: &vedro.BucketYcConfig{},
+			},
+			providerType:  vedro.ProviderTypeGCP,
+			validateCloud: validateGCP,
+			valid:         false,
+			message:       "retentionDuration must be a whole number of days",
 		},
 		{
 			name:          "zero gcp retention duration is valid",
@@ -116,6 +166,22 @@ func TestValidateCloudSpecificConfig(t *testing.T) {
 			validateCloud: validateGCP,
 			valid:         false,
 			message:       "retentionDuration cannot be negative",
+		},
+		{
+			name:          "below minimum gcp retention duration is invalid",
+			cfg:           gcpConfigWithDuration(24 * time.Hour),
+			providerType:  vedro.ProviderTypeGCP,
+			validateCloud: validateGCP,
+			valid:         false,
+			message:       "retentionDuration must be 0 or between 7 and 90 days",
+		},
+		{
+			name:          "above maximum gcp retention duration is invalid",
+			cfg:           gcpConfigWithDuration(91 * 24 * time.Hour),
+			providerType:  vedro.ProviderTypeGCP,
+			validateCloud: validateGCP,
+			valid:         false,
+			message:       "retentionDuration must be 0 or between 7 and 90 days",
 		},
 	}
 

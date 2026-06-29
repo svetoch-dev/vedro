@@ -23,6 +23,11 @@ var (
 	dualRegionPattern = regexp.MustCompile(`^[A-Z]+[0-9]+$`)
 )
 
+const (
+	minSoftDeleteRetention = 7 * 24 * time.Hour
+	maxSoftDeleteRetention = 90 * 24 * time.Hour
+)
+
 func validateGCSLocation(location string) *validation.ValidationResult {
 	normalized := strings.ToUpper(location)
 
@@ -63,6 +68,11 @@ func validateGCSCloudSpecific(cfg *vedro.BucketCloudSpecificConfig) *validation.
 
 		if duration != 0 && duration%(24*time.Hour) != 0 {
 			v := validation.Invalid("spec.cloudSpecificConfig.gcp.softDeletePolicy.retentionDuration must be a whole number of days")
+			return &v
+		}
+
+		if duration != 0 && (duration < minSoftDeleteRetention || duration > maxSoftDeleteRetention) {
+			v := validation.Invalid("spec.cloudSpecificConfig.gcp.softDeletePolicy.retentionDuration must be 0 or between 7 and 90 days")
 			return &v
 		}
 	}
@@ -194,7 +204,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		attrs.Properties.CloudSpecificConfig,
 		desiredCloudSpecificConfig,
 	) {
-		patch.CloudSpecificConfig = helpers.PatchTo(spec.CloudSpecificConfig)
+		patch.CloudSpecificConfig = helpers.PatchTo(desiredCloudSpecificConfig)
 	}
 
 	if patch.HasChanges() {

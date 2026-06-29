@@ -74,14 +74,15 @@ spec:
                             default: 168h
                             description: |-
                               RetentionDuration is how long deleted objects are retained before permanent deletion.
-                              Must be a whole number of days for GCS.
+                              Must be 0 or a whole number of days between 7 and 90 for GCS.
                               Example: "168h" for 7 days.
                             type: string
                             x-kubernetes-validations:
                             - message: retentionDuration must be 0 or a whole number
-                                of days
-                              rule: duration(self) >= duration('0s') && duration(self).getSeconds()
-                                % 86400 == 0
+                                of days between 7 and 90
+                              rule: duration(self) == duration('0s') || (duration(self)
+                                >= duration('168h') && duration(self) <= duration('2160h')
+                                && duration(self).getSeconds() % 86400 == 0)
                         required:
                         - retentionDuration
                         type: object
@@ -215,14 +216,15 @@ spec:
                                 default: 168h
                                 description: |-
                                   RetentionDuration is how long deleted objects are retained before permanent deletion.
-                                  Must be a whole number of days for GCS.
+                                  Must be 0 or a whole number of days between 7 and 90 for GCS.
                                   Example: "168h" for 7 days.
                                 type: string
                                 x-kubernetes-validations:
                                 - message: retentionDuration must be 0 or a whole
-                                    number of days
-                                  rule: duration(self) >= duration('0s') && duration(self).getSeconds()
-                                    % 86400 == 0
+                                    number of days between 7 and 90
+                                  rule: duration(self) == duration('0s') || (duration(self)
+                                    >= duration('168h') && duration(self) <= duration('2160h')
+                                    && duration(self).getSeconds() % 86400 == 0)
                             required:
                             - retentionDuration
                             type: object

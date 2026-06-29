@@ -185,6 +185,30 @@ var _ = Describe("BucketProvider.EnsureBucketGCP", func() {
 		Expect(fake.Updated).To(BeNil())
 	})
 
+	It("does not update cloudSpecificConfig when gcp options are empty", func() {
+		emptyGCPConfig := vedro.BucketCloudSpecificConfig{
+			Gcp: &vedro.BucketGcpConfig{},
+		}
+		fake.Attrs = cloudtest.NewBucketAttrs(
+			"my-bucket", "EU-WEST1",
+			vedro.BucketStorageClassStandard,
+			func(p *vedro.BucketProperties) {
+				p.CloudSpecificConfig = &defaultCloudSpecific
+			},
+		)
+
+		bckt := newBucketCR(
+			"my-bucket", "EU-WEST1",
+			func(b *vedro.Bucket) {
+				b.Spec.StorageClass = vedro.BucketStorageClassStandard
+				b.Spec.CloudSpecificConfig = &emptyGCPConfig
+			})
+
+		_, err := bucket.EnsureBucket(ctx, bckt)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fake.Updated).To(BeNil())
+	})
+
 })
 
 var _ = Describe("Bucket.ValidateBucketSpecGCP", func() {
@@ -223,6 +247,38 @@ var _ = Describe("Bucket.ValidateBucketSpecGCP", func() {
 		result := bucket.ValidateBucketSpec(bckt, vedro.ProviderTypeGCP)
 		Expect(result.Valid).To(BeFalse())
 		Expect(result.Message).To(ContainSubstring("can only be used with provider type yc"))
+	})
+
+	It("returns an Invalid when soft delete retention is below the GCS minimum", func() {
+		bckt := newBucketCR("my-bucket", "europe-west1", func(v *vedro.Bucket) {
+			v.Spec.CloudSpecificConfig = &vedro.BucketCloudSpecificConfig{
+				Gcp: &vedro.BucketGcpConfig{
+					SoftDeletePolicy: &vedro.SoftDeletePolicy{
+						RetentionDuration: v1.Duration{Duration: 24 * time.Hour},
+					},
+				},
+			}
+		})
+
+		result := bucket.ValidateBucketSpec(bckt, vedro.ProviderTypeGCP)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("must be 0 or between 7 and 90 days"))
+	})
+
+	It("returns an Invalid when soft delete retention is above the GCS maximum", func() {
+		bckt := newBucketCR("my-bucket", "europe-west1", func(v *vedro.Bucket) {
+			v.Spec.CloudSpecificConfig = &vedro.BucketCloudSpecificConfig{
+				Gcp: &vedro.BucketGcpConfig{
+					SoftDeletePolicy: &vedro.SoftDeletePolicy{
+						RetentionDuration: v1.Duration{Duration: 91 * 24 * time.Hour},
+					},
+				},
+			}
+		})
+
+		result := bucket.ValidateBucketSpec(bckt, vedro.ProviderTypeGCP)
+		Expect(result.Valid).To(BeFalse())
+		Expect(result.Message).To(ContainSubstring("must be 0 or between 7 and 90 days"))
 	})
 
 })

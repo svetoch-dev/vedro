@@ -413,6 +413,90 @@ var _ = Describe("fromGCSLifeCycle", func() {
 	})
 })
 
+var _ = Describe("toCloudSpecific", func() {
+	It("returns the default GCP soft delete policy when the GCS policy is nil", func() {
+		result := toCloudSpecific(nil)
+
+		Expect(result).NotTo(BeNil())
+		Expect(*result).To(Equal(defaultCloudSpecific))
+	})
+
+	It("maps a zero GCS soft delete duration", func() {
+		result := toCloudSpecific(&storage.SoftDeletePolicy{
+			RetentionDuration: 0,
+		})
+
+		Expect(result).NotTo(BeNil())
+		Expect(result.Gcp).NotTo(BeNil())
+		Expect(result.Gcp.SoftDeletePolicy).NotTo(BeNil())
+		Expect(result.Gcp.SoftDeletePolicy.RetentionDuration).To(Equal(v1.Duration{Duration: 0}))
+	})
+
+	It("maps a non-default GCS soft delete duration", func() {
+		result := toCloudSpecific(&storage.SoftDeletePolicy{
+			RetentionDuration: 8 * 24 * time.Hour,
+		})
+
+		Expect(result).NotTo(BeNil())
+		Expect(result.Gcp).NotTo(BeNil())
+		Expect(result.Gcp.SoftDeletePolicy).NotTo(BeNil())
+		Expect(result.Gcp.SoftDeletePolicy.RetentionDuration).To(Equal(v1.Duration{Duration: 8 * 24 * time.Hour}))
+	})
+})
+
+var _ = Describe("fromCloudSpecific", func() {
+	It("returns the default GCS soft delete policy when the cloud-specific config is nil", func() {
+		result := fromCloudSpecific(nil)
+
+		Expect(result).NotTo(BeNil())
+		Expect(result.RetentionDuration).To(Equal(defaultSoftDeleteDuration))
+	})
+
+	It("returns the default GCS soft delete policy when GCP config is absent", func() {
+		result := fromCloudSpecific(&vedro.BucketCloudSpecificConfig{
+			Yc: &vedro.BucketYcConfig{},
+		})
+
+		Expect(result).NotTo(BeNil())
+		Expect(result.RetentionDuration).To(Equal(defaultSoftDeleteDuration))
+	})
+
+	It("returns the default GCS soft delete policy when GCP soft delete policy is absent", func() {
+		result := fromCloudSpecific(&vedro.BucketCloudSpecificConfig{
+			Gcp: &vedro.BucketGcpConfig{},
+		})
+
+		Expect(result).NotTo(BeNil())
+		Expect(result.RetentionDuration).To(Equal(defaultSoftDeleteDuration))
+	})
+
+	It("maps a zero cloud-specific soft delete duration", func() {
+		result := fromCloudSpecific(&vedro.BucketCloudSpecificConfig{
+			Gcp: &vedro.BucketGcpConfig{
+				SoftDeletePolicy: &vedro.SoftDeletePolicy{
+					RetentionDuration: v1.Duration{Duration: 0},
+				},
+			},
+		})
+
+		Expect(result).NotTo(BeNil())
+		Expect(result.RetentionDuration).To(Equal(time.Duration(0)))
+	})
+
+	It("maps a non-default cloud-specific soft delete duration", func() {
+		result := fromCloudSpecific(&vedro.BucketCloudSpecificConfig{
+			Gcp: &vedro.BucketGcpConfig{
+				SoftDeletePolicy: &vedro.SoftDeletePolicy{
+					RetentionDuration: v1.Duration{Duration: 8 * 24 * time.Hour},
+				},
+			},
+		})
+
+		Expect(result).NotTo(BeNil())
+		Expect(result.RetentionDuration).To(Equal(8 * 24 * time.Hour))
+	})
+})
+
 var _ = Describe("fromGCSBucketAttrs", func() {
 	It("maps all fields when the bucket is fully populated", func() {
 		in := storage.BucketAttrs{

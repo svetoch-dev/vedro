@@ -74,7 +74,7 @@ func versioningMapping(v *vedro.BucketVersioning) bool {
 }
 
 func normalizedCloudSpecific(cfg *vedro.BucketCloudSpecificConfig) *vedro.BucketCloudSpecificConfig {
-	if cfg == nil || cfg.Gcp == nil {
+	if cfg == nil || cfg.Gcp == nil || cfg.Gcp.SoftDeletePolicy == nil {
 		return &vedro.BucketCloudSpecificConfig{
 			Gcp: &vedro.BucketGcpConfig{
 				SoftDeletePolicy: defaultSoftDelete,

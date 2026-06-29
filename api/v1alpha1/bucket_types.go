@@ -69,10 +69,10 @@ type BucketGcpConfig struct {
 
 type SoftDeletePolicy struct {
 	// RetentionDuration is how long deleted objects are retained before permanent deletion.
-	// Must be a whole number of days for GCS.
+	// Must be 0 or a whole number of days between 7 and 90 for GCS.
 	// Example: "168h" for 7 days.
 	// +kubebuilder:default:="168h"
-	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('0s') && duration(self).getSeconds() % 86400 == 0",message="retentionDuration must be 0 or a whole number of days"
+	// +kubebuilder:validation:XValidation:rule="duration(self) == duration('0s') || (duration(self) >= duration('168h') && duration(self) <= duration('2160h') && duration(self).getSeconds() % 86400 == 0)",message="retentionDuration must be 0 or a whole number of days between 7 and 90"
 	RetentionDuration metav1.Duration `json:"retentionDuration"`
 }
 

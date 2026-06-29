@@ -3,6 +3,7 @@ package validation
 import (
 	"strings"
 	"testing"
+	"time"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +26,109 @@ func TestInvalid(t *testing.T) {
 	}
 	if result.Message != "something went wrong" {
 		t.Errorf("Expect Invalid() message %q, got %q", "something went wrong", result.Message)
+	}
+}
+
+func TestValidateCloudSpecificConfig(t *testing.T) {
+	validateGCP := func(cfg *vedro.BucketCloudSpecificConfig) *ValidationResult {
+		if cfg.Gcp == nil || cfg.Gcp.SoftDeletePolicy == nil {
+			return nil
+		}
+
+		duration := cfg.Gcp.SoftDeletePolicy.RetentionDuration.Duration
+		if duration < 0 {
+			v := Invalid("retentionDuration cannot be negative")
+			return &v
+		}
+
+		if duration != 0 && duration%(24*time.Hour) != 0 {
+			v := Invalid("retentionDuration must be a whole number of days")
+			return &v
+		}
+
+		return nil
+	}
+
+	gcpConfigWithDuration := func(duration time.Duration) *vedro.BucketCloudSpecificConfig {
+		return &vedro.BucketCloudSpecificConfig{
+			Gcp: &vedro.BucketGcpConfig{
+				SoftDeletePolicy: &vedro.SoftDeletePolicy{
+					RetentionDuration: metav1.Duration{Duration: duration},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name          string
+		cfg           *vedro.BucketCloudSpecificConfig
+		providerType  vedro.ProviderType
+		validateCloud func(*vedro.BucketCloudSpecificConfig) *ValidationResult
+		valid         bool
+		message       string
+	}{
+		{
+			name:         "nil config",
+			providerType: vedro.ProviderTypeGCP,
+			valid:        true,
+		},
+		{
+			name:         "gcp config with gcp provider",
+			cfg:          gcpConfigWithDuration(24 * time.Hour),
+			providerType: vedro.ProviderTypeGCP,
+			valid:        true,
+		},
+		{
+			name: "yc config with gcp provider",
+			cfg: &vedro.BucketCloudSpecificConfig{
+				Yc: &vedro.BucketYcConfig{},
+			},
+			providerType: vedro.ProviderTypeGCP,
+			valid:        false,
+			message:      "spec.cloudSpecificConfig.yc can only be used with provider type yc",
+		},
+		{
+			name:          "zero gcp retention duration is valid",
+			cfg:           gcpConfigWithDuration(0),
+			providerType:  vedro.ProviderTypeGCP,
+			validateCloud: validateGCP,
+			valid:         true,
+		},
+		{
+			name:          "whole day gcp retention duration is valid",
+			cfg:           gcpConfigWithDuration(7 * 24 * time.Hour),
+			providerType:  vedro.ProviderTypeGCP,
+			validateCloud: validateGCP,
+			valid:         true,
+		},
+		{
+			name:          "sub-day gcp retention duration is invalid",
+			cfg:           gcpConfigWithDuration(7 * time.Hour),
+			providerType:  vedro.ProviderTypeGCP,
+			validateCloud: validateGCP,
+			valid:         false,
+			message:       "retentionDuration must be a whole number of days",
+		},
+		{
+			name:          "negative gcp retention duration is invalid",
+			cfg:           gcpConfigWithDuration(-24 * time.Hour),
+			providerType:  vedro.ProviderTypeGCP,
+			validateCloud: validateGCP,
+			valid:         false,
+			message:       "retentionDuration cannot be negative",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ValidateCloudSpecificConfig(tt.cfg, tt.providerType, tt.validateCloud)
+			if result.Valid != tt.valid {
+				t.Errorf("Expect Valid=%v, got %v", tt.valid, result.Valid)
+			}
+			if !tt.valid && !strings.Contains(result.Message, tt.message) {
+				t.Errorf("Expect message to contain %q, got %q", tt.message, result.Message)
+			}
+		})
 	}
 }
 

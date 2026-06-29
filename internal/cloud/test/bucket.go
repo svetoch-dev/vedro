@@ -30,6 +30,8 @@ type Config struct {
 
 	ProviderConfigType vedro.ProviderType
 
+	DefaultBucketPropertiesMods []func(*vedro.BucketProperties)
+
 	// NewBucket wires the provider's cloud.BucketProvider to the supplied
 	// fake API. Implemented inside each provider's package so it can reach
 	// unexported fields.
@@ -43,6 +45,16 @@ type Config struct {
 func BucketProviderTests(cfg Config) bool {
 	newBucketCR := func(mods ...func(*vedro.Bucket)) vedro.Bucket {
 		return NewBucketCR("my-bucket", cfg.Location, mods...)
+	}
+	newBucketAttrs := func(
+		name string,
+		location string,
+		storageClass vedro.BucketStorageClass,
+		mods ...func(*vedro.BucketProperties),
+	) *cloud.BucketAttrs {
+		allMods := append([]func(*vedro.BucketProperties){}, cfg.DefaultBucketPropertiesMods...)
+		allMods = append(allMods, mods...)
+		return NewBucketAttrs(name, location, storageClass, allMods...)
 	}
 
 	Describe("BucketProvider.EnsureBucket", func() {
@@ -132,7 +144,7 @@ func BucketProviderTests(cfg Config) bool {
 		})
 
 		It("returns the existing attrs when the bucket already matches the spec", func() {
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 			)
 
@@ -148,7 +160,7 @@ func BucketProviderTests(cfg Config) bool {
 		})
 
 		It("returns an error when the existing bucket is in a different location", func() {
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.OtherNormalizedLocation, vedro.BucketStorageClassStandard,
 			)
 
@@ -163,7 +175,7 @@ func BucketProviderTests(cfg Config) bool {
 		})
 
 		It("updates the storage class when it differs", func() {
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 			)
 
@@ -181,7 +193,7 @@ func BucketProviderTests(cfg Config) bool {
 		})
 
 		It("updates lifecycle when its empty", func() {
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 			)
 
@@ -200,7 +212,7 @@ func BucketProviderTests(cfg Config) bool {
 		It("updates lifecycle when it differs", func() {
 			actualLifecycle := Lifecycle.DeepCopy()
 			actualLifecycle.Rules[0].AgeDays = helpers.Ptr(int64(100000))
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 				func(p *vedro.BucketProperties) { p.Lifecycle = actualLifecycle },
 			)
@@ -218,7 +230,7 @@ func BucketProviderTests(cfg Config) bool {
 		})
 
 		It("updates versioning when it differs", func() {
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 				func(p *vedro.BucketProperties) {
 					p.Versioning = &vedro.BucketVersioning{Enabled: false}
@@ -240,7 +252,7 @@ func BucketProviderTests(cfg Config) bool {
 		})
 
 		It("updates labels when they differ", func() {
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 				func(p *vedro.BucketProperties) {
 					p.Labels = map[string]string{"env": "dev"}
@@ -260,7 +272,7 @@ func BucketProviderTests(cfg Config) bool {
 		})
 
 		It("updates public access prevention when it differs", func() {
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 				func(p *vedro.BucketProperties) {
 					p.PublicAccessPrevention = helpers.Ptr(false)
@@ -281,7 +293,7 @@ func BucketProviderTests(cfg Config) bool {
 		})
 
 		It("updates labels when spec.Labels is nil labels in status.Applied.Labels", func() {
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 				func(p *vedro.BucketProperties) {
 					p.Labels = map[string]string{"env": "dev"}
@@ -305,7 +317,7 @@ func BucketProviderTests(cfg Config) bool {
 		})
 
 		It("returns an error when updating the bucket fails", func() {
-			fake.Attrs = NewBucketAttrs(
+			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 			)
 			fake.UpdateErr = errors.New("update failed")

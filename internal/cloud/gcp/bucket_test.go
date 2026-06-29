@@ -14,6 +14,12 @@ import (
 	"github.com/svetoch-dev/vedro/internal/helpers"
 )
 
+var defaultCloudSpecific = vedro.BucketCloudSpecificConfig{
+	Gcp: &vedro.BucketGcpConfig{
+		SoftDeletePolicy: defaultSoftDelete,
+	},
+}
+
 // newBucketCR is a small package-local helper so the GCP-specific specs
 // (ValidateBucketSpec, and cloudSpecific case) stay concise.
 func newBucketCR(name string, location string, mods ...func(*vedro.Bucket)) vedro.Bucket {
@@ -28,6 +34,11 @@ var _ = cloudtest.BucketProviderTests(cloudtest.Config{
 	OtherLocation:           "us-central1",
 	OtherNormalizedLocation: "US-CENTRAL1",
 	ProviderConfigType:      vedro.ProviderTypeGCP,
+	DefaultBucketPropertiesMods: []func(*vedro.BucketProperties){
+		func(p *vedro.BucketProperties) {
+			p.CloudSpecificConfig = &defaultCloudSpecific
+		},
+	},
 	NewBucket: func(api cloud.BucketAPI) cloud.BucketProvider {
 		return &Bucket{api: api}
 	},
@@ -86,7 +97,7 @@ var _ = Describe("BucketProvider.EnsureBucketGCP", func() {
 		Expect(attrs.Properties.CloudSpecificConfig).NotTo(BeNil())
 		Expect(*attrs.Properties.CloudSpecificConfig).To(Equal(gcpConfig))
 	})
-	It("ignores bucket creation if none gcp options are passed", func() {
+	It("falls back to default cloudSpecificConfig if none cloudSpecific gcp options are passed", func() {
 		fake.AttrsErr = cloud.ErrBucketNotFound
 		ycConfig := vedro.BucketCloudSpecificConfig{
 			Yc: &vedro.BucketYcConfig{},
@@ -102,8 +113,8 @@ var _ = Describe("BucketProvider.EnsureBucketGCP", func() {
 		Expect(fake.Created).NotTo(BeNil())
 		Expect(fake.Created.Location).To(Equal("us-central1"))
 		Expect(fake.Created.Properties.StorageClass).To(Equal(vedro.BucketStorageClassStandard))
-		Expect(fake.Created.Properties.CloudSpecificConfig).To(BeNil())
-		Expect(attrs.Properties.CloudSpecificConfig).To(BeNil())
+		Expect(*fake.Created.Properties.CloudSpecificConfig).To(Equal(defaultCloudSpecific))
+		Expect(*attrs.Properties.CloudSpecificConfig).To(Equal(defaultCloudSpecific))
 	})
 
 	It("updates cloudSpecificConfig when it differs", func() {

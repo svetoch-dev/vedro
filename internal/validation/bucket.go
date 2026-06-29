@@ -13,9 +13,17 @@ var (
 	bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
 )
 
-func ValidateCloudSpecificConfig(cfg *vedro.BucketCloudSpecificConfig, pType vedro.ProviderType) ValidationResult {
+func ValidateCloudSpecificConfig(cfg *vedro.BucketCloudSpecificConfig, pType vedro.ProviderType, validateCloud func(cfg *vedro.BucketCloudSpecificConfig) *ValidationResult) ValidationResult {
 	if cfg == nil {
 		return Valid()
+	}
+
+	if validateCloud != nil {
+		v := validateCloud(cfg)
+
+		if v != nil {
+			return *v
+		}
 	}
 
 	switch pType {

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -50,6 +51,25 @@ func validateGCSName(name string) *validation.ValidationResult {
 	return nil
 }
 
+func validateGCSCloudSpecific(cfg *vedro.BucketCloudSpecificConfig) *validation.ValidationResult {
+	if cfg != nil && cfg.Gcp != nil &&
+		cfg.Gcp.SoftDeletePolicy != nil {
+		duration := cfg.Gcp.SoftDeletePolicy.RetentionDuration.Duration
+
+		if duration < 0 {
+			v := validation.Invalid("spec.cloudSpecificConfig.gcp.softDeletePolicy.retentionDuration cannot be negative")
+			return &v
+		}
+
+		if duration != 0 && duration%(24*time.Hour) != 0 {
+			v := validation.Invalid("spec.cloudSpecificConfig.gcp.softDeletePolicy.retentionDuration must be a whole number of days")
+			return &v
+		}
+	}
+
+	return nil
+}
+
 type Bucket struct {
 	api cloud.BucketAPI
 }
@@ -57,7 +77,7 @@ type Bucket struct {
 func (b *Bucket) ValidateBucketSpec(bckt vedro.Bucket, pType vedro.ProviderType) validation.ValidationResult {
 	spec := bckt.Spec
 
-	v := validation.ValidateCloudSpecificConfig(bckt.Spec.CloudSpecificConfig, pType)
+	v := validation.ValidateCloudSpecificConfig(bckt.Spec.CloudSpecificConfig, pType, validateGCSCloudSpecific)
 
 	if !v.Valid {
 		return v
@@ -93,12 +113,6 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 	p := &Provider{}
 	caps := p.Capabilities().Bucket
 
-	var cloudSpecificConfig *vedro.BucketCloudSpecificConfig
-
-	if spec.CloudSpecificConfig != nil && spec.CloudSpecificConfig.Gcp != nil {
-		cloudSpecificConfig = spec.CloudSpecificConfig
-	}
-
 	attrs, err := b.api.GetBucket(ctx, bucketName)
 
 	if errors.Is(err, cloud.ErrBucketNotFound) {
@@ -111,7 +125,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 				Lifecycle:              helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps),
 				StorageClass:           spec.StorageClass,
 				Labels:                 spec.Labels,
-				CloudSpecificConfig:    cloudSpecificConfig,
+				CloudSpecificConfig:    normalizedCloudSpecific(spec.CloudSpecificConfig),
 			},
 		}
 
@@ -174,9 +188,11 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		patch.Lifecycle = helpers.PatchTo(desiredLifecycle)
 	}
 
-	if cloudSpecificConfig != nil && !reflect.DeepEqual(
+	desiredCloudSpecificConfig := normalizedCloudSpecific(spec.CloudSpecificConfig)
+
+	if !reflect.DeepEqual(
 		attrs.Properties.CloudSpecificConfig,
-		cloudSpecificConfig,
+		desiredCloudSpecificConfig,
 	) {
 		patch.CloudSpecificConfig = helpers.PatchTo(spec.CloudSpecificConfig)
 	}

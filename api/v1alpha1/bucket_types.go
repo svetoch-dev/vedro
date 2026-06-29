@@ -72,6 +72,7 @@ type SoftDeletePolicy struct {
 	// Must be a whole number of days for GCS.
 	// Example: "168h" for 7 days.
 	// +kubebuilder:default:="168h"
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('0s') && duration(self).getSeconds() % 86400 == 0",message="retentionDuration must be 0 or a whole number of days"
 	RetentionDuration metav1.Duration `json:"retentionDuration"`
 }
 

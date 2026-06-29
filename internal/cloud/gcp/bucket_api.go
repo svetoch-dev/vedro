@@ -12,6 +12,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -167,6 +168,19 @@ func fromGCSBucketAttrs(attrs storage.BucketAttrs) (*cloud.BucketAttrs, error) {
 
 	lifeCycle := fromGCSLifeCycle(attrs.Lifecycle)
 
+	var cloudSpecificConfig *vedro.BucketCloudSpecificConfig
+	if attrs.SoftDeletePolicy != nil {
+		cloudSpecificConfig = &vedro.BucketCloudSpecificConfig{
+			Gcp: &vedro.BucketGcpConfig{
+				SoftDeletePolicy: &vedro.SoftDeletePolicy{
+					RetentionDuration: v1.Duration{
+						Duration: attrs.SoftDeletePolicy.RetentionDuration,
+					},
+				},
+			},
+		}
+	}
+
 	return &cloud.BucketAttrs{
 		Name:     attrs.Name,
 		Location: attrs.Location,
@@ -175,9 +189,10 @@ func fromGCSBucketAttrs(attrs storage.BucketAttrs) (*cloud.BucketAttrs, error) {
 			Versioning: &vedro.BucketVersioning{
 				Enabled: attrs.VersioningEnabled,
 			},
-			StorageClass: sc,
-			Labels:       attrs.Labels,
-			Lifecycle:    &lifeCycle,
+			StorageClass:        sc,
+			Labels:              attrs.Labels,
+			Lifecycle:           &lifeCycle,
+			CloudSpecificConfig: cloudSpecificConfig,
 		},
 	}, nil
 }
@@ -209,6 +224,16 @@ func toGCSBucketAttrs(attrs cloud.BucketAttrs) (*storage.BucketAttrs, error) {
 		return nil, err
 	}
 	gcsAttrs.Lifecycle = lifecycle
+
+	cloudSpecificConfig := attrs.Properties.CloudSpecificConfig
+
+	if cloudSpecificConfig != nil && cloudSpecificConfig.Gcp != nil {
+		if cloudSpecificConfig.Gcp.SoftDeletePolicy != nil {
+			gcsAttrs.SoftDeletePolicy = &storage.SoftDeletePolicy{
+				RetentionDuration: cloudSpecificConfig.Gcp.SoftDeletePolicy.RetentionDuration.Duration,
+			}
+		}
+	}
 
 	return gcsAttrs, nil
 }
@@ -249,6 +274,17 @@ func patchGCSBucketAttrs(patch cloud.BucketPatch, currentAttrs *cloud.BucketAttr
 			currentAttrs.Properties.Labels,
 			update,
 		)
+	}
+
+	if patch.CloudSpecificConfig.Set {
+		cloudSpecificConfig := patch.CloudSpecificConfig.Value
+		if cloudSpecificConfig.Gcp != nil {
+			if cloudSpecificConfig.Gcp.SoftDeletePolicy != nil {
+				update.SoftDeletePolicy = &storage.SoftDeletePolicy{
+					RetentionDuration: cloudSpecificConfig.Gcp.SoftDeletePolicy.RetentionDuration.Duration,
+				}
+			}
+		}
 	}
 
 	return update, nil

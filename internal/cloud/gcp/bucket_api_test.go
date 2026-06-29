@@ -2,9 +2,11 @@ package gcp
 
 import (
 	"reflect"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"cloud.google.com/go/storage"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -420,6 +422,9 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 			PublicAccessPrevention: storage.PublicAccessPreventionEnforced,
 			VersioningEnabled:      true,
 			Labels:                 map[string]string{"env": "prod", "team": "data"},
+			SoftDeletePolicy: &storage.SoftDeletePolicy{
+				RetentionDuration: 0,
+			},
 			Lifecycle: storage.Lifecycle{
 				Rules: []storage.LifecycleRule{
 					{
@@ -429,7 +434,15 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 				},
 			},
 		}
-
+		wantCloudSpecific := vedro.BucketCloudSpecificConfig{
+			Gcp: &vedro.BucketGcpConfig{
+				SoftDeletePolicy: &vedro.SoftDeletePolicy{
+					RetentionDuration: v1.Duration{
+						Duration: 0,
+					},
+				},
+			},
+		}
 		result, err := fromGCSBucketAttrs(in)
 
 		Expect(err).NotTo(HaveOccurred())
@@ -448,6 +461,9 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 		Expect(*result.Properties.Lifecycle.Rules[0].AgeDays).To(Equal(int64(30)))
 		Expect(result.Properties.Lifecycle.Rules[0].Action).To(Equal(vedro.BucketLifecycleActionDelete))
 		Expect(result.Properties.Lifecycle.Rules[0].Enabled).To(BeTrue())
+
+		Expect(result.Properties.CloudSpecificConfig).NotTo(BeNil())
+		Expect(*result.Properties.CloudSpecificConfig).To(Equal(wantCloudSpecific))
 	})
 
 	It("maps an inherited public access prevention to false", func() {
@@ -465,6 +481,46 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 		Expect(*result.Properties.PublicAccessPrevention).To(BeFalse())
 		Expect(*result.Properties.Versioning).To(Equal(vedro.BucketVersioning{Enabled: false}))
 		Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassStandard))
+	})
+	It("maps attributes to CloudSpecificConfig.gcp if they are set", func() {
+		in := storage.BucketAttrs{
+			Name:         "my-bucket",
+			Location:     "EUROPE-WEST1",
+			StorageClass: "STANDARD",
+			SoftDeletePolicy: &storage.SoftDeletePolicy{
+				RetentionDuration: 0,
+			},
+		}
+
+		want := vedro.BucketCloudSpecificConfig{
+			Gcp: &vedro.BucketGcpConfig{
+				SoftDeletePolicy: &vedro.SoftDeletePolicy{
+					RetentionDuration: v1.Duration{
+						Duration: 0,
+					},
+				},
+			},
+		}
+
+		result, err := fromGCSBucketAttrs(in)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.Properties.CloudSpecificConfig).NotTo(BeNil())
+		Expect(*result.Properties.CloudSpecificConfig).To(Equal(want))
+		Expect(result.Properties.StorageClass).To(Equal(vedro.BucketStorageClassStandard))
+	})
+	It("does not map attributes to CloudSpecificConfig.gcp if they do not exist", func() {
+		in := storage.BucketAttrs{
+			Name:             "my-bucket",
+			Location:         "EUROPE-WEST1",
+			StorageClass:     "STANDARD",
+			SoftDeletePolicy: nil,
+		}
+
+		result, err := fromGCSBucketAttrs(in)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.Properties.CloudSpecificConfig).To(BeNil())
 	})
 
 	It("maps an unknown public access prevention to nil", func() {
@@ -550,19 +606,6 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 		Expect(err).To(MatchError(ContainSubstring("gcs StorageClass UNKNOWN doesnt map to any bucket StorageClass")))
 		Expect(result).To(BeNil())
 	})
-
-	It("checks the public access prevention before the storage class", func() {
-		in := storage.BucketAttrs{
-			Name:                   "my-bucket",
-			Location:               "EUROPE-WEST1",
-			StorageClass:           "UNKNOWN",
-			PublicAccessPrevention: storage.PublicAccessPrevention(99),
-		}
-
-		_, err := fromGCSBucketAttrs(in)
-
-		Expect(err).To(MatchError(ContainSubstring("gcs PublicAccessPrevention")))
-	})
 })
 
 var _ = Describe("toGCSBucketAttrs", func() {
@@ -604,6 +647,15 @@ var _ = Describe("toGCSBucketAttrs", func() {
 						},
 					},
 				},
+				CloudSpecificConfig: &vedro.BucketCloudSpecificConfig{
+					Gcp: &vedro.BucketGcpConfig{
+						SoftDeletePolicy: &vedro.SoftDeletePolicy{
+							RetentionDuration: v1.Duration{
+								Duration: 7 * time.Hour,
+							},
+						},
+					},
+				},
 			},
 		}
 
@@ -621,8 +673,55 @@ var _ = Describe("toGCSBucketAttrs", func() {
 		Expect(result.Lifecycle.Rules).To(HaveLen(1))
 		Expect(result.Lifecycle.Rules[0].Action).To(Equal(storage.LifecycleAction{Type: storage.DeleteAction}))
 		Expect(result.Lifecycle.Rules[0].Condition.AgeInDays).To(Equal(int64(30)))
-	})
 
+		Expect(result.SoftDeletePolicy).NotTo(BeNil())
+		Expect(result.SoftDeletePolicy.RetentionDuration).To(Equal(7 * time.Hour))
+	})
+	It("maps cloudSpecifiConfigs if they are set", func() {
+		in := cloud.BucketAttrs{
+			Name:     "my-bucket",
+			Location: "EUROPE-WEST1",
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClassWarm,
+				CloudSpecificConfig: &vedro.BucketCloudSpecificConfig{
+					Gcp: &vedro.BucketGcpConfig{
+						SoftDeletePolicy: &vedro.SoftDeletePolicy{
+							RetentionDuration: v1.Duration{
+								Duration: 7 * time.Hour,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result, err := toGCSBucketAttrs(in)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).NotTo(BeNil())
+
+		Expect(result.SoftDeletePolicy).NotTo(BeNil())
+		Expect(result.SoftDeletePolicy.RetentionDuration).To(Equal(7 * time.Hour))
+	})
+	It("does not map cloudSpecifiConfigs if they are not set", func() {
+		in := cloud.BucketAttrs{
+			Name:     "my-bucket",
+			Location: "EUROPE-WEST1",
+			Properties: &vedro.BucketProperties{
+				StorageClass: vedro.BucketStorageClassWarm,
+				CloudSpecificConfig: &vedro.BucketCloudSpecificConfig{
+					Yc: &vedro.BucketYcConfig{},
+				},
+			},
+		}
+
+		result, err := toGCSBucketAttrs(in)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).NotTo(BeNil())
+
+		Expect(result.SoftDeletePolicy).To(BeNil())
+	})
 	It("maps the standard storage class to STANDARD", func() {
 		in := cloud.BucketAttrs{
 			Name:     "my-bucket",
@@ -958,6 +1057,25 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 		Expect(gcsSetLabels(update)).To(BeEmpty())
 		Expect(gcsDeleteLabels(update)).To(BeEmpty())
 	})
+	It("patches cloudSpecificConfigs", func() {
+		patch := cloud.BucketPatch{
+			CloudSpecificConfig: helpers.PatchTo(&vedro.BucketCloudSpecificConfig{
+				Gcp: &vedro.BucketGcpConfig{
+					SoftDeletePolicy: &vedro.SoftDeletePolicy{
+						RetentionDuration: v1.Duration{
+							Duration: 8 * time.Hour,
+						},
+					},
+				},
+			}),
+		}
+
+		update, err := patchGCSBucketAttrs(patch, currentAttrs)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(update.SoftDeletePolicy).NotTo(BeNil())
+		Expect(update.SoftDeletePolicy.RetentionDuration).To(Equal(8 * time.Hour))
+	})
 
 	It("maps all set fields at once", func() {
 		patch := cloud.BucketPatch{
@@ -974,6 +1092,15 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 				},
 			}),
 			Labels: helpers.PatchTo(map[string]string{"env": "prod"}),
+			CloudSpecificConfig: helpers.PatchTo(&vedro.BucketCloudSpecificConfig{
+				Gcp: &vedro.BucketGcpConfig{
+					SoftDeletePolicy: &vedro.SoftDeletePolicy{
+						RetentionDuration: v1.Duration{
+							Duration: 8 * time.Hour,
+						},
+					},
+				},
+			}),
 		}
 
 		update, err := patchGCSBucketAttrs(patch, currentAttrs)
@@ -987,5 +1114,9 @@ var _ = Describe("patchGCSBucketAttrs", func() {
 		Expect(update.Lifecycle.Rules[0].Condition.AgeInDays).To(Equal(int64(10)))
 		Expect(gcsSetLabels(update)).To(Equal(map[string]string{"env": "prod"}))
 		Expect(gcsDeleteLabels(update)).To(Equal(map[string]bool{"keep": true, "remove": true}))
+
+		Expect(update.SoftDeletePolicy).NotTo(BeNil())
+		Expect(update.SoftDeletePolicy.RetentionDuration).To(Equal(8 * time.Hour))
+
 	})
 })

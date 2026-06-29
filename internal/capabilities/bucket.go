@@ -9,47 +9,47 @@ import (
 
 var (
 	unsupportedFeatures = map[string]vedro.UnsupportedFeature{
-		"Versioning": vedro.UnsupportedFeature{
+		"Versioning": {
 			Field:   "spec.Versioning",
 			Message: "Versioning is not supported by this provider",
 			Reason:  vedro.BucketUnsupportedVersioning,
 		},
-		"Lifecycle": vedro.UnsupportedFeature{
+		"Lifecycle": {
 			Field:   "spec.lifecycle",
 			Message: "Lifecycle is not supported by this provider",
 			Reason:  vedro.BucketUnsupportedLifecycle,
 		},
-		"LifecycleEpiration": vedro.UnsupportedFeature{
+		"LifecycleEpiration": {
 			Field:   "spec.lifecycle.rules[%d].AgeDays",
 			Message: "Object expiration is not supported by this provider",
 			Reason:  vedro.BucketUnsupportedLifecycleExpiration,
 		},
-		"LifecycleNamed": vedro.UnsupportedFeature{
+		"LifecycleNamed": {
 			Field:   "spec.lifecycle.rules[%d].Name",
 			Message: "Named lifecycle rules are not supported by this provider",
 			Reason:  vedro.BucketUnsupportedLifecycleNamed,
 		},
-		"Labels": vedro.UnsupportedFeature{
+		"Labels": {
 			Field:   "spec.Labels",
 			Message: "Labels are not supported by this provider",
 			Reason:  vedro.BucketUnsupportedLabels,
 		},
-		"PublicAccessPrevention": vedro.UnsupportedFeature{
+		"PublicAccessPrevention": {
 			Field:   "spec.PublicAccessPrevention",
 			Message: "PublicAccessPrevention is not supported by this provider",
 			Reason:  vedro.BucketUnsupportedPublicAccessPrevention,
 		},
-		"StorageClassWarm": vedro.UnsupportedFeature{
+		"StorageClassWarm": {
 			Field:   "spec.StorageClass",
 			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassWarm),
 			Reason:  vedro.BucketUnsupportedStorageClass,
 		},
-		"StorageClassIce": vedro.UnsupportedFeature{
+		"StorageClassIce": {
 			Field:   "spec.StorageClass",
 			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassIce),
 			Reason:  vedro.BucketUnsupportedStorageClass,
 		},
-		"StorageClassCold": vedro.UnsupportedFeature{
+		"StorageClassCold": {
 			Field:   "spec.StorageClass",
 			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassCold),
 			Reason:  vedro.BucketUnsupportedStorageClass,

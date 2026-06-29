@@ -68,7 +68,7 @@ var _ = Describe("BucketProvider.EnsureBucketGCP", func() {
 		bucket = &Bucket{api: fake}
 	})
 
-	It("creates a bucket with gcp specfic options", func() {
+	It("creates a bucket with gcp specific options", func() {
 		fake.AttrsErr = cloud.ErrBucketNotFound
 
 		gcpConfig := vedro.BucketCloudSpecificConfig{

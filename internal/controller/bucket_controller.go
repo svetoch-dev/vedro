@@ -48,7 +48,7 @@ const bucketFinalizer = "bucket.vedro.svetoch.dev/finalizer"
 type BucketReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	//Needed abstraction for tests
+	// Needed abstraction for tests
 	ProviderFactory func(
 		ctx context.Context,
 		cfg vedro.ProviderConfig,
@@ -69,7 +69,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Logger:     logger,
 	}
 
-	//Find bucket and set Conditions
+	// Find bucket and set Conditions
 	bucket.Resolve(ctx, req.NamespacedName)
 	bucket.Condition.ObservedGeneration = bucket.Generation
 
@@ -100,7 +100,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Name: bucket.Spec.ProviderRef.Name,
 	}
 
-	//Find ProviderConfig and set condition
+	// Find ProviderConfig and set condition
 	providerConfig.Resolve(ctx, providerConfigName)
 	providerConfig.Condition.ObservedGeneration = bucket.Generation
 
@@ -123,7 +123,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	provider, err := providerFactory(ctx, providerConfig.ProviderConfig, r.Client)
 
-	//If error change status conditions and end Reconcile
+	// If error change status conditions and end Reconcile
 	if err != nil {
 		logger.Error(err, "Error in setting NewProvider")
 		providerConfig.Condition.Status = metav1.ConditionFalse
@@ -184,7 +184,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return Reconciled()
 	}
 
-	//check bucket capabilities
+	// check bucket capabilities
 	caps := provider.Capabilities().Bucket
 	unsupported := capabilities.ValidateBucketCapabilities(caps, bucket.Spec)
 	bucket.Status.UnsupportedFeatures = unsupported
@@ -218,7 +218,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	}
 
-	//check that spec is valid
+	// check that spec is valid
 	validationResult := provider.Bucket().ValidateBucketSpec(bucket.Bucket, providerConfig.Spec.Type)
 
 	if !validationResult.Valid {
@@ -235,7 +235,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return Reconciled()
 	}
 
-	//Ensure that spec and bucket match
+	// Ensure that spec and bucket match
 	result, err := provider.Bucket().EnsureBucket(ctx, bucket.Bucket)
 
 	if err != nil {
@@ -252,7 +252,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return Reconciled()
 	}
 
-	//Set bucket condition to reconciled and do a final patch
+	// Set bucket condition to reconciled and do a final patch
 	bucket.Condition.Status = metav1.ConditionTrue
 	bucket.Condition.Reason = conditions.ReasonBucketReconciled
 	bucket.Condition.Message = "Bucket Reconciled"
@@ -315,7 +315,7 @@ func (r *BucketReconciler) findBucketsForProviderConfig(
 		return nil
 	}
 
-	var requests []reconcile.Request
+	requests := make([]reconcile.Request, 0, len(bucketList.Items))
 
 	for _, bucket := range bucketList.Items {
 		if bucket.Spec.ProviderRef.Name != providerConfig.Name {
@@ -340,8 +340,8 @@ func (r *BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&vedro.Bucket{},
 		).
 		Watches(
-			//Watch ProviderConfig for changes and queue events for
-			//buckets that reference it
+			// Watch ProviderConfig for changes and queue events for
+			// buckets that reference it
 			&vedro.ProviderConfig{},
 			handler.EnqueueRequestsFromMapFunc(r.findBucketsForProviderConfig),
 		).

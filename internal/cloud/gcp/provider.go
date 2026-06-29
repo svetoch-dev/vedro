@@ -27,7 +27,7 @@ func New(
 	cfg vedro.ProviderConfig,
 ) (*Provider, error) {
 
-	client, err := newClient(ctx, kubeClient, cfg)
+	gcsClient, err := newClient(ctx, kubeClient, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func New(
 	p.bucket = &Bucket{
 		api: &bucketAPI{
 			projectID: cfg.Spec.ProjectId,
-			client:    client,
+			client:    gcsClient,
 		},
 	}
 
@@ -64,7 +64,7 @@ func newClient(
 			return nil, err
 		}
 
-		return storage.NewClient(ctx, option.WithCredentialsJSON(data[gcpCredentialsSecretKey]))
+		return storage.NewClient(ctx, option.WithAuthCredentialsJSON(option.ServiceAccount, data[gcpCredentialsSecretKey]))
 
 	default:
 		return nil, fmt.Errorf("unsupported provider auth method %q", cfg.Spec.Method)

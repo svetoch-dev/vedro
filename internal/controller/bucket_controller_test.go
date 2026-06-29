@@ -123,7 +123,7 @@ var _ = Describe("BucketReconciler", func() {
 
 	It("records provider factory errors", func() {
 		bucket := createBucket(ctx, "provider-factory-error")
-		createProviderConfig(ctx, "test-provider")
+		createProviderConfig(ctx)
 		reconciler.ProviderFactory = func(
 			ctx context.Context,
 			cfg vedro.ProviderConfig,
@@ -154,7 +154,7 @@ var _ = Describe("BucketReconciler", func() {
 
 	It("records invalid Bucket specs without ensuring the external bucket", func() {
 		bucket := createBucket(ctx, "invalid-spec")
-		createProviderConfig(ctx, "test-provider")
+		createProviderConfig(ctx)
 		provider.bucket.validateResult = validation.Invalid("invalid location")
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -178,7 +178,7 @@ var _ = Describe("BucketReconciler", func() {
 			spec.Versioning = &vedro.BucketVersioning{Enabled: true}
 			spec.UnsupportedFeaturePolicy = vedro.UnsupportedFeaturePolicyFail
 		})
-		createProviderConfig(ctx, "test-provider")
+		createProviderConfig(ctx)
 		provider.capabilities.Bucket.Versioning = false
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -202,7 +202,7 @@ var _ = Describe("BucketReconciler", func() {
 			spec.Versioning = &vedro.BucketVersioning{Enabled: true}
 			spec.UnsupportedFeaturePolicy = vedro.UnsupportedFeaturePolicyWarn
 		})
-		createProviderConfig(ctx, "test-provider")
+		createProviderConfig(ctx)
 		provider.capabilities.Bucket.Versioning = false
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -220,7 +220,7 @@ var _ = Describe("BucketReconciler", func() {
 
 	It("sets successful Bucket status after ensuring the external bucket", func() {
 		bucket := createBucket(ctx, "successful-reconcile")
-		createProviderConfig(ctx, "test-provider")
+		createProviderConfig(ctx)
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(bucket),
@@ -250,7 +250,7 @@ var _ = Describe("BucketReconciler", func() {
 
 	It("records ensure errors", func() {
 		bucket := createBucket(ctx, "ensure-error")
-		createProviderConfig(ctx, "test-provider")
+		createProviderConfig(ctx)
 		provider.bucket.ensureErr = errors.New("ensure failed")
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -273,7 +273,7 @@ var _ = Describe("BucketReconciler", func() {
 		bucket := createBucket(ctx, "delete-policy", func(spec *vedro.BucketSpec) {
 			spec.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
-		createProviderConfig(ctx, "test-provider")
+		createProviderConfig(ctx)
 		controllerutilAddFinalizer(ctx, bucket)
 		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
 
@@ -367,14 +367,14 @@ func createBucket(
 	return bucket
 }
 
-func createProviderConfig(ctx context.Context, name string) *vedro.ProviderConfig {
+func createProviderConfig(ctx context.Context) {
 	providerConfig := &vedro.ProviderConfig{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "vedro.svetoch.dev/v1alpha1",
 			Kind:       "ProviderConfig",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name: "test-provider",
 		},
 		Spec: vedro.ProviderConfigSpec{
 			Type:      vedro.ProviderTypeGCP,
@@ -389,7 +389,6 @@ func createProviderConfig(ctx context.Context, name string) *vedro.ProviderConfi
 		cleanupProviderConfig(ctx, client.ObjectKeyFromObject(providerConfig))
 	})
 
-	return providerConfig
 }
 
 func getBucket(ctx context.Context, key client.ObjectKey) *vedro.Bucket {

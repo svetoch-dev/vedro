@@ -13,6 +13,29 @@ var (
 	bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
 )
 
+func ValidateCloudSpecificConfig(cfg *vedro.BucketCloudSpecificConfig, pType vedro.ProviderType) ValidationResult {
+	if cfg == nil {
+		return Valid()
+	}
+
+	switch pType {
+	case vedro.ProviderTypeGCP:
+		if cfg.Yc != nil {
+			return Invalid("spec.cloudSpecificConfig.yc can only be used with provider type yc")
+		}
+		return Valid()
+
+	case vedro.ProviderTypeYandexCloud:
+		if cfg.Gcp != nil {
+			return Invalid("spec.cloudSpecificConfig.gcp can only be used with provider type gcp")
+		}
+		return Valid()
+
+	default:
+		return Invalid("spec.cloudSpecificConfig contains provider-specific settings unsupported by provider type")
+	}
+}
+
 func ValidateBucketNameImmutability(bckt vedro.Bucket) ValidationResult {
 	spec := bckt.Spec
 	status := bckt.Status

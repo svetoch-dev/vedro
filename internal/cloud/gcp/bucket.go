@@ -54,10 +54,16 @@ type Bucket struct {
 	api cloud.BucketAPI
 }
 
-func (b *Bucket) ValidateBucketSpec(bckt vedro.Bucket) validation.ValidationResult {
+func (b *Bucket) ValidateBucketSpec(bckt vedro.Bucket, pType vedro.ProviderType) validation.ValidationResult {
 	spec := bckt.Spec
 
-	v := validation.ValidateBucketNameImmutability(bckt)
+	v := validation.ValidateCloudSpecificConfig(bckt.Spec.CloudSpecificConfig, pType)
+
+	if !v.Valid {
+		return v
+	}
+
+	v = validation.ValidateBucketNameImmutability(bckt)
 
 	if !v.Valid {
 		return v
@@ -87,6 +93,12 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 	p := &Provider{}
 	caps := p.Capabilities().Bucket
 
+	var cloudSpecificConfig *vedro.BucketCloudSpecificConfig
+
+	if spec.CloudSpecificConfig != nil && spec.CloudSpecificConfig.Gcp != nil {
+		cloudSpecificConfig = spec.CloudSpecificConfig
+	}
+
 	attrs, err := b.api.GetBucket(ctx, bucketName)
 
 	if errors.Is(err, cloud.ErrBucketNotFound) {
@@ -99,6 +111,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 				Lifecycle:              helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps),
 				StorageClass:           spec.StorageClass,
 				Labels:                 spec.Labels,
+				CloudSpecificConfig:    cloudSpecificConfig,
 			},
 		}
 
@@ -159,6 +172,13 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		desiredLifecycle,
 	) {
 		patch.Lifecycle = helpers.PatchTo(desiredLifecycle)
+	}
+
+	if cloudSpecificConfig != nil && !reflect.DeepEqual(
+		attrs.Properties.CloudSpecificConfig,
+		cloudSpecificConfig,
+	) {
+		patch.CloudSpecificConfig = helpers.PatchTo(spec.CloudSpecificConfig)
 	}
 
 	if patch.HasChanges() {

@@ -92,8 +92,8 @@ spec:
               type:
                 description: Type is the cloud provider type.
                 enum:
-                - GCP
-                - Yandex
+                - gcp
+                - yc
                 type: string
             required:
             - method

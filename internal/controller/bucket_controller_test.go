@@ -313,7 +313,7 @@ type fakeBucketProvider struct {
 	deleteCalls    int
 }
 
-func (p *fakeBucketProvider) ValidateBucketSpec(spec vedro.Bucket) validation.ValidationResult {
+func (p *fakeBucketProvider) ValidateBucketSpec(spec vedro.Bucket, pType vedro.ProviderType) validation.ValidationResult {
 	return p.validateResult
 }
 

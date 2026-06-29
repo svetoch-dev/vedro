@@ -68,6 +68,7 @@ type BucketPatch struct {
 	Versioning             Change[*vedro.BucketVersioning]
 	PublicAccessPrevention Change[*bool]
 	Lifecycle              Change[*vedro.BucketLifecycle]
+	CloudSpecificConfig    Change[*vedro.BucketCloudSpecificConfig]
 }
 
 func (p BucketPatch) HasChanges() bool {
@@ -75,6 +76,7 @@ func (p BucketPatch) HasChanges() bool {
 		p.Labels.Set ||
 		p.Versioning.Set ||
 		p.PublicAccessPrevention.Set ||
+		p.CloudSpecificConfig.Set ||
 		p.Lifecycle.Set
 }
 
@@ -99,7 +101,7 @@ type BucketAPI interface {
 }
 
 type BucketProvider interface {
-	ValidateBucketSpec(spec vedro.Bucket) validation.ValidationResult
+	ValidateBucketSpec(bckt vedro.Bucket, pType vedro.ProviderType) validation.ValidationResult
 
 	EnsureBucket(
 		ctx context.Context,

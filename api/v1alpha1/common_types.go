@@ -3,8 +3,8 @@ package v1alpha1
 type ProviderType string
 
 const (
-	ProviderTypeGCP    ProviderType = "GCP"
-	ProviderTypeYandex ProviderType = "Yandex"
+	ProviderTypeGCP         ProviderType = "gcp"
+	ProviderTypeYandexCloud ProviderType = "yc"
 )
 
 type ProviderConfigReference struct {

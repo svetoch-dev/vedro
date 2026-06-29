@@ -28,6 +28,8 @@ type Config struct {
 	// OtherNormalizedLocation is the normalized form of OtherLocation.
 	OtherNormalizedLocation string
 
+	ProviderConfigType vedro.ProviderType
+
 	// NewBucket wires the provider's cloud.BucketProvider to the supplied
 	// fake API. Implemented inside each provider's package so it can reach
 	// unexported fields.
@@ -481,7 +483,7 @@ func BucketValidationTests(cfg Config) bool {
 		It("returns valid for a correct bucket spec", func() {
 			bckt := newBucketCR()
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeTrue())
 		})
 
@@ -490,7 +492,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Spec.Name = "actual-bucket-name"
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeTrue())
 		})
 
@@ -500,7 +502,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Status.ExternalName = "old-name"
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
 			Expect(result.Message).To(ContainSubstring("spec.name cannot be changed"))
 		})
@@ -511,7 +513,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Status.ExternalName = "old-spec-name"
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
 			Expect(result.Message).To(ContainSubstring("metadata.name cannot be used"))
 		})
@@ -521,7 +523,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Spec.Location = ""
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
 			Expect(result.Message).To(ContainSubstring("location is an empty string"))
 		})
@@ -531,7 +533,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Spec.Location = "bad"
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
 			Expect(result.Message).To(ContainSubstring("unsupported bucket location"))
 		})
@@ -541,7 +543,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Name = "b"
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
 			Expect(result.Message).To(ContainSubstring("bucket name must be 3-63 characters"))
 		})
@@ -551,7 +553,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Name = "My-Bucket"
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
 			Expect(result.Message).To(ContainSubstring("bucket name must be 3-63 characters"))
 		})
@@ -561,7 +563,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Name = "my..bucket"
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
 			Expect(result.Message).To(ContainSubstring("consecutive dots"))
 		})
@@ -571,7 +573,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Name = "my.-bucket"
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
 			Expect(result.Message).To(ContainSubstring("dots next to dashes"))
 		})
@@ -580,7 +582,7 @@ func BucketValidationTests(cfg Config) bool {
 				b.Spec.Name = "INVALID"
 			})
 
-			result := bucket.ValidateBucketSpec(bckt)
+			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
 			Expect(result.Message).To(ContainSubstring("bucket name must be 3-63 characters"))
 		})

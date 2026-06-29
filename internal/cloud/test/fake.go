@@ -191,6 +191,9 @@ func (f *FakeBucketAPI) UpdateBucket(
 	if patch.Lifecycle.Set {
 		f.Attrs.Properties.Lifecycle = patch.Lifecycle.Value
 	}
+	if patch.CloudSpecificConfig.Set {
+		f.Attrs.Properties.CloudSpecificConfig = patch.CloudSpecificConfig.Value
+	}
 
 	return f.Attrs, nil
 }

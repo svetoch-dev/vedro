@@ -46,6 +46,35 @@ const (
 	BucketLifecycleActionDelete BucketLifecycleAction = "Delete"
 )
 
+type BucketCloudSpecificConfig struct {
+	// GCP-specific bucket configuration.
+	// +optional
+	Gcp *BucketGcpConfig `json:"gcp,omitempty"`
+
+	// Yandex cloud-specific bucket configuration.
+	// Reserved for future Yandex Cloud extensions.
+	// +optional
+	Yc *BucketYcConfig `json:"yc,omitempty"`
+}
+
+// BucketYcConfig contains Yandex Cloud-specific bucket configuration.
+// It is currently empty and reserved for future extensions.
+type BucketYcConfig struct {
+}
+
+type BucketGcpConfig struct {
+	// +optional
+	SoftDeletePolicy *SoftDeletePolicy `json:"softDeletePolicy,omitempty"`
+}
+
+type SoftDeletePolicy struct {
+	// RetentionDuration is how long deleted objects are retained before permanent deletion.
+	// Must be a whole number of days for GCS.
+	// Example: "168h" for 7 days.
+	// +kubebuilder:default:="168h"
+	RetentionDuration metav1.Duration `json:"retentionDuration"`
+}
+
 type BucketVersioning struct {
 	// Enabled controls bucket object versioning.
 	Enabled bool `json:"enabled"`
@@ -57,11 +86,12 @@ type BucketLifecycle struct {
 }
 
 type BucketProperties struct {
-	PublicAccessPrevention *bool              `json:"publicAccessPrevention,omitempty"`
-	Versioning             *BucketVersioning  `json:"versioning,omitempty"`
-	Lifecycle              *BucketLifecycle   `json:"lifecycle,omitempty"`
-	StorageClass           BucketStorageClass `json:"storageClass,omitempty"`
-	Labels                 map[string]string  `json:"labels,omitempty"`
+	PublicAccessPrevention *bool                      `json:"publicAccessPrevention,omitempty"`
+	Versioning             *BucketVersioning          `json:"versioning,omitempty"`
+	Lifecycle              *BucketLifecycle           `json:"lifecycle,omitempty"`
+	StorageClass           BucketStorageClass         `json:"storageClass,omitempty"`
+	Labels                 map[string]string          `json:"labels,omitempty"`
+	CloudSpecificConfig    *BucketCloudSpecificConfig `json:"cloudSpecificConfig,omitempty"`
 }
 
 type BucketLifecycleRule struct {
@@ -148,6 +178,14 @@ type BucketSpec struct {
 	// +kubebuilder:default:=Fail
 	// +optional
 	UnsupportedFeaturePolicy UnsupportedFeaturePolicy `json:"unsupportedFeaturePolicy,omitempty"`
+
+	// CloudSpecificConfig contains provider-specific bucket settings that do not
+	// have a cloud-agnostic equivalent in BucketSpec.
+	//
+	// These settings are applied only when the selected provider matches the
+	// corresponding provider config field. For example, Gcp is used only for GCS
+	// buckets.
+	CloudSpecificConfig *BucketCloudSpecificConfig `json:"cloudSpecificConfig,omitempty"`
 }
 
 type BucketStatus struct {

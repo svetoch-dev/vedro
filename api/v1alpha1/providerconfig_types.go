@@ -28,7 +28,7 @@ import (
 type ProviderConfigSpec struct {
 	// Type is the cloud provider type.
 	//
-	// +kubebuilder:validation:Enum=GCP;Yandex
+	// +kubebuilder:validation:Enum=gcp;yc
 	Type ProviderType `json:"type"`
 
 	// ProjectID identifies the cloud project/account/folder.

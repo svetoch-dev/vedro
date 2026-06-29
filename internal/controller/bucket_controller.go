@@ -219,7 +219,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	//check that spec is valid
-	validationResult := provider.Bucket().ValidateBucketSpec(bucket.Bucket)
+	validationResult := provider.Bucket().ValidateBucketSpec(bucket.Bucket, providerConfig.Spec.Type)
 
 	if !validationResult.Valid {
 		logger.Info("spec is invalid")

@@ -56,6 +56,37 @@ spec:
             type: object
           spec:
             properties:
+              cloudSpecificConfig:
+                description: |-
+                  CloudSpecificConfig contains provider-specific bucket settings that do not
+                  have a cloud-agnostic equivalent in BucketSpec.
+
+                  These settings are applied only when the selected provider matches the
+                  corresponding provider config field. For example, Gcp is used only for GCS
+                  buckets.
+                properties:
+                  gcp:
+                    description: GCP-specific bucket configuration.
+                    properties:
+                      softDeletePolicy:
+                        properties:
+                          retentionDuration:
+                            default: 168h
+                            description: |-
+                              RetentionDuration is how long deleted objects are retained before permanent deletion.
+                              Must be a whole number of days for GCS.
+                              Example: "168h" for 7 days.
+                            type: string
+                        required:
+                        - retentionDuration
+                        type: object
+                    type: object
+                  yc:
+                    description: |-
+                      Yandex cloud-specific bucket configuration.
+                      Reserved for future Yandex Cloud extensions.
+                    type: object
+                type: object
               deletionPolicy:
                 default: Retain
                 description: |-
@@ -168,6 +199,30 @@ spec:
               applied:
                 description: Applied is the applied bucket attributes
                 properties:
+                  cloudSpecificConfig:
+                    properties:
+                      gcp:
+                        description: GCP-specific bucket configuration.
+                        properties:
+                          softDeletePolicy:
+                            properties:
+                              retentionDuration:
+                                default: 168h
+                                description: |-
+                                  RetentionDuration is how long deleted objects are retained before permanent deletion.
+                                  Must be a whole number of days for GCS.
+                                  Example: "168h" for 7 days.
+                                type: string
+                            required:
+                            - retentionDuration
+                            type: object
+                        type: object
+                      yc:
+                        description: |-
+                          Yandex cloud-specific bucket configuration.
+                          Reserved for future Yandex Cloud extensions.
+                        type: object
+                    type: object
                   labels:
                     additionalProperties:
                       type: string

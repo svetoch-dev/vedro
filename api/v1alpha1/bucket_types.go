@@ -256,7 +256,3 @@ type BucketList struct {
 
 	Items []Bucket `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&Bucket{}, &BucketList{})
-}

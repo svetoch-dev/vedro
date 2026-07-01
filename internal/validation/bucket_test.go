@@ -392,8 +392,8 @@ func TestValidateBucketName(t *testing.T) {
 			valid: true,
 		},
 		{
-			name:  "name with dots and underscores",
-			input: "my.bucket_name",
+			name:  "name with dots",
+			input: "my.bucket-name",
 			fn:    deferToGeneric,
 			valid: true,
 		},

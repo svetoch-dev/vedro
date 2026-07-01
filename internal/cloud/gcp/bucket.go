@@ -21,6 +21,7 @@ import (
 
 var (
 	dualRegionPattern = regexp.MustCompile(`^[A-Z]+[0-9]+$`)
+	gcsNamePattern    = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
 )
 
 const (
@@ -53,7 +54,23 @@ func validateGCSName(name string) *validation.ValidationResult {
 		return &v
 	}
 
-	return nil
+	if !gcsNamePattern.MatchString(name) {
+		v := validation.Invalid("bucket name must be 3-63 characters, contain only lowercase letters, numbers, dots, underscores, and dashes,and start/end with a letter or number")
+		return &v
+	}
+
+	if strings.Contains(name, "..") {
+		v := validation.Invalid("bucket name must not contain consecutive dots")
+		return &v
+	}
+
+	if strings.Contains(name, ".-") || strings.Contains(name, "-.") {
+		v := validation.Invalid("bucket name must not contain dots next to dashes")
+		return &v
+	}
+
+	v := validation.Valid()
+	return &v
 }
 
 func validateGCSCloudSpecific(cfg *vedro.BucketCloudSpecificConfig) *validation.ValidationResult {

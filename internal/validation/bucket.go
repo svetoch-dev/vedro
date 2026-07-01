@@ -10,16 +10,17 @@ import (
 var (
 	// Matches regional names like europe-west1, us-central1, us-east-1, cn-hongkong
 	regionalPattern   = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)+$`)
-	bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
+	bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
 )
 
-func ValidateCloudSpecificConfig(cfg *vedro.BucketCloudSpecificConfig, pType vedro.ProviderType, validateCloud func(cfg *vedro.BucketCloudSpecificConfig) *ValidationResult) ValidationResult {
+func ValidateCloudSpecificConfig(cfg *vedro.BucketCloudSpecificConfig, pType vedro.ProviderType, fn func(cfg *vedro.BucketCloudSpecificConfig) *ValidationResult) ValidationResult {
 	if cfg == nil {
 		return Valid()
 	}
 
-	if validateCloud != nil {
-		v := validateCloud(cfg)
+	// per provider validation
+	if fn != nil {
+		v := fn(cfg)
 
 		if v != nil {
 			return *v
@@ -65,10 +66,12 @@ func ValidateBucketLocation(location string, fn func(location string) *Validatio
 	}
 
 	// per provider validation
-	v := fn(location)
+	if fn != nil {
+		v := fn(location)
 
-	if v != nil {
-		return *v
+		if v != nil {
+			return *v
+		}
 	}
 
 	if !regionalPattern.MatchString(location) {
@@ -83,15 +86,18 @@ func ValidateBucketName(name string, fn func(name string) *ValidationResult) Val
 		return Invalid("name is an empty string")
 	}
 
-	v := fn(name)
+	// per provider validation
+	if fn != nil {
+		v := fn(name)
 
-	if v != nil {
-		return *v
+		if v != nil {
+			return *v
+		}
 	}
 
 	if !bucketNamePattern.MatchString(name) {
 		return Invalid(
-			"bucket name must be 3-63 characters, contain only lowercase letters, numbers, dots, underscores, and dashes, and start/end with a letter or number",
+			"bucket name must be 3-63 characters, contain only lowercase letters, numbers, dots, and dashes, and start/end with a letter or number",
 		)
 	}
 

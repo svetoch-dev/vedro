@@ -16,6 +16,7 @@ var (
 type Provider interface {
 	Bucket() BucketProvider
 	Capabilities() Capabilities
+	Cleanup(ctx context.Context) error
 }
 
 type Capabilities struct {

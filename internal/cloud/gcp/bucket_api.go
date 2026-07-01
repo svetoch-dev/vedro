@@ -85,7 +85,7 @@ func normalizedCloudSpecific(cfg *vedro.BucketCloudSpecificConfig) *vedro.Bucket
 	return cfg
 }
 
-type bucketAPI struct {
+type gcsAPI struct {
 	client    *storage.Client
 	projectID string
 }
@@ -320,7 +320,7 @@ func patchGCSBucketAttrs(patch cloud.BucketPatch, currentAttrs *cloud.BucketAttr
 	return update, nil
 }
 
-func (a *bucketAPI) GetBucket(
+func (a *gcsAPI) GetBucket(
 	ctx context.Context,
 	name string,
 ) (*cloud.BucketAttrs, error) {
@@ -336,7 +336,7 @@ func (a *bucketAPI) GetBucket(
 	return fromGCSBucketAttrs(*gcsAttrs)
 }
 
-func (a *bucketAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
+func (a *gcsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
 	createAttrs, err := toGCSBucketAttrs(attrs)
 	if err != nil {
 		return err
@@ -348,7 +348,7 @@ func (a *bucketAPI) CreateBucket(ctx context.Context, name string, attrs cloud.B
 	return nil
 }
 
-func (a *bucketAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
+func (a *gcsAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
 	log.FromContext(ctx).V(1).Info("Updating bucket")
 
 	currentAttrs, err := a.GetBucket(ctx, name)
@@ -369,7 +369,7 @@ func (a *bucketAPI) UpdateBucket(ctx context.Context, name string, patch cloud.B
 	return fromGCSBucketAttrs(*gcsAttrs)
 }
 
-func (a *bucketAPI) ProcessObjects(
+func (a *gcsAPI) ProcessObjects(
 	ctx context.Context,
 	bucket string,
 	process func(cloud.ObjectVersion) error,
@@ -396,7 +396,7 @@ func (a *bucketAPI) ProcessObjects(
 	}
 }
 
-func (a *bucketAPI) DeleteObject(
+func (a *gcsAPI) DeleteObject(
 	ctx context.Context,
 	bucket string,
 	object cloud.ObjectVersion,
@@ -409,7 +409,7 @@ func (a *bucketAPI) DeleteObject(
 	return err
 }
 
-func (a *bucketAPI) DeleteBucket(ctx context.Context, name string) error {
+func (a *gcsAPI) DeleteBucket(ctx context.Context, name string) error {
 	bh := a.client.Bucket(name)
 	err := bh.Delete(ctx)
 	if isGoogleAPINotFound(err) {

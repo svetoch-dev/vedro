@@ -230,6 +230,14 @@ var _ = Describe("Bucket.ValidateBucketSpecGCP", func() {
 		result := bucket.ValidateBucketSpec(bckt, vedro.ProviderTypeGCP)
 		Expect(result.Valid).To(BeTrue())
 	})
+	It("accepts underscores in spec.name", func() {
+		bckt := newBucketCR("my-bucket", "europe-west1", func(v *vedro.Bucket) {
+			v.Spec.Name = "my_bucket"
+		})
+
+		result := bucket.ValidateBucketSpec(bckt, vedro.ProviderTypeGCP)
+		Expect(result.Valid).To(BeTrue())
+	})
 	It("returns an Invalid when the bucket name uses a reserved google prefix", func() {
 		bckt := newBucketCR("google-bucket", "europe-west1")
 

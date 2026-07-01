@@ -142,6 +142,12 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return Reconciled()
 	}
 
+	defer func() {
+		if err := provider.Cleanup(ctx); err != nil {
+			logger.Error(err, "provider cleanup failed")
+		}
+	}()
+
 	// providerConfig is valid and provider is configured by now;
 	// set its final condition.
 	providerConfig.Condition.Status = metav1.ConditionTrue

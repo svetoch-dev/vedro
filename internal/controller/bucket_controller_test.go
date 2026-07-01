@@ -150,6 +150,7 @@ var _ = Describe("BucketReconciler", func() {
 		Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
 		Expect(readyCondition.Reason).To(Equal(conditions.ReasonProviderConfigError))
 		Expect(provider.bucket.ensureCalls).To(Equal(0))
+		Expect(provider.cleanupCalled).To(BeFalse())
 	})
 
 	It("records invalid Bucket specs without ensuring the external bucket", func() {
@@ -246,6 +247,27 @@ var _ = Describe("BucketReconciler", func() {
 		Expect(readyCondition.Status).To(Equal(metav1.ConditionTrue))
 		Expect(readyCondition.Reason).To(Equal(conditions.ReasonBucketReconciled))
 		Expect(provider.bucket.ensureCalls).To(Equal(1))
+		Expect(provider.cleanupCalled).To(BeTrue())
+	})
+
+	It("does not fail reconcile when provider cleanup fails", func() {
+		bucket := createBucket(ctx, "cleanup-error")
+		createProviderConfig(ctx)
+		provider.cleanupErr = errors.New("cleanup failed")
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(provider.cleanupCalled).To(BeTrue())
+
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		readyCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(readyCondition.Reason).To(Equal(conditions.ReasonBucketReconciled))
 	})
 
 	It("records ensure errors", func() {
@@ -294,6 +316,9 @@ var _ = Describe("BucketReconciler", func() {
 type fakeProvider struct {
 	capabilities cloud.Capabilities
 	bucket       *fakeBucketProvider
+	cleanupErr   error
+
+	cleanupCalled bool
 }
 
 func (p *fakeProvider) Capabilities() cloud.Capabilities {
@@ -302,6 +327,11 @@ func (p *fakeProvider) Capabilities() cloud.Capabilities {
 
 func (p *fakeProvider) Bucket() cloud.BucketProvider {
 	return p.bucket
+}
+
+func (p *fakeProvider) Cleanup(ctx context.Context) error {
+	p.cleanupCalled = true
+	return p.cleanupErr
 }
 
 type fakeBucketProvider struct {

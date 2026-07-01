@@ -35,7 +35,7 @@ func New(
 	p := &Provider{}
 
 	p.bucket = &Bucket{
-		api: &bucketAPI{
+		api: &gcsAPI{
 			projectID: cfg.Spec.ProjectId,
 			client:    gcsClient,
 		},
@@ -91,4 +91,8 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 
 func (p *Provider) Bucket() cloud.BucketProvider {
 	return p.bucket
+}
+
+func (p *Provider) Cleanup(ctx context.Context) error {
+	return nil
 }

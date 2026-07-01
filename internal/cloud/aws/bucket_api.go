@@ -8,16 +8,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type AccessKey struct {
-	AccessKeyID     string
-	SecretAccessKey string
-}
-
-type AwsAPI struct {
+type S3API struct {
 	Client *s3.Client
 }
 
-func (a *AwsAPI) GetBucket(
+func (s *S3API) GetBucket(
 	ctx context.Context,
 	name string,
 ) (*cloud.BucketAttrs, error) {
@@ -25,17 +20,17 @@ func (a *AwsAPI) GetBucket(
 	return &cloud.BucketAttrs{}, nil
 }
 
-func (a *AwsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
+func (s *S3API) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
 	return nil
 }
 
-func (a *AwsAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
+func (s *S3API) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
 	log.FromContext(ctx).V(1).Info("Updating bucket")
 
 	return &cloud.BucketAttrs{}, nil
 }
 
-func (a *AwsAPI) ProcessObjects(
+func (s *S3API) ProcessObjects(
 	ctx context.Context,
 	bucket string,
 	process func(cloud.ObjectVersion) error,
@@ -43,7 +38,7 @@ func (a *AwsAPI) ProcessObjects(
 	return nil
 }
 
-func (a *AwsAPI) DeleteObject(
+func (s *S3API) DeleteObject(
 	ctx context.Context,
 	bucket string,
 	object cloud.ObjectVersion,
@@ -51,6 +46,6 @@ func (a *AwsAPI) DeleteObject(
 	return nil
 }
 
-func (a *AwsAPI) DeleteBucket(ctx context.Context, name string) error {
+func (s *S3API) DeleteBucket(ctx context.Context, name string) error {
 	return nil
 }

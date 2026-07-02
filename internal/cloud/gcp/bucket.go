@@ -137,9 +137,6 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 	bucketName := helpers.BucketNameFromCR(bckt)
 	normalizedLocation := strings.ToUpper(spec.Location)
 
-	p := &Provider{}
-	caps := p.Capabilities().Bucket
-
 	attrs, err := b.api.GetBucket(ctx, bucketName)
 
 	if errors.Is(err, cloud.ErrBucketNotFound) {
@@ -147,9 +144,9 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 			Name:     bucketName,
 			Location: spec.Location,
 			Properties: &vedro.BucketProperties{
-				PublicAccessPrevention: helpers.NormalizedBucketPAP(spec.PublicAccessPrevention),
-				Versioning:             helpers.NormalizedBucketVersioning(spec.Versioning),
-				Lifecycle:              helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps),
+				PublicAccessPrevention: normalizedBucketPAP(spec.PublicAccessPrevention),
+				Versioning:             normalizedBucketVersioning(spec.Versioning),
+				Lifecycle:              normalizedBucketLifecycle(spec.Lifecycle),
 				StorageClass:           spec.StorageClass,
 				Labels:                 spec.Labels,
 				CloudSpecificConfig:    normalizedCloudSpecific(spec.CloudSpecificConfig),
@@ -176,7 +173,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		)
 	}
 
-	appliedState := helpers.AppliedState(attrs.Location, bckt, caps)
+	appliedState := appliedState(attrs.Location, bckt)
 
 	patch := cloud.BucketPatch{}
 
@@ -188,7 +185,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		patch.StorageClass = helpers.PatchTo(spec.StorageClass)
 	}
 
-	desiredVersioning := helpers.NormalizedBucketVersioning(spec.Versioning)
+	desiredVersioning := normalizedBucketVersioning(spec.Versioning)
 
 	if !reflect.DeepEqual(
 		attrs.Properties.Versioning,
@@ -197,7 +194,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		patch.Versioning = helpers.PatchTo(desiredVersioning)
 	}
 
-	desiredPAP := helpers.NormalizedBucketPAP(spec.PublicAccessPrevention)
+	desiredPAP := normalizedBucketPAP(spec.PublicAccessPrevention)
 
 	if !reflect.DeepEqual(
 		attrs.Properties.PublicAccessPrevention,
@@ -206,7 +203,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		patch.PublicAccessPrevention = helpers.PatchTo(desiredPAP)
 	}
 
-	desiredLifecycle := helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps)
+	desiredLifecycle := normalizedBucketLifecycle(spec.Lifecycle)
 
 	if !reflect.DeepEqual(
 		attrs.Properties.Lifecycle,

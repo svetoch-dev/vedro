@@ -3,7 +3,6 @@ package helpers
 import (
 	"context"
 	"fmt"
-	"maps"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
@@ -59,73 +58,7 @@ func GetSecretData(
 	return data, nil
 }
 
-func AppliedState(
-	location string,
-	bckt vedro.Bucket,
-	caps cloud.BucketCapabilities,
-) *cloud.BucketAttrs {
-	spec := bckt.Spec
-	bucketName := BucketNameFromCR(bckt)
-
-	return &cloud.BucketAttrs{
-		Name:     bucketName,
-		Location: location,
-		Properties: &vedro.BucketProperties{
-			StorageClass:           spec.StorageClass,
-			Labels:                 maps.Clone(spec.Labels),
-			Versioning:             NormalizedBucketVersioning(spec.Versioning.DeepCopy()),
-			PublicAccessPrevention: NormalizedBucketPAP(cloneBool(spec.PublicAccessPrevention)),
-			Lifecycle:              NormalizedBucketLifecycle(spec.Lifecycle.DeepCopy(), caps),
-		},
-	}
-}
-
-func NormalizedBucketVersioning(ver *vedro.BucketVersioning) *vedro.BucketVersioning {
-	if ver == nil {
-		return &vedro.BucketVersioning{
-			Enabled: false,
-		}
-	}
-	return ver
-}
-
-func NormalizedBucketPAP(pap *bool) *bool {
-	if pap == nil {
-		return Ptr(false)
-	}
-
-	return pap
-}
-
-func NormalizedBucketLifecycle(
-	lifecycle *vedro.BucketLifecycle,
-	caps cloud.BucketCapabilities,
-) *vedro.BucketLifecycle {
-	normalized := &vedro.BucketLifecycle{}
-	if lifecycle == nil || len(lifecycle.Rules) == 0 {
-		return normalized
-	}
-
-	for _, rule := range lifecycle.Rules {
-		if !rule.Enabled {
-			continue
-		}
-		if !caps.Lifecycle.RuleNames {
-			normalized.Rules = append(normalized.Rules,
-				vedro.BucketLifecycleRule{
-					AgeDays: rule.AgeDays,
-					Action:  rule.Action,
-					Enabled: rule.Enabled,
-				},
-			)
-		} else {
-			normalized.Rules = append(normalized.Rules, rule)
-		}
-	}
-	return normalized
-}
-
-func cloneBool(value *bool) *bool {
+func CloneBool(value *bool) *bool {
 	if value == nil {
 		return nil
 	}

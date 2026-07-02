@@ -73,18 +73,6 @@ func versioningMapping(v *vedro.BucketVersioning) bool {
 	return false
 }
 
-func normalizedCloudSpecific(cfg *vedro.BucketCloudSpecificConfig) *vedro.BucketCloudSpecificConfig {
-	if cfg == nil || cfg.Gcp == nil || cfg.Gcp.SoftDeletePolicy == nil {
-		return &vedro.BucketCloudSpecificConfig{
-			Gcp: &vedro.BucketGcpConfig{
-				SoftDeletePolicy: defaultSoftDelete,
-			},
-		}
-	}
-
-	return cfg
-}
-
 type gcsAPI struct {
 	client    *storage.Client
 	projectID string

@@ -47,15 +47,13 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 	spec := bckt.Spec
 
 	bucketName := helpers.BucketNameFromCR(bckt)
-	p := &Provider{}
-	caps := p.Capabilities().Bucket
 
 	fake := cloud.BucketAttrs{
 		Name:     bucketName,
 		Location: spec.Location,
 		Properties: &vedro.BucketProperties{
-			Versioning:   helpers.NormalizedBucketVersioning(spec.Versioning),
-			Lifecycle:    helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps),
+			Versioning:   spec.Versioning,
+			Lifecycle:    spec.Lifecycle,
 			StorageClass: spec.StorageClass,
 			Labels:       spec.Labels,
 		},

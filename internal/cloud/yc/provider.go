@@ -81,8 +81,13 @@ func New(
 	}
 
 	p.bucket = &Bucket{
-		api: &aws.S3API{
-			Client: s3Client,
+		api: &ycAPI{
+			sdk: sdk,
+			awsAPI: aws.S3API{
+				Client: s3Client,
+			},
+			folderId: cfg.Spec.ProjectId,
+			location: cfg.Spec.Region,
 		},
 	}
 

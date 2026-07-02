@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -68,25 +69,77 @@ func fromYcVersioning(versioning storageapi.Versioning) *vedro.BucketVersioning 
 	}
 }
 
+func toYcVersioning(versioning *vedro.BucketVersioning) storageapi.Versioning {
+	if versioning == nil {
+		return storageapi.Versioning_VERSIONING_DISABLED
+	}
+
+	if versioning.Enabled {
+		return storageapi.Versioning_VERSIONING_ENABLED
+	} else {
+		return storageapi.Versioning_VERSIONING_SUSPENDED
+	}
+}
+
 func fromYcLifecycle(lifecycleRules []*storageapi.LifecycleRule) *vedro.BucketLifecycle {
-	var lifecycle *vedro.BucketLifecycle
+	lifecycle := &vedro.BucketLifecycle{}
 
 	for _, rule := range lifecycleRules {
-		if rule.Expiration != nil && rule.Expiration.Days != nil {
+		if rule == nil {
+			continue
+		}
+		if rule.Expiration != nil {
 			var name *string
 			if rule.Id != nil {
 				name = helpers.Ptr(rule.Id.Value)
 			}
-			lifecycle.Rules = append(lifecycle.Rules, vedro.BucketLifecycleRule{
-				Name:    name,
-				Enabled: true,
-				AgeDays: helpers.Ptr(rule.Expiration.Days.Value),
-				Action:  vedro.BucketLifecycleActionDelete,
-			})
+			if rule.Expiration.Days != nil {
+				lifecycle.Rules = append(lifecycle.Rules, vedro.BucketLifecycleRule{
+					Name:    name,
+					Enabled: rule.Enabled,
+					AgeDays: helpers.Ptr(rule.Expiration.Days.Value),
+					Action:  vedro.BucketLifecycleActionDelete,
+				})
+			}
 		}
 	}
 
+	if len(lifecycle.Rules) == 0 {
+		return nil
+	}
+
 	return lifecycle
+}
+
+func toYcLifecycle(lifecycle *vedro.BucketLifecycle) []*storageapi.LifecycleRule {
+	rules := []*storageapi.LifecycleRule{}
+
+	if lifecycle == nil || len(lifecycle.Rules) == 0 {
+		return rules
+	}
+
+	for _, rule := range lifecycle.Rules {
+		var id *wrapperspb.StringValue
+		if rule.Name != nil {
+			id = &wrapperspb.StringValue{
+				Value: *rule.Name,
+			}
+		}
+		if rule.AgeDays != nil {
+			if rule.Action == vedro.BucketLifecycleActionDelete {
+				rules = append(rules, &storageapi.LifecycleRule{
+					Id:      id,
+					Enabled: rule.Enabled,
+					Expiration: &storageapi.LifecycleRule_Expiration{
+						Days: &wrapperspb.Int64Value{
+							Value: *rule.AgeDays,
+						},
+					},
+				})
+			}
+		}
+	}
+	return rules
 }
 
 func fromYcTags(tags []*storageapi.Tag) map[string]string {
@@ -124,10 +177,8 @@ func fromYcBucket(bucket *storageapi.Bucket, location string) (*cloud.BucketAttr
 		Name:     bucket.Name,
 		Location: location,
 		Properties: &vedro.BucketProperties{
-			//Versioning: fromYcVersioning(bucket.Versioning),
-			//Lifecycle: &vedro.BucketLifecycle{
-			//	Rules: []vedro.BucketLifecycleRule{},
-			//},
+			Versioning:   fromYcVersioning(bucket.Versioning),
+			Lifecycle:    fromYcLifecycle(bucket.LifecycleRules),
 			Labels:       fromYcTags(bucket.Tags),
 			StorageClass: sc,
 		},
@@ -137,10 +188,13 @@ func fromYcBucket(bucket *storageapi.Bucket, location string) (*cloud.BucketAttr
 
 func toCreateBucketRequest(attrs cloud.BucketAttrs, folderId string) (*storageapi.CreateBucketRequest, error) {
 	request := &storageapi.CreateBucketRequest{
-		Name:     attrs.Name,
-		FolderId: folderId,
-		Tags:     toYcTags(attrs.Properties.Labels),
+		Name:           attrs.Name,
+		FolderId:       folderId,
+		Tags:           toYcTags(attrs.Properties.Labels),
+		Versioning:     toYcVersioning(attrs.Properties.Versioning),
+		LifecycleRules: toYcLifecycle(attrs.Properties.Lifecycle),
 	}
+
 	storageClass, ok := storageClassMapping[attrs.Properties.StorageClass]
 	if !ok {
 		return nil, fmt.Errorf(
@@ -175,6 +229,20 @@ func patchYcBucketAttrs(patch cloud.BucketPatch, name string) (*storageapi.Updat
 	if patch.Labels.Set {
 		update.Tags = toYcTags(patch.Labels.Value)
 		update.UpdateMask.Paths = append(update.UpdateMask.Paths, "tags")
+	}
+
+	if patch.Versioning.Set {
+		update.Versioning = toYcVersioning(patch.Versioning.Value)
+		// cant set versioning back to disabled so we just suspend it
+		if update.Versioning == storageapi.Versioning_VERSIONING_DISABLED {
+			update.Versioning = storageapi.Versioning_VERSIONING_SUSPENDED
+		}
+		update.UpdateMask.Paths = append(update.UpdateMask.Paths, "versioning")
+
+	}
+	if patch.Lifecycle.Set {
+		update.LifecycleRules = toYcLifecycle(patch.Lifecycle.Value)
+		update.UpdateMask.Paths = append(update.UpdateMask.Paths, "lifecycle_rules")
 	}
 
 	return update, nil

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"strings"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -108,32 +109,19 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		patch.StorageClass = helpers.PatchTo(spec.StorageClass)
 	}
 
-	// desiredVersioning := helpers.NormalizedBucketVersioning(spec.Versioning)
+	if !reflect.DeepEqual(
+		attrs.Properties.Versioning,
+		spec.Versioning,
+	) {
+		patch.Versioning = helpers.PatchTo(spec.Versioning)
+	}
 
-	// if !reflect.DeepEqual(
-	// 	attrs.Properties.Versioning,
-	// 	desiredVersioning,
-	// ) {
-	// 	patch.Versioning = helpers.PatchTo(desiredVersioning)
-	// }
-
-	// desiredPAP := helpers.NormalizedBucketPAP(spec.PublicAccessPrevention)
-
-	// if !reflect.DeepEqual(
-	// 	attrs.Properties.PublicAccessPrevention,
-	// 	desiredPAP,
-	// ) {
-	// 	patch.PublicAccessPrevention = helpers.PatchTo(desiredPAP)
-	// }
-
-	// desiredLifecycle := helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps)
-
-	// if !reflect.DeepEqual(
-	// 	attrs.Properties.Lifecycle,
-	// 	desiredLifecycle,
-	// ) {
-	// 	patch.Lifecycle = helpers.PatchTo(desiredLifecycle)
-	// }
+	if !reflect.DeepEqual(
+		attrs.Properties.Lifecycle,
+		spec.Lifecycle,
+	) {
+		patch.Lifecycle = helpers.PatchTo(spec.Lifecycle)
+	}
 
 	if patch.HasChanges() {
 		updateAttrs, updateErr := b.api.UpdateBucket(ctx, bucketName, patch)

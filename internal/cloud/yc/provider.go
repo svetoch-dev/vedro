@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	awscompatibility "github.com/yandex-cloud/go-genproto/yandex/cloud/iam/v1/awscompatibility"
 	ycsdk "github.com/yandex-cloud/go-sdk/v2"
@@ -87,7 +88,7 @@ func New(
 				Client: s3Client,
 			},
 			folderId: cfg.Spec.ProjectId,
-			location: cfg.Spec.Region,
+			location: strings.ToUpper(cfg.Spec.Region),
 		},
 	}
 

@@ -64,9 +64,7 @@ func fromYcVersioning(versioning storageapi.Versioning) *vedro.BucketVersioning 
 			Enabled: false,
 		}
 	default:
-		return &vedro.BucketVersioning{
-			Enabled: false,
-		}
+		return nil
 	}
 }
 
@@ -100,6 +98,18 @@ func fromYcTags(tags []*storageapi.Tag) map[string]string {
 	return dict
 }
 
+func toYcTags(labels map[string]string) []*storageapi.Tag {
+	tags := []*storageapi.Tag{}
+
+	for key, value := range labels {
+		tags = append(tags, &storageapi.Tag{
+			Key:   key,
+			Value: value,
+		})
+	}
+	return tags
+}
+
 func fromYcBucket(bucket *storageapi.Bucket, location string) (*cloud.BucketAttrs, error) {
 	if bucket == nil {
 		return nil, fmt.Errorf("yc storageapi.Bucket is nil")
@@ -118,7 +128,7 @@ func fromYcBucket(bucket *storageapi.Bucket, location string) (*cloud.BucketAttr
 			//Lifecycle: &vedro.BucketLifecycle{
 			//	Rules: []vedro.BucketLifecycleRule{},
 			//},
-			//Labels:       fromYcTags(bucket.Tags),
+			Labels:       fromYcTags(bucket.Tags),
 			StorageClass: sc,
 		},
 	}, nil
@@ -129,6 +139,7 @@ func toCreateBucketRequest(attrs cloud.BucketAttrs, folderId string) (*storageap
 	request := &storageapi.CreateBucketRequest{
 		Name:     attrs.Name,
 		FolderId: folderId,
+		Tags:     toYcTags(attrs.Properties.Labels),
 	}
 	storageClass, ok := storageClassMapping[attrs.Properties.StorageClass]
 	if !ok {
@@ -159,6 +170,11 @@ func patchYcBucketAttrs(patch cloud.BucketPatch, name string) (*storageapi.Updat
 		}
 		update.DefaultStorageClass = storageClass
 		update.UpdateMask.Paths = append(update.UpdateMask.Paths, "default_storage_class")
+	}
+
+	if patch.Labels.Set {
+		update.Tags = toYcTags(patch.Labels.Value)
+		update.UpdateMask.Paths = append(update.UpdateMask.Paths, "tags")
 	}
 
 	return update, nil

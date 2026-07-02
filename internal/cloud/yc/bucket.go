@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -99,9 +100,9 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 
 	patch := cloud.BucketPatch{}
 
-	// if !maps.Equal(attrs.Properties.Labels, spec.Labels) {
-	// 	patch.Labels = helpers.PatchTo(spec.Labels)
-	// }
+	if !maps.Equal(attrs.Properties.Labels, spec.Labels) {
+		patch.Labels = helpers.PatchTo(spec.Labels)
+	}
 
 	if attrs.Properties.StorageClass != spec.StorageClass {
 		patch.StorageClass = helpers.PatchTo(spec.StorageClass)

@@ -116,7 +116,7 @@ func (b *Bucket) ValidateBucketSpec(bckt vedro.Bucket, pType vedro.ProviderType)
 		return v
 	}
 
-	v = validation.ValidateBucketLocation(spec.Location, validateGCSLocation)
+	v = validation.ValidateLocation(spec.Location, validateGCSLocation)
 
 	if !v.Valid {
 		return v

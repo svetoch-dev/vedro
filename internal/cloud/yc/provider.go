@@ -3,6 +3,7 @@ package yc
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	awscompatibility "github.com/yandex-cloud/go-genproto/yandex/cloud/iam/v1/awscompatibility"
 	ycsdk "github.com/yandex-cloud/go-sdk/v2"
@@ -23,6 +24,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/cloud/aws"
 	"github.com/svetoch-dev/vedro/internal/helpers"
+	"github.com/svetoch-dev/vedro/internal/validation"
 )
 
 const (
@@ -31,6 +33,8 @@ const (
 		"yandex.cloud.iam.v1.awscompatibility.AccessKeyService.Create",
 	)
 )
+
+var ycProjectIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,62}$`)
 
 type staticS3AccessKey struct {
 	accessKeyID     string
@@ -231,4 +235,18 @@ func (p *Provider) Bucket() cloud.BucketProvider {
 
 func (p *Provider) Cleanup(ctx context.Context) error {
 	return deleteStaticS3AccessKey(ctx, p.sdk, p.accessKey.id)
+}
+
+func (p *Provider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {
+	if !ycProjectIDPattern.MatchString(cfg.Spec.ProjectId) {
+		return validation.Invalid("spec.projectId must be 5-63 characters, start with a lowercase letter, and contain only lowercase letters, numbers, and dashes")
+	}
+
+	v := validation.ValidateLocation(cfg.Spec.Region, nil)
+
+	if !v.Valid {
+		return v
+	}
+
+	return validation.Valid()
 }

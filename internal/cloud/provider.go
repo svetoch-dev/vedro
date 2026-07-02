@@ -17,6 +17,7 @@ type Provider interface {
 	Bucket() BucketProvider
 	Capabilities() Capabilities
 	Cleanup(ctx context.Context) error
+	ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult
 }
 
 type Capabilities struct {

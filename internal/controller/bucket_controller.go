@@ -148,6 +148,22 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}()
 
+	validationResultCfg := provider.ValidateProviderConfigSpec(providerConfig.ProviderConfig)
+
+	if !validationResultCfg.Valid {
+		logger.Error(err, "ProviderConfig.spec is invalid")
+		providerConfig.Condition.Status = metav1.ConditionFalse
+		providerConfig.Condition.Reason = conditions.ReasonProviderConfigIvalidSpec
+		providerConfig.Condition.Message = validationResultCfg.Message
+		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
 	// providerConfig is valid and provider is configured by now;
 	// set its final condition.
 	providerConfig.Condition.Status = metav1.ConditionTrue

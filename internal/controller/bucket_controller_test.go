@@ -329,6 +329,10 @@ func (p *fakeProvider) Bucket() cloud.BucketProvider {
 	return p.bucket
 }
 
+func (p *fakeProvider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {
+	return validation.Valid()
+}
+
 func (p *fakeProvider) Cleanup(ctx context.Context) error {
 	p.cleanupCalled = true
 	return p.cleanupErr

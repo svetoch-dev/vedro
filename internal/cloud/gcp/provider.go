@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/option"
@@ -11,11 +12,14 @@ import (
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
+	"github.com/svetoch-dev/vedro/internal/validation"
 )
 
 const (
 	gcpCredentialsSecretKey = "key"
 )
+
+var gcpProjectIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
 
 type Provider struct {
 	bucket *Bucket
@@ -95,4 +99,18 @@ func (p *Provider) Bucket() cloud.BucketProvider {
 
 func (p *Provider) Cleanup(ctx context.Context) error {
 	return nil
+}
+
+func (p *Provider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {
+	if !gcpProjectIDPattern.MatchString(cfg.Spec.ProjectId) {
+		return validation.Invalid("spec.projectId must be 6-30 characters, start with a lowercase letter, contain only lowercase letters, numbers, and dashes, and end with a letter or number")
+	}
+
+	v := validation.ValidateLocation(cfg.Spec.Region, nil)
+
+	if !v.Valid {
+		return v
+	}
+
+	return validation.Valid()
 }

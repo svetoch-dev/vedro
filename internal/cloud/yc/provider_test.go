@@ -18,7 +18,7 @@ var _ = Describe("Provider.ValidateProviderConfigSpec", func() {
 	}
 
 	It("returns valid for a valid YC project ID", func() {
-		result := (&Provider{}).ValidateProviderConfigSpec(newProviderConfig("b1g123456789abcdef"))
+		result := (&Provider{}).ValidateProviderConfigSpec(newProviderConfig("b1g123456789abcdefdd"))
 
 		Expect(result.Valid).To(BeTrue())
 	})

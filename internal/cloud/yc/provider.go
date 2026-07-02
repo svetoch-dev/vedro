@@ -34,7 +34,7 @@ const (
 	)
 )
 
-var ycProjectIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,62}$`)
+var ycProjectIDPattern = regexp.MustCompile(`^b1g[a-z0-9]{17}$`)
 
 type staticS3AccessKey struct {
 	accessKeyID     string

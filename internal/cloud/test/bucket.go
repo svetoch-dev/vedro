@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"cloud.google.com/go/storage"
 	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck
 	. "github.com/onsi/gomega"    //nolint:staticcheck
 
@@ -375,7 +374,7 @@ func BucketProviderTests(cfg Config) bool {
 			err := bucket.DeleteBucket(ctx, bckt)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fake.Deleted).To(BeFalse())
-			Expect(fake.Query).To(BeNil())
+			Expect(fake.ProcessObjectsCalled).To(BeFalse())
 		})
 
 		It("deletes an empty bucket", func() {
@@ -386,21 +385,20 @@ func BucketProviderTests(cfg Config) bool {
 			Expect(fake.Deleted).To(BeTrue())
 		})
 
-		It("requests all object versions while listing", func() {
+		It("processes objects before deleting the bucket", func() {
 			fake.ObjectIterator = &FakeObjectIterator{}
 			bckt := newDeleteBucketCR()
 
 			err := bucket.DeleteBucket(ctx, bckt)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(fake.Query).NotTo(BeNil())
-			Expect(fake.Query.Versions).To(BeTrue())
+			Expect(fake.ProcessObjectsCalled).To(BeTrue())
 		})
 
 		It("deletes all objects before deleting the bucket", func() {
 			fake.ObjectIterator = &FakeObjectIterator{
-				Attrs: []*storage.ObjectAttrs{
-					{Name: "obj-a", Generation: 1},
-					{Name: "obj-b", Generation: 2},
+				Objects: []cloud.ObjectVersion{
+					{Name: "obj-a", Version: helpers.Ptr("1")},
+					{Name: "obj-b", Version: helpers.Ptr("2")},
 				},
 			}
 			bckt := newDeleteBucketCR()
@@ -409,8 +407,8 @@ func BucketProviderTests(cfg Config) bool {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fake.Deleted).To(BeTrue())
 			Expect(fake.GetDeletedObjects()).To(ConsistOf(
-				DeletedObject{Name: "obj-a", Generation: 1},
-				DeletedObject{Name: "obj-b", Generation: 2},
+				DeletedObject{Name: "obj-a", Version: helpers.Ptr("1")},
+				DeletedObject{Name: "obj-b", Version: helpers.Ptr("2")},
 			))
 		})
 
@@ -426,8 +424,8 @@ func BucketProviderTests(cfg Config) bool {
 
 		It("returns an error when object deletion fails", func() {
 			fake.ObjectIterator = &FakeObjectIterator{
-				Attrs: []*storage.ObjectAttrs{
-					{Name: "obj-a", Generation: 1},
+				Objects: []cloud.ObjectVersion{
+					{Name: "obj-a", Version: helpers.Ptr("1")},
 				},
 			}
 			fake.ObjectDeleteErr = errors.New("object delete failed")
@@ -442,8 +440,8 @@ func BucketProviderTests(cfg Config) bool {
 
 		It("ignores 404 errors while deleting objects", func() {
 			fake.ObjectIterator = &FakeObjectIterator{
-				Attrs: []*storage.ObjectAttrs{
-					{Name: "obj-a", Generation: 1},
+				Objects: []cloud.ObjectVersion{
+					{Name: "obj-a", Version: helpers.Ptr("1")},
 				},
 			}
 			fake.ObjectDeleteErr = cloud.ErrBucketObjectNotFound

@@ -385,6 +385,18 @@ func (y *ycAPI) DeleteObject(
 }
 
 func (y *ycAPI) DeleteBucket(ctx context.Context, name string) error {
+	op, err := storagesdk.NewBucketClient(y.sdk).Delete(ctx, &storageapi.DeleteBucketRequest{
+		Name: name,
+	})
+	if err != nil {
+		return fmt.Errorf("delete bucket %q: %w", name, err)
+	}
+
+	_, err = op.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("wait delete bucket %q: %w", name, err)
+	}
+
 	return nil
 }
 

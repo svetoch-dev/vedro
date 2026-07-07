@@ -27,11 +27,11 @@ spec:
     name: providerconfig-sample-yc
   location: ru-central1
 
-  deletionPolicy: Delete
+  deletionPolicy: Retain
   storageClass: Standard
 
   versioning:
-    enabled: false
+    enabled: true
 
   lifecycle:
     rules:

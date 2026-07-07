@@ -10,7 +10,6 @@ import (
 	"github.com/yandex-cloud/go-sdk/v2/pkg/iamkey"
 	"github.com/yandex-cloud/go-sdk/v2/pkg/options"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
@@ -65,8 +64,6 @@ func newClient(
 	//case vedro.AuthMethodWorkloadIdentity:
 	//	return storage.NewClient(ctx)
 	case vedro.AuthMethodStaticCredentials:
-		logger := log.FromContext(ctx)
-		logger.V(1).Info("creating yc client")
 		secretRef := cfg.Spec.CredentialsSecretRef
 		if secretRef == nil {
 			return nil, "", fmt.Errorf("spec.credentialsSecretRef is required when auth.method is Secret")

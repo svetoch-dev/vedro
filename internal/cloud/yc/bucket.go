@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"sync"
 
+	"github.com/gammazero/workerpool"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/validation"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Bucket struct {
@@ -143,50 +144,39 @@ func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedro.Bucket) error {
 	// err that we will return if object deletion fails
 	var deleteObjectError error
 	// error mutex for syncing concurrent changes to error var
-	// var errM sync.Mutex
+	var errM sync.Mutex
 
-	// // New pool with workers equal number of CPU
-	// workers := runtime.NumCPU() - 1
-	// if workers < 1 {
-	// 	workers = 1
-	// }
-	// wp := workerpool.New(workers)
+	// TODO make this settable via cli args or/and env var
+	workers := 32
+	wp := workerpool.New(workers)
 
-	// // Semaphore channel allowing up to 2000 uncompleted deletion tasks in the queue
-	// sem := make(chan struct{}, 2000)
+	// Semaphore channel allowing up to 2000 uncompleted deletion tasks in the queue
+	sem := make(chan struct{}, 2000)
 
 	err := b.api.ProcessObjects(ctx, bucketName, func(object cloud.ObjectVersion) error {
-		var v string
-		if object.Version != nil {
-			v = *object.Version
-		}
+		// queue task
+		sem <- struct{}{}
 
-		log.FromContext(ctx).V(1).Info(fmt.Sprintf("Will delete name=%s, version=%s", object.Name, v))
+		wp.Submit(func() {
+			// dequeue task. Defer only accepts callable so wrap it in func
+			defer func() { <-sem }()
+			err := b.api.DeleteObject(ctx, bucketName, object)
+			if err != nil {
+				errM.Lock()
+				defer errM.Unlock()
+				if errors.Is(err, cloud.ErrBucketObjectNotFound) {
+					return
+				}
+				if deleteObjectError == nil {
+					deleteObjectError = err
+				}
+			}
+		})
+
 		return nil
 	})
-	// 	// queue task
-	// 	sem <- struct{}{}
 
-	// 	wp.Submit(func() {
-	// 		// dequeue task. Defer only accepts callable so wrap it in func
-	// 		defer func() { <-sem }()
-	// 		err := b.api.DeleteObject(ctx, bucketName, object)
-	// 		if err != nil {
-	// 			errM.Lock()
-	// 			defer errM.Unlock()
-	// 			if errors.Is(err, cloud.ErrBucketObjectNotFound) {
-	// 				return
-	// 			}
-	// 			if deleteObjectError == nil {
-	// 				deleteObjectError = err
-	// 			}
-	// 		}
-	// 	})
-
-	// 	return nil
-	// })
-
-	// wp.StopWait()
+	wp.StopWait()
 
 	if err != nil {
 		return err

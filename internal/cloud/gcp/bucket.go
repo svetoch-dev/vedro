@@ -7,7 +7,6 @@ import (
 	"maps"
 	"reflect"
 	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -244,11 +243,8 @@ func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedro.Bucket) error {
 	// error mutex for syncing concurrent changes to error var
 	var errM sync.Mutex
 
-	// New pool with workers equal number of CPU
-	workers := runtime.NumCPU() - 1
-	if workers < 1 {
-		workers = 1
-	}
+	// TODO make this settable via cli args or/and env var
+	workers := 32
 	wp := workerpool.New(workers)
 
 	// Semaphore channel allowing up to 2000 uncompleted deletion tasks in the queue

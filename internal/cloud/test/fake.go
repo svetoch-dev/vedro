@@ -3,6 +3,7 @@ package cloudtest
 import (
 	"context"
 	"errors"
+	"strconv"
 	"sync"
 
 	"cloud.google.com/go/storage"
@@ -111,7 +112,7 @@ func (f *FakeBucketAPI) ProcessObjects(
 			if err != nil {
 				return err
 			}
-			if err := process(cloud.ObjectVersion{Name: attrs.Name, Version: attrs.Generation}); err != nil {
+			if err := process(cloud.ObjectVersion{Name: attrs.Name, Version: helpers.Ptr(strconv.FormatInt(attrs.Generation, 10))}); err != nil {
 				return err
 			}
 		}
@@ -128,7 +129,7 @@ func (f *FakeBucketAPI) DeleteObject(
 	return f.ObjectDeleteErr
 }
 
-func (f *FakeBucketAPI) recordDeletedObject(name string, generation int64) {
+func (f *FakeBucketAPI) recordDeletedObject(name string, version *string) {
 	f.deletedObjectsMu.Lock()
 	defer f.deletedObjectsMu.Unlock()
 	f.deletedObjects = append(f.deletedObjects, DeletedObject{Name: name, Generation: generation})
@@ -160,6 +161,10 @@ func (f *FakeBucketAPI) CreateBucket(
 		return f.CreateErr
 	}
 	f.Attrs = &attrs
+	return nil
+}
+
+func (f *FakeBucketAPI) Close(ctx context.Context) error {
 	return nil
 }
 

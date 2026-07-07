@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
-	"strings"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/validation"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Bucket struct {
@@ -52,7 +52,6 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 	spec := bckt.Spec
 
 	bucketName := helpers.BucketNameFromCR(bckt)
-	normalizedLocation := strings.ToUpper(spec.Location)
 
 	attrs, err := b.api.GetBucket(ctx, bucketName)
 
@@ -79,18 +78,18 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		return nil, fmt.Errorf("get bucket attrs %q: %w", bucketName, err)
 	}
 
-	if attrs.Location != normalizedLocation {
+	if attrs.Location != spec.Location {
 		return nil, fmt.Errorf(
 			"bucket %q already exists in location %q, desired location is %q",
 			bucketName,
 			attrs.Location,
-			normalizedLocation,
+			spec.Location,
 		)
 	}
 
 	appliedState := &cloud.BucketAttrs{
 		Name:     bucketName,
-		Location: normalizedLocation,
+		Location: spec.Location,
 		Properties: &vedro.BucketProperties{
 			Versioning:   spec.Versioning,
 			Lifecycle:    spec.Lifecycle,
@@ -135,5 +134,75 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 }
 
 func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedro.Bucket) error {
+	bucketName := helpers.BucketNameFromCR(bckt)
+
+	if bckt.Spec.DeletionPolicy != vedro.DeletionPolicyDelete {
+		return nil
+	}
+
+	// err that we will return if object deletion fails
+	var deleteObjectError error
+	// error mutex for syncing concurrent changes to error var
+	// var errM sync.Mutex
+
+	// // New pool with workers equal number of CPU
+	// workers := runtime.NumCPU() - 1
+	// if workers < 1 {
+	// 	workers = 1
+	// }
+	// wp := workerpool.New(workers)
+
+	// // Semaphore channel allowing up to 2000 uncompleted deletion tasks in the queue
+	// sem := make(chan struct{}, 2000)
+
+	err := b.api.ProcessObjects(ctx, bucketName, func(object cloud.ObjectVersion) error {
+		var v string
+		if object.Version != nil {
+			v = *object.Version
+		}
+
+		log.FromContext(ctx).V(1).Info(fmt.Sprintf("Will delete name=%s, version=%s", object.Name, v))
+		return nil
+	})
+	// 	// queue task
+	// 	sem <- struct{}{}
+
+	// 	wp.Submit(func() {
+	// 		// dequeue task. Defer only accepts callable so wrap it in func
+	// 		defer func() { <-sem }()
+	// 		err := b.api.DeleteObject(ctx, bucketName, object)
+	// 		if err != nil {
+	// 			errM.Lock()
+	// 			defer errM.Unlock()
+	// 			if errors.Is(err, cloud.ErrBucketObjectNotFound) {
+	// 				return
+	// 			}
+	// 			if deleteObjectError == nil {
+	// 				deleteObjectError = err
+	// 			}
+	// 		}
+	// 	})
+
+	// 	return nil
+	// })
+
+	// wp.StopWait()
+
+	if err != nil {
+		return err
+	}
+
+	if deleteObjectError != nil {
+		return fmt.Errorf("could not delete bucket because object deletion failed: %w", deleteObjectError)
+	}
+
+	err = b.api.DeleteBucket(ctx, bucketName)
+	if errors.Is(err, cloud.ErrBucketNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("could not delete bucket because of error: %w", err)
+	}
+
 	return nil
 }

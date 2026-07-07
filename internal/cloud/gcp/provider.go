@@ -98,6 +98,9 @@ func (p *Provider) Bucket() cloud.BucketProvider {
 }
 
 func (p *Provider) Cleanup(ctx context.Context) error {
+	if err := p.bucket.api.Close(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 

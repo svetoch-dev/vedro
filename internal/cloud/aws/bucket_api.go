@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -173,6 +174,36 @@ func (s *S3API) ProcessObjects(
 	bucket string,
 	process func(cloud.ObjectVersion) error,
 ) error {
+	p := s3.NewListObjectVersionsPaginator(s.Client, &s3.ListObjectVersionsInput{
+		Bucket: aws.String(bucket),
+	})
+
+	for p.HasMorePages() {
+		page, err := p.NextPage(ctx)
+		if err != nil {
+			return err
+		}
+
+		for _, v := range page.Versions {
+			if err := process(cloud.ObjectVersion{
+				Name:    aws.ToString(v.Key),
+				Version: v.VersionId,
+			}); err != nil {
+				return err
+			}
+		}
+
+		for _, v := range page.DeleteMarkers {
+			if err := process(cloud.ObjectVersion{
+				Name:    aws.ToString(v.Key),
+				Version: v.VersionId,
+			}); err != nil {
+				return err
+			}
+
+		}
+	}
+
 	return nil
 }
 
@@ -181,7 +212,12 @@ func (s *S3API) DeleteObject(
 	bucket string,
 	object cloud.ObjectVersion,
 ) error {
-	return nil
+	_, err := s.Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket:    aws.String(bucket),
+		Key:       aws.String(object.Name),
+		VersionId: object.Version,
+	})
+	return err
 }
 
 func (s *S3API) DeleteBucket(ctx context.Context, name string) error {

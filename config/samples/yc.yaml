@@ -27,17 +27,17 @@ spec:
     name: providerconfig-sample-yc
   location: ru-central1
 
-  deletionPolicy: Retain
+  deletionPolicy: Delete
   storageClass: Standard
 
   versioning:
     enabled: false
 
-  #lifecycle:
-  #  rules:
-  #    - enabled: true
-  #      ageDays: 90
-  #      action: Delete
+  lifecycle:
+    rules:
+      - enabled: true
+        ageDays: 90
+        action: Delete
 
   labels:
     app: payments

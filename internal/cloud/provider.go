@@ -61,7 +61,7 @@ type Change[T any] struct {
 
 type ObjectVersion struct {
 	Name    string
-	Version int64
+	Version *string
 }
 
 type BucketPatch struct {
@@ -100,6 +100,10 @@ type BucketAPI interface {
 	) error
 
 	DeleteBucket(ctx context.Context, name string) error
+
+	// Close releases resources owned by the BucketAPI implementation.
+	// It may perform remote cleanup, such as deleting temporary provider credentials.
+	Close(ctx context.Context) error
 }
 
 type BucketProvider interface {

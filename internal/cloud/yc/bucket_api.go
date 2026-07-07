@@ -34,11 +34,19 @@ var (
 	}
 )
 
+type staticS3AccessKey struct {
+	accessKeyID     string
+	secretAccessKey string
+	id              string
+}
+
 type ycAPI struct {
-	sdk      *ycsdk.SDK
-	awsAPI   aws.S3API
-	folderId string
-	location string
+	sdk       *ycsdk.SDK
+	accessKey *staticS3AccessKey
+	awsAPI    *aws.S3API
+	saId      string
+	folderId  string
+	location  string
 }
 
 func isNotFound(err error) bool {
@@ -309,11 +317,50 @@ func (y *ycAPI) UpdateBucket(ctx context.Context, name string, patch cloud.Bucke
 	return fromYcBucket(bucket, y.location)
 }
 
+func (y *ycAPI) newAWSAPI(ctx context.Context) error {
+	accessKey, err := createStaticS3AccessKey(ctx, y.sdk, y.saId)
+
+	if err != nil {
+		return err
+	}
+
+	y.accessKey = accessKey
+
+	s3Client, err := newS3Client(ctx, accessKey, y.location)
+	if err != nil {
+		cleanupErr := deleteStaticS3AccessKey(ctx, y.sdk, y.accessKey.id)
+		if cleanupErr != nil {
+			return fmt.Errorf("create yc s3 client: %w; cleanup static access key: %v", err, cleanupErr)
+		}
+		y.accessKey = nil
+
+		return err
+	}
+
+	y.awsAPI = &aws.S3API{
+		Client: s3Client,
+	}
+	return nil
+}
+
 func (y *ycAPI) ProcessObjects(
 	ctx context.Context,
 	bucket string,
 	process func(cloud.ObjectVersion) error,
 ) error {
+
+	if y.awsAPI == nil {
+		err := y.newAWSAPI(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := y.awsAPI.ProcessObjects(ctx, bucket, process)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -322,9 +369,36 @@ func (y *ycAPI) DeleteObject(
 	bucket string,
 	object cloud.ObjectVersion,
 ) error {
+	if y.awsAPI == nil {
+		err := y.newAWSAPI(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := y.awsAPI.DeleteObject(ctx, bucket, object)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (y *ycAPI) DeleteBucket(ctx context.Context, name string) error {
 	return nil
+}
+
+func (y *ycAPI) Close(ctx context.Context) error {
+	if y.sdk == nil {
+		return nil
+	}
+
+	if y.accessKey != nil {
+		err := deleteStaticS3AccessKey(ctx, y.sdk, y.accessKey.id)
+		if err != nil {
+			return err
+		}
+	}
+
+	return y.sdk.Shutdown(ctx)
 }

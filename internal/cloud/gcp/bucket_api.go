@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strconv"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -377,7 +378,7 @@ func (a *gcsAPI) ProcessObjects(
 
 		if err := process(cloud.ObjectVersion{
 			Name:    attrs.Name,
-			Version: attrs.Generation,
+			Version: helpers.Ptr(strconv.FormatInt(attrs.Generation, 10)),
 		}); err != nil {
 			return err
 		}
@@ -390,10 +391,23 @@ func (a *gcsAPI) DeleteObject(
 	object cloud.ObjectVersion,
 ) error {
 	bh := a.client.Bucket(bucket)
-	err := bh.Object(object.Name).Generation(object.Version).Delete(ctx)
+
+	obj := bh.Object(object.Name)
+
+	if object.Version != nil {
+		gen, err := strconv.ParseInt(*object.Version, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid generation %q for object %q: %w", *object.Version, object.Name, err)
+		}
+
+		obj = obj.Generation(gen)
+	}
+
+	err := obj.Delete(ctx)
 	if isGoogleAPINotFound(err) {
 		return cloud.ErrBucketObjectNotFound
 	}
+
 	return err
 }
 
@@ -404,6 +418,13 @@ func (a *gcsAPI) DeleteBucket(ctx context.Context, name string) error {
 		return cloud.ErrBucketNotFound
 	}
 	return err
+}
+
+func (a *gcsAPI) Close(ctx context.Context) error {
+	if a.client == nil {
+		return nil
+	}
+	return a.client.Close()
 }
 
 func isGoogleAPINotFound(err error) bool {

@@ -389,11 +389,17 @@ func (y *ycAPI) DeleteBucket(ctx context.Context, name string) error {
 		Name: name,
 	})
 	if err != nil {
+		if isNotFound(err) {
+			return cloud.ErrBucketNotFound
+		}
 		return fmt.Errorf("delete bucket %q: %w", name, err)
 	}
 
 	_, err = op.Wait(ctx)
 	if err != nil {
+		if isNotFound(err) {
+			return cloud.ErrBucketNotFound
+		}
 		return fmt.Errorf("wait delete bucket %q: %w", name, err)
 	}
 

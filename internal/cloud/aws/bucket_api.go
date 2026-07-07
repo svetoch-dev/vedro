@@ -2,9 +2,12 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -13,20 +16,20 @@ type S3API struct {
 	Client *s3.Client
 }
 
-// func isS3NotFoundLike(err error, codes ...string) bool {
-// 	var apiErr smithy.APIError
-// 	if !errors.As(err, &apiErr) {
-// 		return false
-// 	}
+func isS3NotFoundLike(err error, codes ...string) bool {
+	var apiErr smithy.APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
 
-// 	for _, code := range codes {
-// 		if apiErr.ErrorCode() == code {
-// 			return true
-// 		}
-// 	}
+	for _, code := range codes {
+		if apiErr.ErrorCode() == code {
+			return true
+		}
+	}
 
-// 	return false
-// }
+	return false
+}
 
 // func getS3Location(ctx context.Context, client *s3.Client, name string) (*s3.GetBucketLocationOutput, error) {
 // 	return client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{
@@ -181,7 +184,10 @@ func (s *S3API) ProcessObjects(
 	for p.HasMorePages() {
 		page, err := p.NextPage(ctx)
 		if err != nil {
-			return err
+			if isS3NotFoundLike(err, "NoSuchBucket", "NotFound") {
+				return cloud.ErrBucketNotFound
+			}
+			return fmt.Errorf("list object versions for bucket %q: %w", bucket, err)
 		}
 
 		for _, v := range page.Versions {
@@ -217,6 +223,9 @@ func (s *S3API) DeleteObject(
 		Key:       aws.String(object.Name),
 		VersionId: object.Version,
 	})
+	if isS3NotFoundLike(err, "NoSuchKey", "NoSuchVersion", "NotFound") {
+		return cloud.ErrBucketObjectNotFound
+	}
 	return err
 }
 

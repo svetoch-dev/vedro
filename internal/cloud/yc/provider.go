@@ -24,9 +24,7 @@ const (
 var ycProjectIDPattern = regexp.MustCompile(`^b1g[a-z0-9]{17}$`)
 
 type Provider struct {
-	bucket    *Bucket
-	accessKey *staticS3AccessKey
-	sdk       *ycsdk.SDK
+	bucket *Bucket
 }
 
 func New(
@@ -41,7 +39,6 @@ func New(
 	}
 
 	p := &Provider{}
-	p.sdk = sdk
 
 	p.bucket = &Bucket{
 		api: &ycAPI{

@@ -3,6 +3,7 @@ package yc
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
@@ -160,14 +161,23 @@ func fromYcTags(tags []*storageapi.Tag) map[string]string {
 }
 
 func toYcTags(labels map[string]string) []*storageapi.Tag {
-	tags := []*storageapi.Tag{}
+	// sort keys to make order deterministic to exclude flaky
+	// tests
+	keys := make([]string, 0, len(labels))
+	for key := range labels {
+		keys = append(keys, key)
+	}
 
-	for key, value := range labels {
+	sort.Strings(keys)
+
+	tags := make([]*storageapi.Tag, 0, len(labels))
+	for _, key := range keys {
 		tags = append(tags, &storageapi.Tag{
 			Key:   key,
-			Value: value,
+			Value: labels[key],
 		})
 	}
+
 	return tags
 }
 

@@ -2,7 +2,10 @@ package yc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	awssdkconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -20,7 +23,47 @@ const (
 	accessKeyCreateMethod = protoreflect.FullName(
 		"yandex.cloud.iam.v1.awscompatibility.AccessKeyService.Create",
 	)
+	ycWhoAmIUrl = "https://auth.yandex.cloud/oauth/userinfo"
 )
+
+func whoAmI(
+	ctx context.Context,
+	token string,
+) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ycWhoAmIUrl, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("unexpected status: %s", resp.Status)
+	}
+	var r struct {
+		SaId string `json:"sub"`
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&r)
+
+	if err != nil {
+		return "", err
+	}
+
+	return r.SaId, nil
+}
 
 func newS3Client(
 	ctx context.Context,

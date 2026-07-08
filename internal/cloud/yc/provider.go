@@ -61,8 +61,23 @@ func newClient(
 	cfg vedro.ProviderConfig,
 ) (*ycsdk.SDK, string, error) {
 	switch cfg.Spec.Method {
-	//case vedro.AuthMethodWorkloadIdentity:
-	//	return storage.NewClient(ctx)
+	case vedro.AuthMethodWorkloadIdentity:
+
+		sdk, err := ycsdk.Build(ctx, options.WithCredentials(credentials.InstanceServiceAccount()))
+		if err != nil {
+			return nil, "", err
+		}
+		token, err := sdk.CreateIAMToken(ctx)
+		if err != nil {
+			return nil, "", fmt.Errorf("WorkloadIdentity: failed to create token: %w", err)
+		}
+
+		saId, err := whoAmI(ctx, token.GetIamToken())
+		if err != nil {
+			return nil, "", fmt.Errorf("WorkloadIdentity: get yc service account id: %w", err)
+		}
+
+		return sdk, saId, nil
 	case vedro.AuthMethodStaticCredentials:
 		secretRef := cfg.Spec.CredentialsSecretRef
 		if secretRef == nil {
@@ -77,12 +92,12 @@ func newClient(
 
 		key, err := iamkey.ReadFromJSONBytes(data[ycCredentialsSecretKey])
 		if err != nil {
-			return nil, "", fmt.Errorf("parse yc service account key json: %w", err)
+			return nil, "", fmt.Errorf("StaticCreds: parse yc service account key json: %w", err)
 		}
 
 		creds, err := credentials.ServiceAccountKey(key)
 		if err != nil {
-			return nil, "", fmt.Errorf("create yc service account credentials: %w", err)
+			return nil, "", fmt.Errorf("StaticCred: create yc service account credentials: %w", err)
 		}
 
 		sdk, err := ycsdk.Build(ctx,

@@ -9,10 +9,7 @@ spec:
   type: yc
   projectId: ${YC_PROJECT_ID}
   region: ru-central1
-  method: StaticCredentials
-  credentialsSecretRef:
-    name: yc-creds
-    namespace: vedro-system
+  method: WorkloadIdentity
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: Bucket
@@ -31,7 +28,7 @@ spec:
   storageClass: Standard
 
   versioning:
-    enabled: true
+    enabled: false
 
   lifecycle:
     rules:

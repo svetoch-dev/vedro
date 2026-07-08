@@ -14,11 +14,18 @@ import (
 	"github.com/svetoch-dev/vedro/internal/helpers"
 )
 
-var defaultCloudSpecific = vedro.BucketCloudSpecificConfig{
-	Gcp: &vedro.BucketGcpConfig{
-		SoftDeletePolicy: defaultSoftDelete,
-	},
-}
+var (
+	defaultCloudSpecific = vedro.BucketCloudSpecificConfig{
+		Gcp: &vedro.BucketGcpConfig{
+			SoftDeletePolicy: defaultSoftDelete,
+		},
+	}
+	defaultGcpMod = func(p *vedro.BucketProperties) {
+		p.PublicAccessPrevention = helpers.Ptr(false)
+		p.Lifecycle = &vedro.BucketLifecycle{}
+		p.Versioning = &vedro.BucketVersioning{Enabled: false}
+	}
+)
 
 // newBucketCR is a small package-local helper so the GCP-specific specs
 // (ValidateBucketSpec, and cloudSpecific case) stay concise.
@@ -34,10 +41,12 @@ var _ = cloudtest.BucketProviderTests(cloudtest.Config{
 	OtherLocation:           "us-central1",
 	OtherNormalizedLocation: "US-CENTRAL1",
 	ProviderConfigType:      vedro.ProviderTypeGCP,
-	DefaultBucketPropertiesMods: []func(*vedro.BucketProperties){
+	BucketCaps:              (&Provider{}).Capabilities().Bucket,
+	BucketPropertiesMods: []func(*vedro.BucketProperties){
 		func(p *vedro.BucketProperties) {
 			p.CloudSpecificConfig = &defaultCloudSpecific
 		},
+		defaultGcpMod,
 	},
 	NewBucket: func(api cloud.BucketAPI) cloud.BucketProvider {
 		return &Bucket{api: api}
@@ -137,6 +146,7 @@ var _ = Describe("BucketProvider.EnsureBucketGCP", func() {
 			func(p *vedro.BucketProperties) {
 				p.CloudSpecificConfig = &got
 			},
+			defaultGcpMod,
 		)
 
 		bckt := newBucketCR(
@@ -171,6 +181,7 @@ var _ = Describe("BucketProvider.EnsureBucketGCP", func() {
 			func(p *vedro.BucketProperties) {
 				p.CloudSpecificConfig = &got
 			},
+			defaultGcpMod,
 		)
 
 		bckt := newBucketCR(
@@ -195,6 +206,7 @@ var _ = Describe("BucketProvider.EnsureBucketGCP", func() {
 			func(p *vedro.BucketProperties) {
 				p.CloudSpecificConfig = &defaultCloudSpecific
 			},
+			defaultGcpMod,
 		)
 
 		bckt := newBucketCR(

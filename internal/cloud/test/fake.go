@@ -35,13 +35,11 @@ func NewBucketAttrs(
 	name string,
 	location string,
 	storageClass vedro.BucketStorageClass,
+
 	mods ...func(*vedro.BucketProperties),
 ) *cloud.BucketAttrs {
 	properties := &vedro.BucketProperties{
-		StorageClass:           storageClass,
-		PublicAccessPrevention: helpers.Ptr(false),
-		Lifecycle:              &vedro.BucketLifecycle{},
-		Versioning:             &vedro.BucketVersioning{Enabled: false},
+		StorageClass: storageClass,
 	}
 	for _, mod := range mods {
 		mod(properties)

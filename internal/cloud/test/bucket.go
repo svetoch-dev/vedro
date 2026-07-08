@@ -29,7 +29,10 @@ type Config struct {
 
 	ProviderConfigType vedro.ProviderType
 
-	DefaultBucketPropertiesMods []func(*vedro.BucketProperties)
+	BucketPropertiesMods []func(*vedro.BucketProperties)
+
+	// Bucket provider capabilities
+	BucketCaps cloud.BucketCapabilities
 
 	// NewBucket wires the provider's cloud.BucketProvider to the supplied
 	// fake API. Implemented inside each provider's package so it can reach
@@ -51,10 +54,11 @@ func BucketProviderTests(cfg Config) bool {
 		storageClass vedro.BucketStorageClass,
 		mods ...func(*vedro.BucketProperties),
 	) *cloud.BucketAttrs {
-		allMods := append([]func(*vedro.BucketProperties){}, cfg.DefaultBucketPropertiesMods...)
+		allMods := append([]func(*vedro.BucketProperties){}, cfg.BucketPropertiesMods...)
 		allMods = append(allMods, mods...)
 		return NewBucketAttrs(name, location, storageClass, allMods...)
 	}
+	lifecycleCapability := cfg.BucketCaps.Lifecycle.RuleExpiration
 
 	Describe("BucketProvider.EnsureBucket", func() {
 		var (
@@ -90,13 +94,20 @@ func BucketProviderTests(cfg Config) bool {
 		It("creates a bucket with all supported options", func() {
 			fake.AttrsErr = cloud.ErrBucketNotFound
 
-			publicAccessPrevention := true
 			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassIce
-				b.Spec.Labels = map[string]string{"env": "prod"}
-				b.Spec.Versioning = &vedro.BucketVersioning{Enabled: true}
-				b.Spec.PublicAccessPrevention = &publicAccessPrevention
-				b.Spec.Lifecycle = &Lifecycle
+				b.Spec.StorageClass = vedro.BucketStorageClassStandard
+				if cfg.BucketCaps.Labels {
+					b.Spec.Labels = map[string]string{"env": "prod"}
+				}
+				if cfg.BucketCaps.PublicAccessPrevention {
+					b.Spec.PublicAccessPrevention = helpers.Ptr(true)
+				}
+				if cfg.BucketCaps.Versioning {
+					b.Spec.Versioning = &vedro.BucketVersioning{Enabled: true}
+				}
+				if lifecycleCapability {
+					b.Spec.Lifecycle = &Lifecycle
+				}
 			})
 
 			attrs, err := bucket.EnsureBucket(ctx, bckt)
@@ -104,15 +115,30 @@ func BucketProviderTests(cfg Config) bool {
 
 			Expect(fake.Created).NotTo(BeNil())
 			Expect(fake.Created.Location).To(Equal(cfg.Location))
-			Expect(fake.Created.Properties.StorageClass).To(Equal(vedro.BucketStorageClassIce))
-			Expect(fake.Created.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
-			Expect(fake.Created.Properties.Versioning.Enabled).To(BeTrue())
-			Expect(fake.Created.Properties.Lifecycle).To(Equal(&Lifecycle))
-			Expect(*fake.Created.Properties.PublicAccessPrevention).To(BeTrue())
-			Expect(attrs.Properties.StorageClass).To(Equal(vedro.BucketStorageClassIce))
-			Expect(attrs.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
-			Expect(attrs.Properties.Versioning.Enabled).To(BeTrue())
-			Expect(*attrs.Properties.PublicAccessPrevention).To(BeTrue())
+			Expect(fake.Created.Properties.StorageClass).To(Equal(vedro.BucketStorageClassStandard))
+			Expect(attrs.Properties.StorageClass).To(Equal(vedro.BucketStorageClassStandard))
+
+			if cfg.BucketCaps.Labels {
+				Expect(fake.Created.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
+			}
+			if cfg.BucketCaps.Versioning {
+				Expect(fake.Created.Properties.Versioning.Enabled).To(BeTrue())
+			}
+			if lifecycleCapability {
+				Expect(fake.Created.Properties.Lifecycle).To(Equal(&Lifecycle))
+			}
+			if cfg.BucketCaps.PublicAccessPrevention {
+				Expect(*fake.Created.Properties.PublicAccessPrevention).To(BeTrue())
+			}
+			if cfg.BucketCaps.Labels {
+				Expect(attrs.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
+			}
+			if cfg.BucketCaps.Versioning {
+				Expect(attrs.Properties.Versioning.Enabled).To(BeTrue())
+			}
+			if cfg.BucketCaps.PublicAccessPrevention {
+				Expect(*attrs.Properties.PublicAccessPrevention).To(BeTrue())
+			}
 		})
 
 		It("returns an error when creating a bucket fails", func() {
@@ -191,129 +217,139 @@ func BucketProviderTests(cfg Config) bool {
 			Expect(attrs.Properties.StorageClass).To(Equal(vedro.BucketStorageClassWarm))
 		})
 
-		It("updates lifecycle when its empty", func() {
-			fake.Attrs = newBucketAttrs(
-				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
-			)
+		if lifecycleCapability {
+			It("updates lifecycle when its empty", func() {
+				fake.Attrs = newBucketAttrs(
+					"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
+				)
 
-			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassStandard
-				b.Spec.Lifecycle = &Lifecycle
+				bckt := newBucketCR(func(b *vedro.Bucket) {
+					b.Spec.StorageClass = vedro.BucketStorageClassStandard
+					b.Spec.Lifecycle = &Lifecycle
+				})
+
+				attrs, err := bucket.EnsureBucket(ctx, bckt)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(fake.Updated).NotTo(BeNil())
+				Expect(fake.Updated.Lifecycle).To(Equal(helpers.PatchTo(&Lifecycle)))
+				Expect(attrs.Properties.Lifecycle).To(Equal(&Lifecycle))
 			})
 
-			attrs, err := bucket.EnsureBucket(ctx, bckt)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fake.Updated).NotTo(BeNil())
-			Expect(fake.Updated.Lifecycle).To(Equal(helpers.PatchTo(&Lifecycle)))
-			Expect(attrs.Properties.Lifecycle).To(Equal(&Lifecycle))
-		})
+			It("updates lifecycle when it differs", func() {
+				actualLifecycle := Lifecycle.DeepCopy()
+				actualLifecycle.Rules[0].AgeDays = helpers.Ptr(int64(100000))
+				fake.Attrs = newBucketAttrs(
+					"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
+					func(p *vedro.BucketProperties) { p.Lifecycle = actualLifecycle },
+				)
 
-		It("updates lifecycle when it differs", func() {
-			actualLifecycle := Lifecycle.DeepCopy()
-			actualLifecycle.Rules[0].AgeDays = helpers.Ptr(int64(100000))
-			fake.Attrs = newBucketAttrs(
-				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
-				func(p *vedro.BucketProperties) { p.Lifecycle = actualLifecycle },
-			)
+				bckt := newBucketCR(func(b *vedro.Bucket) {
+					b.Spec.StorageClass = vedro.BucketStorageClassStandard
+					b.Spec.Lifecycle = &Lifecycle
+				})
 
-			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassStandard
-				b.Spec.Lifecycle = &Lifecycle
+				attrs, err := bucket.EnsureBucket(ctx, bckt)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(fake.Updated).NotTo(BeNil())
+				Expect(fake.Updated.Lifecycle).To(Equal(helpers.PatchTo(&Lifecycle)))
+				Expect(attrs.Properties.Lifecycle).To(Equal(&Lifecycle))
+			})
+		}
+
+		if cfg.BucketCaps.Versioning {
+
+			It("updates versioning when it differs", func() {
+				fake.Attrs = newBucketAttrs(
+					"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
+					func(p *vedro.BucketProperties) {
+						p.Versioning = &vedro.BucketVersioning{Enabled: false}
+					},
+				)
+
+				bckt := newBucketCR(func(b *vedro.Bucket) {
+					b.Spec.StorageClass = vedro.BucketStorageClassStandard
+					b.Spec.Versioning = &vedro.BucketVersioning{Enabled: true}
+				})
+
+				attrs, err := bucket.EnsureBucket(ctx, bckt)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(fake.Updated).NotTo(BeNil())
+				Expect(fake.Updated.Versioning).To(Equal(
+					helpers.PatchTo(&vedro.BucketVersioning{Enabled: true}),
+				))
+				Expect(attrs.Properties.Versioning.Enabled).To(BeTrue())
+			})
+		}
+
+		if cfg.BucketCaps.Labels {
+
+			It("updates labels when they differ", func() {
+				fake.Attrs = newBucketAttrs(
+					"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
+					func(p *vedro.BucketProperties) {
+						p.Labels = map[string]string{"env": "dev"}
+					},
+				)
+
+				bckt := newBucketCR(func(b *vedro.Bucket) {
+					b.Spec.StorageClass = vedro.BucketStorageClassStandard
+					b.Spec.Labels = map[string]string{"env": "prod"}
+				})
+
+				attrs, err := bucket.EnsureBucket(ctx, bckt)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(fake.Updated).NotTo(BeNil())
+				Expect(fake.Updated.Labels).To(Equal(helpers.PatchTo(map[string]string{"env": "prod"})))
+				Expect(attrs.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
 			})
 
-			attrs, err := bucket.EnsureBucket(ctx, bckt)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fake.Updated).NotTo(BeNil())
-			Expect(fake.Updated.Lifecycle).To(Equal(helpers.PatchTo(&Lifecycle)))
-			Expect(attrs.Properties.Lifecycle).To(Equal(&Lifecycle))
-		})
+			It("updates labels when spec.Labels is nil labels in status.Applied.Labels", func() {
+				fake.Attrs = newBucketAttrs(
+					"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
+					func(p *vedro.BucketProperties) {
+						p.Labels = map[string]string{"env": "dev"}
+					},
+				)
 
-		It("updates versioning when it differs", func() {
-			fake.Attrs = newBucketAttrs(
-				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
-				func(p *vedro.BucketProperties) {
-					p.Versioning = &vedro.BucketVersioning{Enabled: false}
-				},
-			)
+				bckt := newBucketCR(func(b *vedro.Bucket) {
+					b.Spec.StorageClass = vedro.BucketStorageClassStandard
+					b.Status.Applied = &vedro.BucketProperties{
+						StorageClass: vedro.BucketStorageClassStandard,
+						Labels:       map[string]string{"env": "dev"},
+					}
+				})
 
-			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassStandard
-				b.Spec.Versioning = &vedro.BucketVersioning{Enabled: true}
+				attrs, err := bucket.EnsureBucket(ctx, bckt)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(fake.Updated).NotTo(BeNil())
+				Expect(fake.Updated.Labels.Set).To(BeTrue())
+				Expect(fake.Updated.Labels.Value).To(BeNil())
+				Expect(attrs.Properties.Labels).To(BeEmpty())
 			})
+		}
 
-			attrs, err := bucket.EnsureBucket(ctx, bckt)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fake.Updated).NotTo(BeNil())
-			Expect(fake.Updated.Versioning).To(Equal(
-				helpers.PatchTo(&vedro.BucketVersioning{Enabled: true}),
-			))
-			Expect(attrs.Properties.Versioning.Enabled).To(BeTrue())
-		})
+		if cfg.BucketCaps.PublicAccessPrevention {
+			It("updates public access prevention when it differs", func() {
+				fake.Attrs = newBucketAttrs(
+					"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
+					func(p *vedro.BucketProperties) {
+						p.PublicAccessPrevention = helpers.Ptr(false)
+					},
+				)
 
-		It("updates labels when they differ", func() {
-			fake.Attrs = newBucketAttrs(
-				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
-				func(p *vedro.BucketProperties) {
-					p.Labels = map[string]string{"env": "dev"}
-				},
-			)
+				publicAccessPrevention := true
+				bckt := newBucketCR(func(b *vedro.Bucket) {
+					b.Spec.StorageClass = vedro.BucketStorageClassStandard
+					b.Spec.PublicAccessPrevention = &publicAccessPrevention
+				})
 
-			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassStandard
-				b.Spec.Labels = map[string]string{"env": "prod"}
+				attrs, err := bucket.EnsureBucket(ctx, bckt)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(fake.Updated).NotTo(BeNil())
+				Expect(fake.Updated.PublicAccessPrevention).To(Equal(helpers.PatchTo(&publicAccessPrevention)))
+				Expect(*attrs.Properties.PublicAccessPrevention).To(BeTrue())
 			})
-
-			attrs, err := bucket.EnsureBucket(ctx, bckt)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fake.Updated).NotTo(BeNil())
-			Expect(fake.Updated.Labels).To(Equal(helpers.PatchTo(map[string]string{"env": "prod"})))
-			Expect(attrs.Properties.Labels).To(Equal(map[string]string{"env": "prod"}))
-		})
-
-		It("updates public access prevention when it differs", func() {
-			fake.Attrs = newBucketAttrs(
-				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
-				func(p *vedro.BucketProperties) {
-					p.PublicAccessPrevention = helpers.Ptr(false)
-				},
-			)
-
-			publicAccessPrevention := true
-			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassStandard
-				b.Spec.PublicAccessPrevention = &publicAccessPrevention
-			})
-
-			attrs, err := bucket.EnsureBucket(ctx, bckt)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fake.Updated).NotTo(BeNil())
-			Expect(fake.Updated.PublicAccessPrevention).To(Equal(helpers.PatchTo(&publicAccessPrevention)))
-			Expect(*attrs.Properties.PublicAccessPrevention).To(BeTrue())
-		})
-
-		It("updates labels when spec.Labels is nil labels in status.Applied.Labels", func() {
-			fake.Attrs = newBucketAttrs(
-				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
-				func(p *vedro.BucketProperties) {
-					p.Labels = map[string]string{"env": "dev"}
-				},
-			)
-
-			bckt := newBucketCR(func(b *vedro.Bucket) {
-				b.Spec.StorageClass = vedro.BucketStorageClassStandard
-				b.Status.Applied = &vedro.BucketProperties{
-					StorageClass: vedro.BucketStorageClassStandard,
-					Labels:       map[string]string{"env": "dev"},
-				}
-			})
-
-			attrs, err := bucket.EnsureBucket(ctx, bckt)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fake.Updated).NotTo(BeNil())
-			Expect(fake.Updated.Labels.Set).To(BeTrue())
-			Expect(fake.Updated.Labels.Value).To(BeNil())
-			Expect(attrs.Properties.Labels).To(BeEmpty())
-		})
+		}
 
 		It("returns an error when updating the bucket fails", func() {
 			fake.Attrs = newBucketAttrs(

@@ -2,6 +2,7 @@ package yc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -417,16 +418,15 @@ func (y *ycAPI) DeleteBucket(ctx context.Context, name string) error {
 }
 
 func (y *ycAPI) Close(ctx context.Context) error {
-	if y.sdk == nil {
-		return nil
-	}
-
+	var cleanupErr error
 	if y.accessKey != nil {
-		err := deleteStaticS3AccessKey(ctx, y.sdk, y.accessKey.id)
-		if err != nil {
-			return err
-		}
+		cleanupErr = deleteStaticS3AccessKey(ctx, y.sdk, y.accessKey.id)
 	}
 
-	return y.sdk.Shutdown(ctx)
+	var shutdownErr error
+	if y.sdk != nil {
+		shutdownErr = y.sdk.Shutdown(ctx)
+	}
+
+	return errors.Join(cleanupErr, shutdownErr)
 }

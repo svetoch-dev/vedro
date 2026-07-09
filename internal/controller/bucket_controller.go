@@ -151,7 +151,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	validationResultCfg := provider.ValidateProviderConfigSpec(providerConfig.ProviderConfig)
 
 	if !validationResultCfg.Valid {
-		logger.Error(err, "ProviderConfig.spec is invalid")
+		logger.Info("ProviderConfig.spec is invalid", "reason", validationResultCfg.Message)
 		providerConfig.Condition.Status = metav1.ConditionFalse
 		providerConfig.Condition.Reason = conditions.ReasonProviderConfigIvalidSpec
 		providerConfig.Condition.Message = validationResultCfg.Message

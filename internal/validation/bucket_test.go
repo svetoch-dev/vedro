@@ -332,7 +332,7 @@ func TestValidateBucketLocation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ValidateBucketLocation(tt.location, tt.fn)
+			result := ValidateLocation(tt.location, tt.fn)
 			if result.Valid != tt.valid {
 				t.Errorf("Expect Valid=%v, got %v", tt.valid, result.Valid)
 			}
@@ -392,8 +392,8 @@ func TestValidateBucketName(t *testing.T) {
 			valid: true,
 		},
 		{
-			name:  "name with dots and underscores",
-			input: "my.bucket_name",
+			name:  "name with dots",
+			input: "my.bucket-name",
 			fn:    deferToGeneric,
 			valid: true,
 		},

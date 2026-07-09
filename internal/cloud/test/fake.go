@@ -2,11 +2,8 @@ package cloudtest
 
 import (
 	"context"
-	"errors"
 	"sync"
 
-	"cloud.google.com/go/storage"
-	"google.golang.org/api/iterator"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -38,13 +35,11 @@ func NewBucketAttrs(
 	name string,
 	location string,
 	storageClass vedro.BucketStorageClass,
+
 	mods ...func(*vedro.BucketProperties),
 ) *cloud.BucketAttrs {
 	properties := &vedro.BucketProperties{
-		StorageClass:           storageClass,
-		PublicAccessPrevention: helpers.Ptr(false),
-		Lifecycle:              &vedro.BucketLifecycle{},
-		Versioning:             &vedro.BucketVersioning{Enabled: false},
+		StorageClass: storageClass,
 	}
 	for _, mod := range mods {
 		mod(properties)
@@ -67,8 +62,8 @@ var Lifecycle = vedro.BucketLifecycle{
 }
 
 type DeletedObject struct {
-	Name       string
-	Generation int64
+	Name    string
+	Version *string
 }
 
 type FakeBucketAPI struct {
@@ -80,10 +75,10 @@ type FakeBucketAPI struct {
 	Created   *cloud.BucketAttrs
 	Updated   *cloud.BucketPatch
 
-	Deleted         bool
-	Query           *storage.Query
-	ObjectIterator  *FakeObjectIterator
-	ObjectDeleteErr error
+	Deleted              bool
+	ProcessObjectsCalled bool
+	ObjectIterator       *FakeObjectIterator
+	ObjectDeleteErr      error
 
 	deletedObjectsMu sync.Mutex
 	deletedObjects   []DeletedObject
@@ -101,17 +96,17 @@ func (f *FakeBucketAPI) ProcessObjects(
 	_ string,
 	process func(cloud.ObjectVersion) error,
 ) error {
-	f.Query = &storage.Query{Versions: true}
+	f.ProcessObjectsCalled = true
 	if f.ObjectIterator != nil {
 		for {
-			attrs, err := f.ObjectIterator.Next()
-			if errors.Is(err, iterator.Done) {
-				return nil
-			}
+			object, ok, err := f.ObjectIterator.Next()
 			if err != nil {
 				return err
 			}
-			if err := process(cloud.ObjectVersion{Name: attrs.Name, Version: attrs.Generation}); err != nil {
+			if !ok {
+				return nil
+			}
+			if err := process(object); err != nil {
 				return err
 			}
 		}
@@ -128,10 +123,10 @@ func (f *FakeBucketAPI) DeleteObject(
 	return f.ObjectDeleteErr
 }
 
-func (f *FakeBucketAPI) recordDeletedObject(name string, generation int64) {
+func (f *FakeBucketAPI) recordDeletedObject(name string, version *string) {
 	f.deletedObjectsMu.Lock()
 	defer f.deletedObjectsMu.Unlock()
-	f.deletedObjects = append(f.deletedObjects, DeletedObject{Name: name, Generation: generation})
+	f.deletedObjects = append(f.deletedObjects, DeletedObject{Name: name, Version: version})
 }
 
 // GetDeletedObjects returns a copy of the objects deleted so far.
@@ -160,6 +155,10 @@ func (f *FakeBucketAPI) CreateBucket(
 		return f.CreateErr
 	}
 	f.Attrs = &attrs
+	return nil
+}
+
+func (f *FakeBucketAPI) Close(ctx context.Context) error {
 	return nil
 }
 
@@ -198,21 +197,21 @@ func (f *FakeBucketAPI) UpdateBucket(
 	return f.Attrs, nil
 }
 
-// FakeObjectIterator is a test iterator over object attributes.
+// FakeObjectIterator is a test iterator over provider-neutral object versions.
 type FakeObjectIterator struct {
-	Attrs []*storage.ObjectAttrs
-	Err   error
-	index int
+	Objects []cloud.ObjectVersion
+	Err     error
+	index   int
 }
 
-func (f *FakeObjectIterator) Next() (*storage.ObjectAttrs, error) {
+func (f *FakeObjectIterator) Next() (cloud.ObjectVersion, bool, error) {
 	if f.Err != nil {
-		return nil, f.Err
+		return cloud.ObjectVersion{}, false, f.Err
 	}
-	if f.index >= len(f.Attrs) {
-		return nil, iterator.Done
+	if f.index >= len(f.Objects) {
+		return cloud.ObjectVersion{}, false, nil
 	}
-	attrs := f.Attrs[f.index]
+	object := f.Objects[f.index]
 	f.index++
-	return attrs, nil
+	return object, true, nil
 }

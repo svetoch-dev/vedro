@@ -25,6 +25,7 @@ const (
 	ReasonProviderConfigNotFound   = "ProviderConfigNotFound"
 	ReasonProviderConfigGetFailed  = "ProviderConfigGetFailed"
 	ReasonProviderConfigError      = "ProviderConfigError"
+	ReasonProviderConfigIvalidSpec = "ProviderConfigInvalidSpec"
 	ReasonProviderConfigReconciled = "Reconciled"
 	ReasonProviderConfigSet        = "ProviderConfigSet"
 )

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strconv"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -73,19 +74,7 @@ func versioningMapping(v *vedro.BucketVersioning) bool {
 	return false
 }
 
-func normalizedCloudSpecific(cfg *vedro.BucketCloudSpecificConfig) *vedro.BucketCloudSpecificConfig {
-	if cfg == nil || cfg.Gcp == nil || cfg.Gcp.SoftDeletePolicy == nil {
-		return &vedro.BucketCloudSpecificConfig{
-			Gcp: &vedro.BucketGcpConfig{
-				SoftDeletePolicy: defaultSoftDelete,
-			},
-		}
-	}
-
-	return cfg
-}
-
-type bucketAPI struct {
+type gcsAPI struct {
 	client    *storage.Client
 	projectID string
 }
@@ -320,7 +309,7 @@ func patchGCSBucketAttrs(patch cloud.BucketPatch, currentAttrs *cloud.BucketAttr
 	return update, nil
 }
 
-func (a *bucketAPI) GetBucket(
+func (a *gcsAPI) GetBucket(
 	ctx context.Context,
 	name string,
 ) (*cloud.BucketAttrs, error) {
@@ -336,7 +325,7 @@ func (a *bucketAPI) GetBucket(
 	return fromGCSBucketAttrs(*gcsAttrs)
 }
 
-func (a *bucketAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
+func (a *gcsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
 	createAttrs, err := toGCSBucketAttrs(attrs)
 	if err != nil {
 		return err
@@ -348,7 +337,7 @@ func (a *bucketAPI) CreateBucket(ctx context.Context, name string, attrs cloud.B
 	return nil
 }
 
-func (a *bucketAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
+func (a *gcsAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
 	log.FromContext(ctx).V(1).Info("Updating bucket")
 
 	currentAttrs, err := a.GetBucket(ctx, name)
@@ -369,7 +358,7 @@ func (a *bucketAPI) UpdateBucket(ctx context.Context, name string, patch cloud.B
 	return fromGCSBucketAttrs(*gcsAttrs)
 }
 
-func (a *bucketAPI) ProcessObjects(
+func (a *gcsAPI) ProcessObjects(
 	ctx context.Context,
 	bucket string,
 	process func(cloud.ObjectVersion) error,
@@ -389,33 +378,53 @@ func (a *bucketAPI) ProcessObjects(
 
 		if err := process(cloud.ObjectVersion{
 			Name:    attrs.Name,
-			Version: attrs.Generation,
+			Version: helpers.Ptr(strconv.FormatInt(attrs.Generation, 10)),
 		}); err != nil {
 			return err
 		}
 	}
 }
 
-func (a *bucketAPI) DeleteObject(
+func (a *gcsAPI) DeleteObject(
 	ctx context.Context,
 	bucket string,
 	object cloud.ObjectVersion,
 ) error {
 	bh := a.client.Bucket(bucket)
-	err := bh.Object(object.Name).Generation(object.Version).Delete(ctx)
+
+	obj := bh.Object(object.Name)
+
+	if object.Version != nil {
+		gen, err := strconv.ParseInt(*object.Version, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid generation %q for object %q: %w", *object.Version, object.Name, err)
+		}
+
+		obj = obj.Generation(gen)
+	}
+
+	err := obj.Delete(ctx)
 	if isGoogleAPINotFound(err) {
 		return cloud.ErrBucketObjectNotFound
 	}
+
 	return err
 }
 
-func (a *bucketAPI) DeleteBucket(ctx context.Context, name string) error {
+func (a *gcsAPI) DeleteBucket(ctx context.Context, name string) error {
 	bh := a.client.Bucket(name)
 	err := bh.Delete(ctx)
 	if isGoogleAPINotFound(err) {
 		return cloud.ErrBucketNotFound
 	}
 	return err
+}
+
+func (a *gcsAPI) Close(ctx context.Context) error {
+	if a.client == nil {
+		return nil
+	}
+	return a.client.Close()
 }
 
 func isGoogleAPINotFound(err error) bool {

@@ -1,0 +1,43 @@
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: ProviderConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: vedro
+    app.kubernetes.io/managed-by: kustomize
+  name: providerconfig-sample-yc
+spec:
+  type: yc
+  projectId: ${YC_PROJECT_ID}
+  region: ru-central1
+  method: WorkloadIdentity
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: Bucket
+metadata:
+  labels:
+    app.kubernetes.io/name: vedro
+    app.kubernetes.io/managed-by: kustomize
+  name: bucket-sample-yc
+  namespace: vedro-system
+spec:
+  providerRef:
+    name: providerconfig-sample-yc
+  location: ru-central1
+
+  deletionPolicy: Retain
+  storageClass: Standard
+
+  versioning:
+    enabled: false
+
+  lifecycle:
+    rules:
+      - enabled: true
+        ageDays: 90
+        action: Delete
+
+  labels:
+    app: payments
+    env: dev
+
+  unsupportedFeaturePolicy: Fail

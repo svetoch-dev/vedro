@@ -7,7 +7,6 @@ import (
 	"maps"
 	"reflect"
 	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +20,7 @@ import (
 
 var (
 	dualRegionPattern = regexp.MustCompile(`^[A-Z]+[0-9]+$`)
+	gcsNamePattern    = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$`)
 )
 
 const (
@@ -53,7 +53,23 @@ func validateGCSName(name string) *validation.ValidationResult {
 		return &v
 	}
 
-	return nil
+	if !gcsNamePattern.MatchString(name) {
+		v := validation.Invalid("bucket name must be 3-63 characters, contain only lowercase letters, numbers, dots, underscores, and dashes,and start/end with a letter or number")
+		return &v
+	}
+
+	if strings.Contains(name, "..") {
+		v := validation.Invalid("bucket name must not contain consecutive dots")
+		return &v
+	}
+
+	if strings.Contains(name, ".-") || strings.Contains(name, "-.") {
+		v := validation.Invalid("bucket name must not contain dots next to dashes")
+		return &v
+	}
+
+	v := validation.Valid()
+	return &v
 }
 
 func validateGCSCloudSpecific(cfg *vedro.BucketCloudSpecificConfig) *validation.ValidationResult {
@@ -99,7 +115,7 @@ func (b *Bucket) ValidateBucketSpec(bckt vedro.Bucket, pType vedro.ProviderType)
 		return v
 	}
 
-	v = validation.ValidateBucketLocation(spec.Location, validateGCSLocation)
+	v = validation.ValidateLocation(spec.Location, validateGCSLocation)
 
 	if !v.Valid {
 		return v
@@ -120,9 +136,6 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 	bucketName := helpers.BucketNameFromCR(bckt)
 	normalizedLocation := strings.ToUpper(spec.Location)
 
-	p := &Provider{}
-	caps := p.Capabilities().Bucket
-
 	attrs, err := b.api.GetBucket(ctx, bucketName)
 
 	if errors.Is(err, cloud.ErrBucketNotFound) {
@@ -130,9 +143,9 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 			Name:     bucketName,
 			Location: spec.Location,
 			Properties: &vedro.BucketProperties{
-				PublicAccessPrevention: helpers.NormalizedBucketPAP(spec.PublicAccessPrevention),
-				Versioning:             helpers.NormalizedBucketVersioning(spec.Versioning),
-				Lifecycle:              helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps),
+				PublicAccessPrevention: normalizedBucketPAP(spec.PublicAccessPrevention),
+				Versioning:             normalizedBucketVersioning(spec.Versioning),
+				Lifecycle:              normalizedBucketLifecycle(spec.Lifecycle),
 				StorageClass:           spec.StorageClass,
 				Labels:                 spec.Labels,
 				CloudSpecificConfig:    normalizedCloudSpecific(spec.CloudSpecificConfig),
@@ -159,7 +172,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		)
 	}
 
-	appliedState := helpers.AppliedState(attrs.Location, bckt, caps)
+	appliedState := appliedState(attrs.Location, bckt)
 
 	patch := cloud.BucketPatch{}
 
@@ -171,7 +184,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		patch.StorageClass = helpers.PatchTo(spec.StorageClass)
 	}
 
-	desiredVersioning := helpers.NormalizedBucketVersioning(spec.Versioning)
+	desiredVersioning := normalizedBucketVersioning(spec.Versioning)
 
 	if !reflect.DeepEqual(
 		attrs.Properties.Versioning,
@@ -180,7 +193,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		patch.Versioning = helpers.PatchTo(desiredVersioning)
 	}
 
-	desiredPAP := helpers.NormalizedBucketPAP(spec.PublicAccessPrevention)
+	desiredPAP := normalizedBucketPAP(spec.PublicAccessPrevention)
 
 	if !reflect.DeepEqual(
 		attrs.Properties.PublicAccessPrevention,
@@ -189,7 +202,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		patch.PublicAccessPrevention = helpers.PatchTo(desiredPAP)
 	}
 
-	desiredLifecycle := helpers.NormalizedBucketLifecycle(spec.Lifecycle, caps)
+	desiredLifecycle := normalizedBucketLifecycle(spec.Lifecycle)
 
 	if !reflect.DeepEqual(
 		attrs.Properties.Lifecycle,
@@ -230,11 +243,8 @@ func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedro.Bucket) error {
 	// error mutex for syncing concurrent changes to error var
 	var errM sync.Mutex
 
-	// New pool with workers equal number of CPU
-	workers := runtime.NumCPU() - 1
-	if workers < 1 {
-		workers = 1
-	}
+	// TODO make this settable via cli args or/and env var
+	workers := 32
 	wp := workerpool.New(workers)
 
 	// Semaphore channel allowing up to 2000 uncompleted deletion tasks in the queue

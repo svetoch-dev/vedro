@@ -20,6 +20,12 @@ const (
 	ReasonBucketDeleteError         = "BucketDeleteError"
 )
 
+// Condition reasons for CloudPrincipal resources.
+const (
+	ReasonCloudPrincipalNotFound  = "CloudPrincipalNotFound"
+	ReasonCloudPrincipalGetFailed = "CloudPrincipalGetFailed"
+)
+
 // Condition reasons for ProviderConfig resources.
 const (
 	ReasonProviderConfigNotFound   = "ProviderConfigNotFound"

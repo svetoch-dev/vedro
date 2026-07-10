@@ -24,7 +24,8 @@ const (
 var ycProjectIDPattern = regexp.MustCompile(`^b1g[a-z0-9]{17}$`)
 
 type Provider struct {
-	bucket *Bucket
+	bucket    *Bucket
+	principal *Principal
 }
 
 func New(
@@ -38,14 +39,18 @@ func New(
 		return nil, err
 	}
 
-	p := &Provider{}
-
-	p.bucket = &Bucket{
-		api: &ycAPI{
-			sdk:      sdk,
-			folderId: cfg.Spec.ProjectId,
-			saId:     saID,
-			location: cfg.Spec.Region,
+	api := &ycAPI{
+		sdk:      sdk,
+		folderId: cfg.Spec.ProjectId,
+		saId:     saID,
+		location: cfg.Spec.Region,
+	}
+	p := &Provider{
+		bucket: &Bucket{
+			api: api,
+		},
+		principal: &Principal{
+			api: api,
 		},
 	}
 
@@ -126,6 +131,10 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 
 func (p *Provider) Bucket() cloud.BucketProvider {
 	return p.bucket
+}
+
+func (p *Provider) Principal() cloud.PrincipalProvider {
+	return p.principal
 }
 
 func (p *Provider) Cleanup(ctx context.Context) error {

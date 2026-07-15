@@ -19,7 +19,7 @@ type Principal struct {
 }
 
 func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) validation.ValidationResult {
-	name := helpers.CloudPrincipalNameFromCR(principal)
+	name := helpers.PrincipalNameFromCR(principal)
 
 	v := validation.ValidateNameImmutability(
 		principal.Spec.Name,

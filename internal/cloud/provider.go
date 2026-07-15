@@ -11,6 +11,7 @@ import (
 var (
 	ErrBucketNotFound       = errors.New("bucket not found")
 	ErrBucketObjectNotFound = errors.New("bucket object not found")
+	ErrPrincipalNotFound    = errors.New("principal not found")
 )
 
 type Provider interface {
@@ -114,7 +115,7 @@ type BucketAPI interface {
 
 type PrincipalAPI interface {
 	GetPrincipal(ctx context.Context, name string) (*PrincipalAttrs, error)
-	CreatePrincipal(ctx context.Context, name string, attrs PrincipalAttrs) error
+	CreatePrincipal(ctx context.Context, name string) (*PrincipalAttrs, error)
 	DeletePrincipal(ctx context.Context, name string) error
 }
 

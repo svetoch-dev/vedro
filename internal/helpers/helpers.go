@@ -20,7 +20,7 @@ func BucketNameFromCR(bckt vedro.Bucket) string {
 	return bucketName
 }
 
-func CloudPrincipalNameFromCR(prncpl vedro.CloudPrincipal) string {
+func PrincipalNameFromCR(prncpl vedro.CloudPrincipal) string {
 	cloudPrincipalName := prncpl.Name
 
 	if prncpl.Spec.Name != "" {

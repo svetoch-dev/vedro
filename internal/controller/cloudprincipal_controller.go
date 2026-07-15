@@ -77,7 +77,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	logger = logger.WithValues(
-		"principalName", helpers.CloudPrincipalNameFromCR(principal.CloudPrincipal),
+		"principalName", helpers.PrincipalNameFromCR(principal.CloudPrincipal),
 		"providerConfig", principal.Spec.ProviderRef.Name,
 	)
 

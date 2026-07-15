@@ -11,14 +11,12 @@ type gcpPrincipalAPI struct {
 	client *admin.IamClient
 }
 
-var _ cloud.PrincipalAPI = (*gcpPrincipalAPI)(nil)
-
 func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, name string) (*cloud.PrincipalAttrs, error) {
 	return nil, nil
 }
 
-func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, name string, attrs cloud.PrincipalAttrs) error {
-	return nil
+func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, name string) (*cloud.PrincipalAttrs, error) {
+	return nil, nil
 }
 
 func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, name string) error {

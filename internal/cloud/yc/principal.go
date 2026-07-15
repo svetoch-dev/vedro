@@ -2,6 +2,8 @@ package yc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"regexp"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
@@ -17,7 +19,7 @@ type Principal struct {
 }
 
 func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) validation.ValidationResult {
-	name := helpers.CloudPrincipalNameFromCR(principal)
+	name := helpers.PrincipalNameFromCR(principal)
 
 	v := validation.ValidateNameImmutability(
 		principal.Spec.Name,
@@ -42,15 +44,27 @@ func (p *Principal) EnsurePrincipal(
 	ctx context.Context,
 	principal vedro.CloudPrincipal,
 ) (*cloud.PrincipalAttrs, error) {
-	return &cloud.PrincipalAttrs{
-		Name: "",
-		Id:   "",
-	}, nil
+	principalName := helpers.PrincipalNameFromCR(principal)
+	attrs, err := p.api.GetPrincipal(ctx, principalName)
+	if errors.Is(err, cloud.ErrPrincipalNotFound) {
+		attrs, err := p.api.CreatePrincipal(ctx, principalName)
+		if err != nil {
+			return nil, fmt.Errorf("create principal %q: %w", principalName, err)
+		}
+		return attrs, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("get principal attrs %q: %w", principalName, err)
+	}
+
+	return attrs, nil
 }
 
 func (p *Principal) DeletePrincipal(
 	ctx context.Context,
 	principal vedro.CloudPrincipal,
 ) error {
-	return nil
+	principalName := helpers.PrincipalNameFromCR(principal)
+	return p.api.DeletePrincipal(ctx, principalName)
 }

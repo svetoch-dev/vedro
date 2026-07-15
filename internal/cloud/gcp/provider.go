@@ -53,7 +53,8 @@ func New(
 	}
 	p.principal = &Principal{
 		api: &gcpPrincipalAPI{
-			client: clients.iam,
+			projectID: cfg.Spec.ProjectId,
+			client:    clients.iam,
 		},
 	}
 

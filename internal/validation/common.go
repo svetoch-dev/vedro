@@ -36,3 +36,25 @@ func ValidateLocation(location string, fn func(location string) *ValidationResul
 
 	return Valid()
 }
+
+func ValidateNameImmutability(
+	specName string,
+	externalName string,
+	objectName string,
+) ValidationResult {
+	if specName != "" &&
+		externalName != "" &&
+		externalName != specName {
+		return Invalid("spec.name cannot be changed after creation")
+	}
+
+	if specName == "" &&
+		externalName != "" &&
+		externalName != objectName {
+		return Invalid(
+			"metadata.name cannot be used as the name source if spec.name was used and CR is created",
+		)
+	}
+
+	return Valid()
+}

@@ -20,6 +20,16 @@ func BucketNameFromCR(bckt vedro.Bucket) string {
 	return bucketName
 }
 
+func CloudPrincipalNameFromCR(prncpl vedro.CloudPrincipal) string {
+	cloudPrincipalName := prncpl.Name
+
+	if prncpl.Spec.Name != "" {
+		cloudPrincipalName = prncpl.Spec.Name
+	}
+
+	return cloudPrincipalName
+}
+
 func GetSecretData(
 	ctx context.Context,
 	kubeClient client.Client,

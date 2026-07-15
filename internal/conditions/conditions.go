@@ -22,16 +22,20 @@ const (
 
 // Condition reasons for CloudPrincipal resources.
 const (
-	ReasonCloudPrincipalNotFound  = "CloudPrincipalNotFound"
-	ReasonCloudPrincipalGetFailed = "CloudPrincipalGetFailed"
+	ReasonCloudPrincipalNotFound    = "CloudPrincipalNotFound"
+	ReasonCloudPrincipalGetFailed   = "CloudPrincipalGetFailed"
+	ReasonCloudPrincipalInvalidSpec = "CloudPrincipalInvalidSpec"
+	ReasonCloudPrincipalDeleteError = "CloudPrincipalDeleteError"
+	ReasonCloudPrincipalEnsureError = "CloudPrincipalEnsureError"
+	ReasonCloudPrincipalReconciled  = "Reconciled"
 )
 
 // Condition reasons for ProviderConfig resources.
 const (
-	ReasonProviderConfigNotFound   = "ProviderConfigNotFound"
-	ReasonProviderConfigGetFailed  = "ProviderConfigGetFailed"
-	ReasonProviderConfigError      = "ProviderConfigError"
-	ReasonProviderConfigIvalidSpec = "ProviderConfigInvalidSpec"
-	ReasonProviderConfigReconciled = "Reconciled"
-	ReasonProviderConfigSet        = "ProviderConfigSet"
+	ReasonProviderConfigNotFound    = "ProviderConfigNotFound"
+	ReasonProviderConfigGetFailed   = "ProviderConfigGetFailed"
+	ReasonProviderConfigError       = "ProviderConfigError"
+	ReasonProviderConfigInvalidSpec = "ProviderConfigInvalidSpec"
+	ReasonProviderConfigReconciled  = "Reconciled"
+	ReasonProviderConfigSet         = "ProviderConfigSet"
 )

@@ -50,6 +50,15 @@ spec:
             type: object
           spec:
             properties:
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy controls what happens to the external CloudPrincipal
+                  when this Kubernetes object is deleted.
+                enum:
+                - Delete
+                - Retain
+                type: string
               name:
                 description: Name is the real cloud provider bucket name.
                 minLength: 1
@@ -135,6 +144,14 @@ spec:
                 type: string
               externalName:
                 description: ExternalName is the provider-side principal name.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the latest metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              observedProvider:
+                description: Provider used for this CloudPrincipal
                 type: string
             type: object
         type: object

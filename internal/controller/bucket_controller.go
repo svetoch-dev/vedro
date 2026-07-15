@@ -42,7 +42,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/resolvers"
 )
 
-const bucketFinalizer = "bucket.vedro.svetoch.dev/finalizer"
+const bucketFinalizer = "vedro.svetoch.dev/bucket-finalizer"
 
 // BucketReconciler reconciles a Bucket object
 type BucketReconciler struct {
@@ -153,7 +153,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if !validationResultCfg.Valid {
 		logger.Info("ProviderConfig.spec is invalid", "reason", validationResultCfg.Message)
 		providerConfig.Condition.Status = metav1.ConditionFalse
-		providerConfig.Condition.Reason = conditions.ReasonProviderConfigIvalidSpec
+		providerConfig.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
 		providerConfig.Condition.Message = validationResultCfg.Message
 		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
@@ -292,7 +292,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ReconcileError(ctx, patchErr, "patch error")
 	}
 
-	logger.Info("reconcile success")
+	logger.Info("Bucket reconcile success")
 
 	return Reconciled()
 }

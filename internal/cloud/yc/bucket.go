@@ -28,7 +28,11 @@ func (b *Bucket) ValidateBucketSpec(bckt vedro.Bucket, pType vedro.ProviderType)
 		return v
 	}
 
-	v = validation.ValidateBucketNameImmutability(bckt)
+	v = validation.ValidateNameImmutability(
+		bckt.Spec.Name,
+		bckt.Status.ExternalName,
+		bckt.Name,
+	)
 
 	if !v.Valid {
 		return v

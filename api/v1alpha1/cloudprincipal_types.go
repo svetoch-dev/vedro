@@ -29,6 +29,14 @@ type CloudPrincipalSpec struct {
 
 	// ProviderRef references the ProviderConfig used to manage this bucket.
 	ProviderRef ProviderConfigReference `json:"providerRef"`
+
+	// DeletionPolicy controls what happens to the external CloudPrincipal
+	// when this Kubernetes object is deleted.
+	//
+	// +kubebuilder:validation:Enum=Delete;Retain
+	// +kubebuilder:default:=Delete
+	// +optional
+	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 }
 
 // ProviderConfigStatus defines the observed provider configuration state.
@@ -37,6 +45,16 @@ type CloudPrincipalStatus struct {
 	//
 	// +optional
 	ExternalName string `json:"externalName,omitempty"`
+
+	// Provider used for this CloudPrincipal
+	//
+	// +optional
+	ObservedProvider string `json:"observedProvider,omitempty"`
+
+	// ObservedGeneration is the latest metadata.generation observed by the controller.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// ExternalId is the provider-side principal id.
 	//

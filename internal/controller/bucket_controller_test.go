@@ -329,6 +329,10 @@ func (p *fakeProvider) Bucket() cloud.BucketProvider {
 	return p.bucket
 }
 
+func (p *fakeProvider) Principal() cloud.PrincipalProvider {
+	return nil
+}
+
 func (p *fakeProvider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {
 	return validation.Valid()
 }

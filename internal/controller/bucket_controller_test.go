@@ -316,6 +316,7 @@ var _ = Describe("BucketReconciler", func() {
 type fakeProvider struct {
 	capabilities cloud.Capabilities
 	bucket       *fakeBucketProvider
+	principal    *fakePrincipalProvider
 	cleanupErr   error
 
 	cleanupCalled bool
@@ -330,7 +331,7 @@ func (p *fakeProvider) Bucket() cloud.BucketProvider {
 }
 
 func (p *fakeProvider) Principal() cloud.PrincipalProvider {
-	return nil
+	return p.principal
 }
 
 func (p *fakeProvider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {

@@ -28,6 +28,8 @@ type CloudPrincipalSpec struct {
 	Name string `json:"name,omitempty"`
 
 	// ProviderRef references the ProviderConfig used to manage this bucket.
+	//
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="providerRef is immutable"
 	ProviderRef ProviderConfigReference `json:"providerRef"`
 
 	// DeletionPolicy controls what happens to the external CloudPrincipal

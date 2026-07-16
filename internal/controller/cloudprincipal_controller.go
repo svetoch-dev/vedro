@@ -90,6 +90,28 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
+	// when cr gets deleted metadata.deletionTimestamp
+	// is set to current timestamp. If its not in process
+	// of being deleted metadata.deletionTimestamp == 0
+	// If DeletionPolicy is Retain we just Delete the finalizers
+	// so that obj is deleted in k8s not in cloud
+	if !principal.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
+			logger.Info("CloudPrincipal is being deleted, but finalizer is not set; skipping deletion handling")
+			return Reconciled()
+		}
+
+		if principal.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+			logger.Info("skipping CloudPrincipal deletion because deletionPolicy is Retain")
+
+			controllerutil.RemoveFinalizer(&principal.CloudPrincipal, principalFinalizer)
+			if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
+				return ReconcileError(ctx, err, "remove finalizer error")
+			}
+			return Reconciled()
+		}
+	}
+
 	providerConfig := resolvers.ProviderConfigResolver{
 		KubeClient: r.Client,
 		Logger:     logger,
@@ -104,8 +126,12 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	providerConfig.Condition.ObservedGeneration = principal.Generation
 
 	if !providerConfig.IsOk() {
+		principal.Condition.Status = metav1.ConditionFalse
+		principal.Condition.Reason = conditions.ReasonProviderConfigError
+		principal.Condition.Message = providerConfig.Error.Error()
 		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		})
 
 		if patchErr != nil {
@@ -154,8 +180,12 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		providerConfig.Condition.Status = metav1.ConditionFalse
 		providerConfig.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
 		providerConfig.Condition.Message = validationResultCfg.Message
+		principal.Condition.Status = metav1.ConditionFalse
+		principal.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
+		principal.Condition.Message = validationResultCfg.Message
 		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		})
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")
@@ -169,9 +199,8 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	providerConfig.Condition.Reason = conditions.ReasonProviderConfigReconciled
 	providerConfig.Condition.Message = "ProviderConfig Reconciled"
 
-	// when cr gets deleted metadata.deletionTimestamp
-	// is set to current timestamp. If its not in process
-	// of being deleted metadata.deletionTimestamp == 0
+	// If obj is being deleted and DeletionPolicy is Delete
+	// delete it in cloud then remove finalizers
 	if !principal.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
 			logger.Info("CloudPrincipal is being deleted, but finalizer is not set; skipping deletion handling")
@@ -194,15 +223,12 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				}
 				return ReconcileErrorRAfter(ctx, err, time.Second*10, "unable to delete external CloudPrincipal")
 			}
-		} else {
-			logger.Info("skipping CloudPrincipal deletion because deletionPolicy is Retain")
+			controllerutil.RemoveFinalizer(&principal.CloudPrincipal, principalFinalizer)
+			if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
+				return ReconcileError(ctx, err, "remove finalizer error")
+			}
+			return Reconciled()
 		}
-
-		controllerutil.RemoveFinalizer(&principal.CloudPrincipal, principalFinalizer)
-		if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
-			return ReconcileError(ctx, err, "remove finalizer error")
-		}
-		return Reconciled()
 	}
 
 	// check that spec is valid

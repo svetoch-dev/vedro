@@ -29,6 +29,7 @@ type ProviderConfigSpec struct {
 	// Type is the cloud provider type.
 	//
 	// +kubebuilder:validation:Enum=gcp;yc
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="type is immutable"
 	Type ProviderType `json:"type"`
 
 	// ProjectID identifies the cloud project/account/folder.
@@ -36,6 +37,7 @@ type ProviderConfigSpec struct {
 	// For GCP this can be the project ID.
 	// For Yandex this can be the folder ID or cloud ID, depending on your design.
 	//
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="projectId is immutable"
 	// +kubebuilder:validation:MinLength=1
 	ProjectId string `json:"projectId"`
 

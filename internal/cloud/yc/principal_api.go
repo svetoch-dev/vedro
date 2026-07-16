@@ -2,6 +2,7 @@ package yc
 
 import (
 	"context"
+	"errors"
 
 	"fmt"
 
@@ -83,6 +84,10 @@ func (y *ycPrincipalAPI) DeletePrincipal(ctx context.Context, name string) error
 
 	sa, err := y.findServiceAccount(ctx, name)
 	if err != nil {
+		if errors.Is(err, cloud.ErrPrincipalNotFound) {
+			return nil
+		}
+
 		return err
 	}
 

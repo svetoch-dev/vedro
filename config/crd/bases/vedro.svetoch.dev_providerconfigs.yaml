@@ -87,6 +87,9 @@ spec:
                   For Yandex this can be the folder ID or cloud ID, depending on your design.
                 minLength: 1
                 type: string
+                x-kubernetes-validations:
+                - message: projectId is immutable
+                  rule: self == oldSelf
               region:
                 type: string
               type:
@@ -95,6 +98,9 @@ spec:
                 - gcp
                 - yc
                 type: string
+                x-kubernetes-validations:
+                - message: type is immutable
+                  rule: self == oldSelf
             required:
             - method
             - projectId

@@ -91,6 +91,28 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
+	// when cr gets deleted metadata.deletionTimestamp
+	// is set to current timestamp. If its not in process
+	// of being deleted metadata.deletionTimestamp == 0
+	// If DeletionPolicy is Retain we just Delete the finalizers
+	// so that obj is deleted in k8s not in cloud
+	if !bucket.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
+			logger.Info("Bucket is being deleted, but finalizer is not set; skipping deletion handling")
+			return Reconciled()
+		}
+
+		if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+			logger.Info("skipping Bucket deletion because deletionPolicy is Retain")
+
+			controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
+			if err := r.Update(ctx, &bucket.Bucket); err != nil {
+				return ReconcileError(ctx, err, "remove finalizer error")
+			}
+			return Reconciled()
+		}
+	}
+
 	providerConfig := resolvers.ProviderConfigResolver{
 		KubeClient: r.Client,
 		Logger:     logger,
@@ -105,8 +127,12 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	providerConfig.Condition.ObservedGeneration = bucket.Generation
 
 	if !providerConfig.IsOk() {
+		bucket.Condition.Status = metav1.ConditionFalse
+		bucket.Condition.Reason = conditions.ReasonProviderConfigGetFailed
+		bucket.Condition.Message = providerConfig.Error.Error()
 		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
 
 		if patchErr != nil {
@@ -155,8 +181,12 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		providerConfig.Condition.Status = metav1.ConditionFalse
 		providerConfig.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
 		providerConfig.Condition.Message = validationResultCfg.Message
+		bucket.Condition.Status = metav1.ConditionFalse
+		bucket.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
+		bucket.Condition.Message = validationResultCfg.Message
 		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")
@@ -170,9 +200,8 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	providerConfig.Condition.Reason = conditions.ReasonProviderConfigReconciled
 	providerConfig.Condition.Message = "ProviderConfig Reconciled"
 
-	// when cr gets deleted metadata.deletionTimestamp
-	// is set to current timestamp. If its not in process
-	// of being deleted metadata.deletionTimestamp == 0
+	// If obj is being deleted and DeletionPolicy is Delete
+	// delete it in cloud then remove finalizers
 	if !bucket.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
 			logger.Info("bucket is being deleted, but finalizer is not set; skipping deletion handling")
@@ -195,15 +224,12 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				}
 				return ReconcileErrorRAfter(ctx, err, time.Second*10, "unable to delete external bucket")
 			}
-		} else {
-			logger.Info("skipping cloud bucket deletion because deletionPolicy is Retain")
+			controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
+			if err := r.Update(ctx, &bucket.Bucket); err != nil {
+				return ReconcileError(ctx, err, "remove finalizer error")
+			}
+			return Reconciled()
 		}
-
-		controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
-		if err := r.Update(ctx, &bucket.Bucket); err != nil {
-			return ReconcileError(ctx, err, "remove finalizer error")
-		}
-		return Reconciled()
 	}
 
 	// check bucket capabilities

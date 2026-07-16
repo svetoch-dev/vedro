@@ -19,11 +19,14 @@ type Principal struct {
 }
 
 func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) validation.ValidationResult {
+	spec := principal.Spec
+	status := principal.Status
+
 	name := helpers.PrincipalNameFromCR(principal)
 
 	v := validation.ValidateNameImmutability(
-		principal.Spec.Name,
-		principal.Status.ExternalName,
+		spec.Name,
+		status.ExternalName,
 		principal.Name,
 	)
 	if !v.Valid {
@@ -64,6 +67,5 @@ func (p *Principal) DeletePrincipal(
 	ctx context.Context,
 	principal vedro.CloudPrincipal,
 ) error {
-	principalName := helpers.PrincipalNameFromCR(principal)
-	return p.api.DeletePrincipal(ctx, principalName)
+	return p.api.DeletePrincipal(ctx, helpers.PrincipalNameForDelete(principal))
 }

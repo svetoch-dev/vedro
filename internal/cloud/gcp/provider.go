@@ -75,7 +75,10 @@ func newClient(
 		}
 		iamClient, err := admin.NewIamClient(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("WorkloadIdentity: error getting iam client %w", err)
+			return nil, errors.Join(
+				storageClient.Close(),
+				fmt.Errorf("WorkloadIdentity: error getting iam client %w", err),
+			)
 		}
 
 		return &gcpClients{
@@ -102,7 +105,11 @@ func newClient(
 		}
 		iamClient, err := admin.NewIamClient(ctx, credentials)
 		if err != nil {
-			return nil, fmt.Errorf("StaticCredentials: error getting iam client %w", err)
+
+			return nil, errors.Join(
+				storageClient.Close(),
+				fmt.Errorf("StaticCredentials: error getting iam client %w", err),
+			)
 		}
 
 		return &gcpClients{

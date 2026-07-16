@@ -74,6 +74,9 @@ spec:
                 required:
                 - name
                 type: object
+                x-kubernetes-validations:
+                - message: providerRef is immutable
+                  rule: self == oldSelf
             required:
             - providerRef
             type: object

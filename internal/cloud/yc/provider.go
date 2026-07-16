@@ -2,6 +2,7 @@ package yc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -26,6 +27,7 @@ var ycProjectIDPattern = regexp.MustCompile(`^b1g[a-z0-9]{17}$`)
 type Provider struct {
 	bucket    *Bucket
 	principal *Principal
+	sdk       *ycsdk.SDK
 }
 
 func New(
@@ -39,19 +41,25 @@ func New(
 		return nil, err
 	}
 
-	api := &ycAPI{
+	ycsApi := &ycsAPI{
 		sdk:      sdk,
 		folderId: cfg.Spec.ProjectId,
 		saId:     saID,
 		location: cfg.Spec.Region,
 	}
+	ycPrincipalApi := &ycPrincipalAPI{
+		sdk:      sdk,
+		folderId: cfg.Spec.ProjectId,
+	}
+
 	p := &Provider{
 		bucket: &Bucket{
-			api: api,
+			api: ycsApi,
 		},
 		principal: &Principal{
-			api: api,
+			api: ycPrincipalApi,
 		},
+		sdk: sdk,
 	}
 
 	return p, nil
@@ -138,10 +146,9 @@ func (p *Provider) Principal() cloud.PrincipalProvider {
 }
 
 func (p *Provider) Cleanup(ctx context.Context) error {
-	if err := p.bucket.api.Close(ctx); err != nil {
-		return err
-	}
-	return nil
+	bucketCloseErr := p.bucket.api.Close(ctx)
+	sdkShutdownErr := p.sdk.Shutdown(ctx)
+	return errors.Join(bucketCloseErr, sdkShutdownErr)
 
 }
 

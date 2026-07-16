@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -141,10 +142,9 @@ func (p *Provider) Principal() cloud.PrincipalProvider {
 }
 
 func (p *Provider) Cleanup(ctx context.Context) error {
-	if err := p.bucket.api.Close(ctx); err != nil {
-		return err
-	}
-	return nil
+	bucketCloseErr := p.bucket.api.Close(ctx)
+	principalCloseErr := p.principal.api.Close(ctx)
+	return errors.Join(bucketCloseErr, principalCloseErr)
 }
 
 func (p *Provider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {

@@ -8,10 +8,16 @@ import (
 	"github.com/svetoch-dev/vedro/internal/cloud"
 
 	iamapi "github.com/yandex-cloud/go-genproto/yandex/cloud/iam/v1"
+	ycsdk "github.com/yandex-cloud/go-sdk/v2"
 	iamsdk "github.com/yandex-cloud/go-sdk/v2/services/iam/v1"
 )
 
-func (y *ycAPI) findServiceAccount(ctx context.Context, name string) (*iamapi.ServiceAccount, error) {
+type ycPrincipalAPI struct {
+	sdk      *ycsdk.SDK
+	folderId string
+}
+
+func (y *ycPrincipalAPI) findServiceAccount(ctx context.Context, name string) (*iamapi.ServiceAccount, error) {
 	client := iamsdk.NewServiceAccountClient(y.sdk)
 	response, err := client.List(ctx, &iamapi.ListServiceAccountsRequest{
 		FolderId: y.folderId,
@@ -29,7 +35,7 @@ func (y *ycAPI) findServiceAccount(ctx context.Context, name string) (*iamapi.Se
 	return response.ServiceAccounts[0], nil
 }
 
-func (y *ycAPI) GetPrincipal(ctx context.Context, name string) (*cloud.PrincipalAttrs, error) {
+func (y *ycPrincipalAPI) GetPrincipal(ctx context.Context, name string) (*cloud.PrincipalAttrs, error) {
 	sa, err := y.findServiceAccount(ctx, name)
 
 	if err != nil {
@@ -42,7 +48,7 @@ func (y *ycAPI) GetPrincipal(ctx context.Context, name string) (*cloud.Principal
 	}, nil
 }
 
-func (y *ycAPI) CreatePrincipal(ctx context.Context, name string) (*cloud.PrincipalAttrs, error) {
+func (y *ycPrincipalAPI) CreatePrincipal(ctx context.Context, name string) (*cloud.PrincipalAttrs, error) {
 	client := iamsdk.NewServiceAccountClient(y.sdk)
 
 	op, err := client.Create(ctx, &iamapi.CreateServiceAccountRequest{
@@ -73,7 +79,7 @@ func (y *ycAPI) CreatePrincipal(ctx context.Context, name string) (*cloud.Princi
 
 }
 
-func (y *ycAPI) DeletePrincipal(ctx context.Context, name string) error {
+func (y *ycPrincipalAPI) DeletePrincipal(ctx context.Context, name string) error {
 
 	sa, err := y.findServiceAccount(ctx, name)
 	if err != nil {
@@ -101,5 +107,9 @@ func (y *ycAPI) DeletePrincipal(ctx context.Context, name string) error {
 		)
 	}
 
+	return nil
+}
+
+func (y *ycPrincipalAPI) Close(ctx context.Context) error {
 	return nil
 }

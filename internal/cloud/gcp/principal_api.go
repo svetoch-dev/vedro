@@ -92,3 +92,10 @@ func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, name string) erro
 
 	return nil
 }
+
+func (p *gcpPrincipalAPI) Close(ctx context.Context) error {
+	if p.client == nil {
+		return nil
+	}
+	return p.client.Close()
+}

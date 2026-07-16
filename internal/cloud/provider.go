@@ -117,6 +117,7 @@ type PrincipalAPI interface {
 	GetPrincipal(ctx context.Context, name string) (*PrincipalAttrs, error)
 	CreatePrincipal(ctx context.Context, name string) (*PrincipalAttrs, error)
 	DeletePrincipal(ctx context.Context, name string) error
+	Close(ctx context.Context) error
 }
 
 type BucketProvider interface {

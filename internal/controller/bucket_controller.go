@@ -105,7 +105,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	providerConfig.Condition.ObservedGeneration = bucket.Generation
 
 	if !providerConfig.IsOk() {
-		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
 		})
 
@@ -132,7 +132,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonProviderConfigError
 		bucket.Condition.Message = err.Error()
-		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
 			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
@@ -155,7 +155,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		providerConfig.Condition.Status = metav1.ConditionFalse
 		providerConfig.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
 		providerConfig.Condition.Message = validationResultCfg.Message
-		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
 		})
 		if patchErr != nil {
@@ -180,14 +180,14 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 
 		if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
-			logger.Info("deleling bucket and all of its objects")
+			logger.Info("deleting bucket and all of its objects")
 			err := provider.Bucket().DeleteBucket(ctx, bucket.Bucket)
 			if err != nil {
 				bucket.Condition.Status = metav1.ConditionFalse
 				bucket.Condition.Reason = conditions.ReasonBucketDeleteError
 				bucket.Condition.Message = err.Error()
 
-				patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+				patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 					meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 				})
 				if patchErr != nil {
@@ -219,7 +219,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			bucket.Condition.Status = metav1.ConditionFalse
 			bucket.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
 			bucket.Condition.Message = "unsupported features found"
-			patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+			patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 				b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 				meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 			})
@@ -230,7 +230,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return Reconciled()
 		}
 		if bucket.Spec.UnsupportedFeaturePolicy == vedro.UnsupportedFeaturePolicyWarn {
-			patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+			patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 				b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 			})
 			if patchErr != nil {
@@ -248,7 +248,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketInvalidSpec
 		bucket.Condition.Message = validationResult.Message
-		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
 		if patchErr != nil {
@@ -265,7 +265,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketEnsureError
 		bucket.Condition.Message = err.Error()
-		patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
 		if patchErr != nil {
@@ -279,7 +279,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	bucket.Condition.Reason = conditions.ReasonBucketReconciled
 	bucket.Condition.Message = "Bucket Reconciled"
 
-	patchErr := r.patchBucketStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+	patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 		b.Status.ExternalName = result.Name
 		b.Status.Location = result.Location
 		b.Status.Applied = result.Properties
@@ -297,33 +297,33 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return Reconciled()
 }
 
-func (r *BucketReconciler) patchBucketStatus(
+func (r *BucketReconciler) patchStatus(
 	ctx context.Context,
 	req ctrl.Request,
 	observedGeneration int64,
 	mutate func(bucket *vedro.Bucket),
 ) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var bucket vedro.Bucket
+		var obj vedro.Bucket
 
-		if err := r.Get(ctx, req.NamespacedName, &bucket); err != nil {
+		if err := r.Get(ctx, req.NamespacedName, &obj); err != nil {
 			return err
 		}
 
-		original := bucket.DeepCopy()
+		original := obj.DeepCopy()
 
-		bucket.Status.ObservedGeneration = observedGeneration
-		mutate(&bucket)
+		obj.Status.ObservedGeneration = observedGeneration
+		mutate(&obj)
 
-		if reflect.DeepEqual(original.Status, bucket.Status) {
+		if reflect.DeepEqual(original.Status, obj.Status) {
 			return nil
 		}
 
-		return r.Status().Patch(ctx, &bucket, client.MergeFrom(original))
+		return r.Status().Patch(ctx, &obj, client.MergeFrom(original))
 	})
 }
 
-func (r *BucketReconciler) findBucketsForProviderConfig(
+func (r *BucketReconciler) findBucketsOfProviderConfig(
 	ctx context.Context,
 	obj client.Object,
 ) []reconcile.Request {
@@ -365,7 +365,7 @@ func (r *BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// Watch ProviderConfig for changes and queue events for
 			// buckets that reference it
 			&vedro.ProviderConfig{},
-			handler.EnqueueRequestsFromMapFunc(r.findBucketsForProviderConfig),
+			handler.EnqueueRequestsFromMapFunc(r.findBucketsOfProviderConfig),
 		).
 		Named("bucket").
 		Complete(r)

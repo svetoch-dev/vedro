@@ -104,7 +104,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	providerConfig.Condition.ObservedGeneration = principal.Generation
 
 	if !providerConfig.IsOk() {
-		patchErr := r.patchCloudPrincipalStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
 		})
 
@@ -131,7 +131,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		principal.Condition.Status = metav1.ConditionFalse
 		principal.Condition.Reason = conditions.ReasonProviderConfigError
 		principal.Condition.Message = err.Error()
-		patchErr := r.patchCloudPrincipalStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		})
@@ -154,7 +154,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		providerConfig.Condition.Status = metav1.ConditionFalse
 		providerConfig.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
 		providerConfig.Condition.Message = validationResultCfg.Message
-		patchErr := r.patchCloudPrincipalStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
 		})
 		if patchErr != nil {
@@ -179,14 +179,14 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 
 		if principal.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
-			logger.Info("deleling CloudPrincipal")
+			logger.Info("deleting CloudPrincipal")
 			err := provider.Principal().DeletePrincipal(ctx, principal.CloudPrincipal)
 			if err != nil {
 				principal.Condition.Status = metav1.ConditionFalse
 				principal.Condition.Reason = conditions.ReasonCloudPrincipalDeleteError
 				principal.Condition.Message = err.Error()
 
-				patchErr := r.patchCloudPrincipalStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+				patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 					meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 				})
 				if patchErr != nil {
@@ -213,7 +213,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		principal.Condition.Status = metav1.ConditionFalse
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalInvalidSpec
 		principal.Condition.Message = validationResult.Message
-		patchErr := r.patchCloudPrincipalStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		})
 		if patchErr != nil {
@@ -230,7 +230,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		principal.Condition.Status = metav1.ConditionFalse
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalEnsureError
 		principal.Condition.Message = err.Error()
-		patchErr := r.patchCloudPrincipalStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		})
 		if patchErr != nil {
@@ -244,7 +244,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	principal.Condition.Reason = conditions.ReasonCloudPrincipalReconciled
 	principal.Condition.Message = "CloudPrincipal Reconciled"
 
-	patchErr := r.patchCloudPrincipalStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+	patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 		p.Status.ExternalName = result.Name
 		p.Status.ExternalId = result.Id
 		p.Status.ObservedProvider = principal.Spec.ProviderRef.Name
@@ -260,7 +260,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return Reconciled()
 }
 
-func (r *CloudPrincipalReconciler) patchCloudPrincipalStatus(
+func (r *CloudPrincipalReconciler) patchStatus(
 	ctx context.Context,
 	req ctrl.Request,
 	observedGeneration int64,
@@ -286,7 +286,7 @@ func (r *CloudPrincipalReconciler) patchCloudPrincipalStatus(
 	})
 }
 
-func (r *CloudPrincipalReconciler) findCloudPrincipalsForProviderConfig(
+func (r *CloudPrincipalReconciler) findCloudPrincipalsOfProviderConfig(
 	ctx context.Context,
 	obj client.Object,
 ) []reconcile.Request {
@@ -328,8 +328,8 @@ func (r *CloudPrincipalReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// Watch ProviderConfig for changes and queue events for
 			// principals that reference it
 			&vedro.ProviderConfig{},
-			handler.EnqueueRequestsFromMapFunc(r.findCloudPrincipalsForProviderConfig),
+			handler.EnqueueRequestsFromMapFunc(r.findCloudPrincipalsOfProviderConfig),
 		).
-		Named("principal").
+		Named("CloudPrincipal").
 		Complete(r)
 }

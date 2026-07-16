@@ -72,10 +72,12 @@ type FakeBucketAPI struct {
 	CreateErr error
 	UpdateErr error
 	DeleteErr error
+	CloseErr  error
 	Created   *cloud.BucketAttrs
 	Updated   *cloud.BucketPatch
 
 	Deleted              bool
+	CloseCalled          bool
 	ProcessObjectsCalled bool
 	ObjectIterator       *FakeObjectIterator
 	ObjectDeleteErr      error
@@ -159,7 +161,8 @@ func (f *FakeBucketAPI) CreateBucket(
 }
 
 func (f *FakeBucketAPI) Close(ctx context.Context) error {
-	return nil
+	f.CloseCalled = true
+	return f.CloseErr
 }
 
 func (f *FakeBucketAPI) UpdateBucket(

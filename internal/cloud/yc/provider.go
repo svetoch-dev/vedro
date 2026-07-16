@@ -24,10 +24,14 @@ const (
 
 var ycProjectIDPattern = regexp.MustCompile(`^b1g[a-z0-9]{17}$`)
 
+type sdkShutdowner interface {
+	Shutdown(ctx context.Context) error
+}
+
 type Provider struct {
 	bucket    *Bucket
 	principal *Principal
-	sdk       *ycsdk.SDK
+	sdk       sdkShutdowner
 }
 
 func New(

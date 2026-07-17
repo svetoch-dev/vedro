@@ -43,6 +43,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&BucketList{},
 		&ProviderConfig{},
 		&ProviderConfigList{},
+		&CloudPrincipal{},
+		&CloudPrincipalList{},
 	)
 	metav1.AddToGroupVersion(scheme, GroupVersion)
 

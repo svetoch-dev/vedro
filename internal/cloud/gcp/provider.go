@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -9,6 +10,7 @@ import (
 	"google.golang.org/api/option"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	admin "cloud.google.com/go/iam/admin/apiv1"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
@@ -21,8 +23,14 @@ const (
 
 var gcpProjectIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
 
+type gcpClients struct {
+	storage *storage.Client
+	iam     *admin.IamClient
+}
+
 type Provider struct {
-	bucket *Bucket
+	bucket    *Bucket
+	principal *Principal
 }
 
 func New(
@@ -31,7 +39,7 @@ func New(
 	cfg vedro.ProviderConfig,
 ) (*Provider, error) {
 
-	gcsClient, err := newClient(ctx, kubeClient, cfg)
+	clients, err := newClient(ctx, kubeClient, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +49,13 @@ func New(
 	p.bucket = &Bucket{
 		api: &gcsAPI{
 			projectID: cfg.Spec.ProjectId,
-			client:    gcsClient,
+			client:    clients.storage,
+		},
+	}
+	p.principal = &Principal{
+		api: &gcpPrincipalAPI{
+			projectID: cfg.Spec.ProjectId,
+			client:    clients.iam,
 		},
 	}
 
@@ -52,10 +66,26 @@ func newClient(
 	ctx context.Context,
 	kubeClient client.Client,
 	cfg vedro.ProviderConfig,
-) (*storage.Client, error) {
+) (*gcpClients, error) {
 	switch cfg.Spec.Method {
 	case vedro.AuthMethodWorkloadIdentity:
-		return storage.NewClient(ctx)
+		storageClient, err := storage.NewClient(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("WorkloadIdentity: error getting storage client %w", err)
+		}
+		iamClient, err := admin.NewIamClient(ctx)
+		if err != nil {
+			return nil, errors.Join(
+				storageClient.Close(),
+				fmt.Errorf("WorkloadIdentity: error getting iam client %w", err),
+			)
+		}
+
+		return &gcpClients{
+			storage: storageClient,
+			iam:     iamClient,
+		}, nil
+
 	case vedro.AuthMethodStaticCredentials:
 		secretRef := cfg.Spec.CredentialsSecretRef
 		if secretRef == nil {
@@ -68,7 +98,24 @@ func newClient(
 			return nil, err
 		}
 
-		return storage.NewClient(ctx, option.WithAuthCredentialsJSON(option.ServiceAccount, data[gcpCredentialsSecretKey]))
+		credentials := option.WithAuthCredentialsJSON(option.ServiceAccount, data[gcpCredentialsSecretKey])
+		storageClient, err := storage.NewClient(ctx, credentials)
+		if err != nil {
+			return nil, fmt.Errorf("StaticCredentials: error getting storage client %w", err)
+		}
+		iamClient, err := admin.NewIamClient(ctx, credentials)
+		if err != nil {
+
+			return nil, errors.Join(
+				storageClient.Close(),
+				fmt.Errorf("StaticCredentials: error getting iam client %w", err),
+			)
+		}
+
+		return &gcpClients{
+			storage: storageClient,
+			iam:     iamClient,
+		}, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported provider auth method %q", cfg.Spec.Method)
@@ -97,11 +144,14 @@ func (p *Provider) Bucket() cloud.BucketProvider {
 	return p.bucket
 }
 
+func (p *Provider) Principal() cloud.PrincipalProvider {
+	return p.principal
+}
+
 func (p *Provider) Cleanup(ctx context.Context) error {
-	if err := p.bucket.api.Close(ctx); err != nil {
-		return err
-	}
-	return nil
+	bucketCloseErr := p.bucket.api.Close(ctx)
+	principalCloseErr := p.principal.api.Close(ctx)
+	return errors.Join(bucketCloseErr, principalCloseErr)
 }
 
 func (p *Provider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {

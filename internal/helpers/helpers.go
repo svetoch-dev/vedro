@@ -20,6 +20,35 @@ func BucketNameFromCR(bckt vedro.Bucket) string {
 	return bucketName
 }
 
+func PrincipalNameFromCR(prncpl vedro.CloudPrincipal) string {
+	cloudPrincipalName := prncpl.Name
+
+	if prncpl.Spec.Name != "" {
+		cloudPrincipalName = prncpl.Spec.Name
+	}
+
+	return cloudPrincipalName
+}
+
+func BucketNameForDelete(bckt vedro.Bucket) string {
+	// check needed if deletion starts before the first
+	// successful reconcile
+	if bckt.Status.ExternalName == "" {
+		return BucketNameFromCR(bckt)
+	}
+
+	return bckt.Status.ExternalName
+}
+
+func PrincipalNameForDelete(prncpl vedro.CloudPrincipal) string {
+	// check needed if deletion starts before the first
+	// successful reconcile
+	if prncpl.Status.ExternalName == "" {
+		return PrincipalNameFromCR(prncpl)
+	}
+	return prncpl.Status.ExternalName
+}
+
 func GetSecretData(
 	ctx context.Context,
 	kubeClient client.Client,

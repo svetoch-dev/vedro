@@ -165,6 +165,9 @@ spec:
                 required:
                 - name
                 type: object
+                x-kubernetes-validations:
+                - message: providerRef is immutable
+                  rule: self == oldSelf
               publicAccessPrevention:
                 description: PublicAccessPrevention controls whether the bucket may
                   be publicly accessible.

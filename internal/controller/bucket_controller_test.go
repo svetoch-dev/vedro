@@ -132,12 +132,11 @@ var _ = Describe("BucketReconciler", func() {
 			return nil, errors.New("provider setup failed")
 		}
 
-		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(bucket),
 		})
 
-		Expect(err).NotTo(HaveOccurred())
-		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(err).To(HaveOccurred())
 
 		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
 		providerCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeProviderConfigReady)
@@ -316,6 +315,7 @@ var _ = Describe("BucketReconciler", func() {
 type fakeProvider struct {
 	capabilities cloud.Capabilities
 	bucket       *fakeBucketProvider
+	principal    *fakePrincipalProvider
 	cleanupErr   error
 
 	cleanupCalled bool
@@ -327,6 +327,10 @@ func (p *fakeProvider) Capabilities() cloud.Capabilities {
 
 func (p *fakeProvider) Bucket() cloud.BucketProvider {
 	return p.bucket
+}
+
+func (p *fakeProvider) Principal() cloud.PrincipalProvider {
+	return p.principal
 }
 
 func (p *fakeProvider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {

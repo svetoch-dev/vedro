@@ -102,14 +102,18 @@ type Bucket struct {
 
 func (b *Bucket) ValidateBucketSpec(bckt vedro.Bucket, pType vedro.ProviderType) validation.ValidationResult {
 	spec := bckt.Spec
+	status := bckt.Status
 
-	v := validation.ValidateCloudSpecificConfig(bckt.Spec.CloudSpecificConfig, pType, validateGCSCloudSpecific)
+	v := validation.ValidateCloudSpecificConfig(spec.CloudSpecificConfig, pType, validateGCSCloudSpecific)
 
 	if !v.Valid {
 		return v
 	}
-
-	v = validation.ValidateBucketNameImmutability(bckt)
+	v = validation.ValidateNameImmutability(
+		spec.Name,
+		status.ExternalName,
+		bckt.Name,
+	)
 
 	if !v.Valid {
 		return v
@@ -232,7 +236,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 }
 
 func (b *Bucket) DeleteBucket(ctx context.Context, bckt vedro.Bucket) error {
-	bucketName := helpers.BucketNameFromCR(bckt)
+	bucketName := helpers.BucketNameForDelete(bckt)
 
 	if bckt.Spec.DeletionPolicy != vedro.DeletionPolicyDelete {
 		return nil

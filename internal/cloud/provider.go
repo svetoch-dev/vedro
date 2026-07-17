@@ -11,10 +11,12 @@ import (
 var (
 	ErrBucketNotFound       = errors.New("bucket not found")
 	ErrBucketObjectNotFound = errors.New("bucket object not found")
+	ErrPrincipalNotFound    = errors.New("principal not found")
 )
 
 type Provider interface {
 	Bucket() BucketProvider
+	Principal() PrincipalProvider
 	Capabilities() Capabilities
 	Cleanup(ctx context.Context) error
 	ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult
@@ -52,6 +54,11 @@ type BucketAttrs struct {
 	Location string
 
 	Properties *vedro.BucketProperties
+}
+
+type PrincipalAttrs struct {
+	Name string
+	Id   string
 }
 
 type Change[T any] struct {
@@ -106,6 +113,13 @@ type BucketAPI interface {
 	Close(ctx context.Context) error
 }
 
+type PrincipalAPI interface {
+	GetPrincipal(ctx context.Context, name string) (*PrincipalAttrs, error)
+	CreatePrincipal(ctx context.Context, name string) (*PrincipalAttrs, error)
+	DeletePrincipal(ctx context.Context, name string) error
+	Close(ctx context.Context) error
+}
+
 type BucketProvider interface {
 	ValidateBucketSpec(bckt vedro.Bucket, pType vedro.ProviderType) validation.ValidationResult
 
@@ -117,5 +131,19 @@ type BucketProvider interface {
 	DeleteBucket(
 		ctx context.Context,
 		bckt vedro.Bucket,
+	) error
+}
+
+type PrincipalProvider interface {
+	ValidatePrincipalSpec(principal vedro.CloudPrincipal) validation.ValidationResult
+
+	EnsurePrincipal(
+		ctx context.Context,
+		principal vedro.CloudPrincipal,
+	) (*PrincipalAttrs, error)
+
+	DeletePrincipal(
+		ctx context.Context,
+		principal vedro.CloudPrincipal,
 	) error
 }

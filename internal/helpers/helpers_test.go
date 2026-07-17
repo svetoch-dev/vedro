@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -47,6 +48,109 @@ func TestBucketNameFromCR(t *testing.T) {
 	}
 }
 
+func TestPrincipalNameFromCR(t *testing.T) {
+	tests := []struct {
+		name      string
+		principal vedro.CloudPrincipal
+		expected  string
+	}{
+		{
+			name: "returns metadata.name when spec.name is empty",
+			principal: vedro.CloudPrincipal{
+				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
+			},
+			expected: "cr-name",
+		},
+		{
+			name: "returns spec.name when set",
+			principal: vedro.CloudPrincipal{
+				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
+				Spec:       vedro.CloudPrincipalSpec{Name: "actual-principal"},
+			},
+			expected: "actual-principal",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := PrincipalNameFromCR(tt.principal)
+			if got != tt.expected {
+				t.Errorf("PrincipalNameFromCR() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestBucketNameForDelete(t *testing.T) {
+	tests := []struct {
+		name     string
+		bucket   vedro.Bucket
+		expected string
+	}{
+		{
+			name: "uses the regular name before a successful reconcile",
+			bucket: vedro.Bucket{
+				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
+				Spec:       vedro.BucketSpec{Name: "spec-name"},
+			},
+			expected: "spec-name",
+		},
+		{
+			name: "uses external name after a successful reconcile",
+			bucket: vedro.Bucket{
+				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
+				Spec:       vedro.BucketSpec{Name: "spec-name"},
+				Status:     vedro.BucketStatus{ExternalName: "external-name"},
+			},
+			expected: "external-name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BucketNameForDelete(tt.bucket)
+			if got != tt.expected {
+				t.Errorf("BucketNameForDelete() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestPrincipalNameForDelete(t *testing.T) {
+	tests := []struct {
+		name      string
+		principal vedro.CloudPrincipal
+		expected  string
+	}{
+		{
+			name: "uses the regular name before a successful reconcile",
+			principal: vedro.CloudPrincipal{
+				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
+				Spec:       vedro.CloudPrincipalSpec{Name: "spec-name"},
+			},
+			expected: "spec-name",
+		},
+		{
+			name: "uses external name after a successful reconcile",
+			principal: vedro.CloudPrincipal{
+				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
+				Spec:       vedro.CloudPrincipalSpec{Name: "spec-name"},
+				Status:     vedro.CloudPrincipalStatus{ExternalName: "external-name"},
+			},
+			expected: "external-name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := PrincipalNameForDelete(tt.principal)
+			if got != tt.expected {
+				t.Errorf("PrincipalNameForDelete() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestPtr(t *testing.T) {
 	t.Run("int pointer", func(t *testing.T) {
 		p := Ptr(42)
@@ -66,6 +170,55 @@ func TestPtr(t *testing.T) {
 		p := Ptr(true)
 		if p == nil || *p != true {
 			t.Errorf("Ptr(true) = %v, want pointer to true", p)
+		}
+	})
+}
+
+func TestCloneBool(t *testing.T) {
+	t.Run("nil remains nil", func(t *testing.T) {
+		if got := CloneBool(nil); got != nil {
+			t.Errorf("CloneBool(nil) = %v, want nil", got)
+		}
+	})
+
+	for _, value := range []bool{false, true} {
+		t.Run(fmt.Sprintf("clones %t", value), func(t *testing.T) {
+			original := value
+			cloned := CloneBool(&original)
+
+			if cloned == nil || *cloned != value {
+				t.Fatalf("CloneBool(%t) = %v, want pointer to %t", value, cloned, value)
+			}
+			if cloned == &original {
+				t.Fatal("CloneBool() returned the original pointer")
+			}
+
+			*cloned = !value
+			if original != value {
+				t.Errorf("mutating clone changed original to %t, want %t", original, value)
+			}
+		})
+	}
+}
+
+func TestPatchTo(t *testing.T) {
+	t.Run("sets a value", func(t *testing.T) {
+		change := PatchTo("updated")
+		if !change.Set {
+			t.Error("PatchTo() Set = false, want true")
+		}
+		if change.Value != "updated" {
+			t.Errorf("PatchTo() Value = %q, want %q", change.Value, "updated")
+		}
+	})
+
+	t.Run("sets a nil pointer", func(t *testing.T) {
+		change := PatchTo[*bool](nil)
+		if !change.Set {
+			t.Error("PatchTo() Set = false, want true")
+		}
+		if change.Value != nil {
+			t.Errorf("PatchTo() Value = %v, want nil", change.Value)
 		}
 	})
 }

@@ -2,6 +2,7 @@ package yc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -23,8 +24,14 @@ const (
 
 var ycProjectIDPattern = regexp.MustCompile(`^b1g[a-z0-9]{17}$`)
 
+type sdkShutdowner interface {
+	Shutdown(ctx context.Context) error
+}
+
 type Provider struct {
-	bucket *Bucket
+	bucket    *Bucket
+	principal *Principal
+	sdk       sdkShutdowner
 }
 
 func New(
@@ -38,15 +45,25 @@ func New(
 		return nil, err
 	}
 
-	p := &Provider{}
+	ycsApi := &ycsAPI{
+		sdk:      sdk,
+		folderId: cfg.Spec.ProjectId,
+		saId:     saID,
+		location: cfg.Spec.Region,
+	}
+	ycPrincipalApi := &ycPrincipalAPI{
+		sdk:      sdk,
+		folderId: cfg.Spec.ProjectId,
+	}
 
-	p.bucket = &Bucket{
-		api: &ycAPI{
-			sdk:      sdk,
-			folderId: cfg.Spec.ProjectId,
-			saId:     saID,
-			location: cfg.Spec.Region,
+	p := &Provider{
+		bucket: &Bucket{
+			api: ycsApi,
 		},
+		principal: &Principal{
+			api: ycPrincipalApi,
+		},
+		sdk: sdk,
 	}
 
 	return p, nil
@@ -128,11 +145,14 @@ func (p *Provider) Bucket() cloud.BucketProvider {
 	return p.bucket
 }
 
+func (p *Provider) Principal() cloud.PrincipalProvider {
+	return p.principal
+}
+
 func (p *Provider) Cleanup(ctx context.Context) error {
-	if err := p.bucket.api.Close(ctx); err != nil {
-		return err
-	}
-	return nil
+	bucketCloseErr := p.bucket.api.Close(ctx)
+	sdkShutdownErr := p.sdk.Shutdown(ctx)
+	return errors.Join(bucketCloseErr, sdkShutdownErr)
 
 }
 

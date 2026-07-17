@@ -2,7 +2,6 @@ package yc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 
@@ -42,7 +41,7 @@ type staticS3AccessKey struct {
 	id              string
 }
 
-type ycAPI struct {
+type ycsAPI struct {
 	sdk       *ycsdk.SDK
 	accessKey *staticS3AccessKey
 	awsAPI    *aws.S3API
@@ -267,7 +266,7 @@ func patchYcBucketAttrs(patch cloud.BucketPatch, name string) (*storageapi.Updat
 	return update, nil
 }
 
-func (y *ycAPI) GetBucket(
+func (y *ycsAPI) GetBucket(
 	ctx context.Context,
 	name string,
 ) (*cloud.BucketAttrs, error) {
@@ -287,7 +286,7 @@ func (y *ycAPI) GetBucket(
 
 }
 
-func (y *ycAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
+func (y *ycsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
 	bucketClient := storagesdk.NewBucketClient(y.sdk)
 	request, err := toCreateBucketRequest(attrs, y.folderId)
 	if err != nil {
@@ -306,7 +305,7 @@ func (y *ycAPI) CreateBucket(ctx context.Context, name string, attrs cloud.Bucke
 	return nil
 }
 
-func (y *ycAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
+func (y *ycsAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
 	log.FromContext(ctx).V(1).Info("Updating bucket")
 	bucketClient := storagesdk.NewBucketClient(y.sdk)
 
@@ -328,7 +327,7 @@ func (y *ycAPI) UpdateBucket(ctx context.Context, name string, patch cloud.Bucke
 	return fromYcBucket(bucket, y.location)
 }
 
-func (y *ycAPI) newAWSAPI(ctx context.Context) error {
+func (y *ycsAPI) newAWSAPI(ctx context.Context) error {
 	accessKey, err := createStaticS3AccessKey(ctx, y.sdk, y.saId)
 
 	if err != nil {
@@ -354,7 +353,7 @@ func (y *ycAPI) newAWSAPI(ctx context.Context) error {
 	return nil
 }
 
-func (y *ycAPI) ProcessObjects(
+func (y *ycsAPI) ProcessObjects(
 	ctx context.Context,
 	bucket string,
 	process func(cloud.ObjectVersion) error,
@@ -375,7 +374,7 @@ func (y *ycAPI) ProcessObjects(
 	return nil
 }
 
-func (y *ycAPI) DeleteObject(
+func (y *ycsAPI) DeleteObject(
 	ctx context.Context,
 	bucket string,
 	object cloud.ObjectVersion,
@@ -395,7 +394,7 @@ func (y *ycAPI) DeleteObject(
 	return nil
 }
 
-func (y *ycAPI) DeleteBucket(ctx context.Context, name string) error {
+func (y *ycsAPI) DeleteBucket(ctx context.Context, name string) error {
 	op, err := storagesdk.NewBucketClient(y.sdk).Delete(ctx, &storageapi.DeleteBucketRequest{
 		Name: name,
 	})
@@ -417,16 +416,10 @@ func (y *ycAPI) DeleteBucket(ctx context.Context, name string) error {
 	return nil
 }
 
-func (y *ycAPI) Close(ctx context.Context) error {
-	var cleanupErr error
+func (y *ycsAPI) Close(ctx context.Context) error {
 	if y.accessKey != nil {
-		cleanupErr = deleteStaticS3AccessKey(ctx, y.sdk, y.accessKey.id)
+		return deleteStaticS3AccessKey(ctx, y.sdk, y.accessKey.id)
 	}
 
-	var shutdownErr error
-	if y.sdk != nil {
-		shutdownErr = y.sdk.Shutdown(ctx)
-	}
-
-	return errors.Join(cleanupErr, shutdownErr)
+	return nil
 }

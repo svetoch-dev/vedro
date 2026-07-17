@@ -16,6 +16,7 @@ rules:
   - vedro.svetoch.dev
   resources:
   - buckets
+  - cloudprincipals
   verbs:
   - create
   - delete
@@ -28,12 +29,14 @@ rules:
   - vedro.svetoch.dev
   resources:
   - buckets/finalizers
+  - cloudprincipals/finalizers
   verbs:
   - update
 - apiGroups:
   - vedro.svetoch.dev
   resources:
   - buckets/status
+  - cloudprincipals/status
   verbs:
   - get
   - patch

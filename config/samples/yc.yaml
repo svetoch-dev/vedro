@@ -9,7 +9,11 @@ spec:
   type: yc
   projectId: ${YC_PROJECT_ID}
   region: ru-central1
-  method: WorkloadIdentity
+  method: StaticCredentials
+  credentialsSecretRef:
+    name: yc-creds
+    namespace: vedro-system
+
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: Bucket
@@ -41,3 +45,15 @@ spec:
     env: dev
 
   unsupportedFeaturePolicy: Fail
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: CloudPrincipal
+metadata:
+  labels:
+    app.kubernetes.io/name: vedro
+    app.kubernetes.io/managed-by: kustomize
+  name: principal-sample-yc
+  namespace: vedro-system
+spec:
+  providerRef:
+    name: providerconfig-sample-yc

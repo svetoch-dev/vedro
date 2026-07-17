@@ -198,59 +198,57 @@ func TestValidateCloudSpecificConfig(t *testing.T) {
 	}
 }
 
-func newBucket(name, specName, externalName string) vedro.Bucket {
-	return vedro.Bucket{
-		Spec: vedro.BucketSpec{
-			Name: specName,
-		},
-		Status: vedro.BucketStatus{
-			ExternalName: externalName,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
-}
-
-func TestValidateBucketNameImmutability(t *testing.T) {
+func TestValidateNameImmutability(t *testing.T) {
 	tests := []struct {
-		name    string
-		bucket  vedro.Bucket
-		valid   bool
-		message string
+		name         string
+		objectName   string
+		specName     string
+		externalName string
+		valid        bool
+		message      string
 	}{
 		{
-			name:   "no external name set",
-			bucket: newBucket("my-bucket", "", ""),
-			valid:  true,
+			name:         "no external name set",
+			objectName:   "my-bucket",
+			specName:     "",
+			externalName: "",
+			valid:        true,
 		},
 		{
-			name:   "spec.name matches external name",
-			bucket: newBucket("cr-name", "same-name", "same-name"),
-			valid:  true,
+			name:         "spec.name matches external name",
+			objectName:   "cr-name",
+			specName:     "same-name",
+			externalName: "same-name",
+			valid:        true,
 		},
 		{
-			name:   "metadata.name matches external name",
-			bucket: newBucket("my-bucket", "", "my-bucket"),
-			valid:  true,
+			name:         "metadata.name matches external name",
+			objectName:   "my-bucket",
+			specName:     "",
+			externalName: "my-bucket",
+			valid:        true,
 		},
 		{
-			name:    "spec.name changed after creation",
-			bucket:  newBucket("cr-name", "new-name", "old-name"),
-			valid:   false,
-			message: "spec.name cannot be changed after bucket creation",
+			name:         "spec.name changed after creation",
+			objectName:   "cr-name",
+			specName:     "new-name",
+			externalName: "old-name",
+			valid:        false,
+			message:      "spec.name cannot be changed after creation",
 		},
 		{
-			name:    "metadata.name used after spec.name was used",
-			bucket:  newBucket("cr-name", "", "old-spec-name"),
-			valid:   false,
-			message: "metadata.name cannot be used as the bucket name source if spec.Name was used and bucket is created",
+			name:         "metadata.name used after spec.name was used",
+			objectName:   "cr-name",
+			specName:     "",
+			externalName: "old-spec-name",
+			valid:        false,
+			message:      "metadata.name cannot be used as the name source if spec.name was used and CR is created",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ValidateBucketNameImmutability(tt.bucket)
+			result := ValidateNameImmutability(tt.specName, tt.externalName, tt.objectName)
 			if result.Valid != tt.valid {
 				t.Errorf("Expect Valid=%v, got %v", tt.valid, result.Valid)
 			}
@@ -261,7 +259,7 @@ func TestValidateBucketNameImmutability(t *testing.T) {
 	}
 }
 
-func TestValidateBucketLocation(t *testing.T) {
+func TestValidateLocation(t *testing.T) {
 	acceptAll := func(string) *ValidationResult {
 		v := Valid()
 		return &v

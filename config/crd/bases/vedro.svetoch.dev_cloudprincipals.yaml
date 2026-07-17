@@ -4,27 +4,24 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.21.0
-  name: providerconfigs.vedro.svetoch.dev
+  name: cloudprincipals.vedro.svetoch.dev
 spec:
   group: vedro.svetoch.dev
   names:
     categories:
     - vedro
-    kind: ProviderConfig
-    listKind: ProviderConfigList
-    plural: providerconfigs
-    singular: providerconfig
-  scope: Cluster
+    kind: CloudPrincipal
+    listKind: CloudPrincipalList
+    plural: cloudprincipals
+    singular: cloudprincipal
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.type
-      name: Type
+    - jsonPath: .spec.providerRef.name
+      name: Provider
       type: string
-    - jsonPath: .spec.method
-      name: Method
-      type: string
-    - jsonPath: .spec.region
-      name: Region
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -52,66 +49,37 @@ spec:
           metadata:
             type: object
           spec:
-            description: |-
-              If StaticCredentials is set credentialsSecretRef should also be set
-              If WorkloadIdentity is set credentialsSecretRef should not be set
             properties:
-              credentialsSecretRef:
+              deletionPolicy:
+                default: Delete
                 description: |-
-                  CredentialsSecretRef references a Kubernetes Secret containing provider credentials.
-
-                  Required when method is StaticCredentials.
-                  Usually empty when method is WorkloadIdentity.
-                properties:
-                  name:
-                    description: name is unique within a namespace to reference a
-                      secret resource.
-                    type: string
-                  namespace:
-                    description: namespace defines the space within which the secret
-                      name must be unique.
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              method:
-                description: Method describes the authentication method.
+                  DeletionPolicy controls what happens to the external CloudPrincipal
+                  when this Kubernetes object is deleted.
                 enum:
-                - StaticCredentials
-                - WorkloadIdentity
+                - Delete
+                - Retain
                 type: string
-              projectId:
-                description: |-
-                  ProjectID identifies the cloud project/account/folder.
-
-                  For GCP this can be the project ID.
-                  For Yandex this can be the folder ID or cloud ID, depending on your design.
+              name:
+                description: Name is the real cloud provider bucket name.
                 minLength: 1
                 type: string
+              providerRef:
+                description: ProviderRef references the ProviderConfig used to manage
+                  this bucket.
+                properties:
+                  name:
+                    description: Name is the name of the ProviderConfig.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
                 x-kubernetes-validations:
-                - message: projectId is immutable
-                  rule: self == oldSelf
-              region:
-                type: string
-              type:
-                description: Type is the cloud provider type.
-                enum:
-                - gcp
-                - yc
-                type: string
-                x-kubernetes-validations:
-                - message: type is immutable
+                - message: providerRef is immutable
                   rule: self == oldSelf
             required:
-            - method
-            - projectId
-            - region
-            - type
+            - providerRef
             type: object
-            x-kubernetes-validations:
-            - message: credentialsSecretRef is required when method is StaticCredentials
-              rule: self.method != 'StaticCredentials' || has(self.credentialsSecretRef)
-            - message: credentialsSecretRef must not be set when method is WorkloadIdentity
-              rule: self.method != 'WorkloadIdentity' || !has(self.credentialsSecretRef)
           status:
             description: ProviderConfigStatus defines the observed provider configuration
               state.
@@ -174,6 +142,20 @@ spec:
                   - type
                   type: object
                 type: array
+              externalId:
+                description: ExternalId is the provider-side principal id.
+                type: string
+              externalName:
+                description: ExternalName is the provider-side principal name.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the latest metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              observedProvider:
+                description: Provider used for this CloudPrincipal
+                type: string
             type: object
         type: object
     served: true

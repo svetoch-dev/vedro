@@ -120,6 +120,8 @@ type BucketLifecycleRule struct {
 
 type BucketSpec struct {
 	// ProviderRef references the ProviderConfig used to manage this bucket.
+	//
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="providerRef is immutable"
 	ProviderRef ProviderConfigReference `json:"providerRef"`
 
 	// Name is the real cloud provider bucket name.

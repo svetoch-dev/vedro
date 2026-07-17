@@ -45,21 +45,6 @@ func ValidateCloudSpecificConfig(cfg *vedro.BucketCloudSpecificConfig, pType ved
 	}
 }
 
-func ValidateBucketNameImmutability(bckt vedro.Bucket) ValidationResult {
-	spec := bckt.Spec
-	status := bckt.Status
-
-	if spec.Name != "" && status.ExternalName != "" && status.ExternalName != spec.Name {
-		return Invalid("spec.name cannot be changed after bucket creation")
-	}
-
-	if spec.Name == "" && status.ExternalName != "" && status.ExternalName != bckt.Name {
-		return Invalid("metadata.name cannot be used as the bucket name source if spec.Name was used and bucket is created")
-	}
-
-	return Valid()
-}
-
 func ValidateBucketName(name string, fn func(name string) *ValidationResult) ValidationResult {
 	if name == "" {
 		return Invalid("name is an empty string")

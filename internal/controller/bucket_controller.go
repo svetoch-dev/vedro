@@ -35,7 +35,6 @@ import (
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/capabilities"
-	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	"github.com/svetoch-dev/vedro/internal/helpers"
@@ -49,11 +48,7 @@ type BucketReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	// Needed abstraction for tests
-	ProviderFactory func(
-		ctx context.Context,
-		cfg vedro.ProviderConfig,
-		kubeClient client.Client,
-	) (cloud.Provider, error)
+	ProviderFactory ProviderFactory
 }
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
@@ -84,13 +79,6 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	ctx = log.IntoContext(ctx, logger)
 
-	if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
-		controllerutil.AddFinalizer(&bucket.Bucket, bucketFinalizer)
-		if err := r.Update(ctx, &bucket.Bucket); err != nil {
-			return ReconcileError(ctx, err, "add finalizer error")
-		}
-	}
-
 	// when cr gets deleted metadata.deletionTimestamp
 	// is set to current timestamp. If its not in process
 	// of being deleted metadata.deletionTimestamp == 0
@@ -111,35 +99,14 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			}
 			return Reconciled()
 		}
-	}
 
-	providerConfig := resolvers.ProviderConfigResolver{
-		KubeClient: r.Client,
-		Logger:     logger,
-	}
-
-	providerConfigName := types.NamespacedName{
-		Name: bucket.Spec.ProviderRef.Name,
-	}
-
-	// Find ProviderConfig and set condition
-	providerConfig.Resolve(ctx, providerConfigName)
-	providerConfig.Condition.ObservedGeneration = bucket.Generation
-
-	if !providerConfig.IsOk() {
-		bucket.Condition.Status = metav1.ConditionFalse
-		bucket.Condition.Reason = conditions.ReasonProviderConfigGetFailed
-		bucket.Condition.Message = providerConfig.Error.Error()
-		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
-			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
-		})
-
-		if patchErr != nil {
-			return ReconcileError(ctx, patchErr, "patch error")
+	} else {
+		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
+			controllerutil.AddFinalizer(&bucket.Bucket, bucketFinalizer)
+			if err := r.Update(ctx, &bucket.Bucket); err != nil {
+				return ReconcileError(ctx, err, "add finalizer error")
+			}
 		}
-
-		return ReconcileIgnoreNotFound(ctx, providerConfig.Error, "unable to fetch ProviderConfig")
 	}
 
 	providerFactory := r.ProviderFactory
@@ -147,58 +114,46 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		providerFactory = registry.NewProvider
 	}
 
-	provider, err := providerFactory(ctx, providerConfig.ProviderConfig, r.Client)
+	providerSetup, issue := prepareProvider(ctx, bucket.Spec.ProviderRef, r.Client, providerFactory)
 
-	// If error change status conditions and end Reconcile
-	if err != nil {
-		logger.Error(err, "Error in setting NewProvider")
-		providerConfig.Condition.Status = metav1.ConditionFalse
-		providerConfig.Condition.Reason = conditions.ReasonProviderConfigError
-		providerConfig.Condition.Message = err.Error()
-		bucket.Condition.Status = metav1.ConditionFalse
-		bucket.Condition.Reason = conditions.ReasonProviderConfigError
-		bucket.Condition.Message = err.Error()
-		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
-			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+	provider := providerSetup.Provider
+	providerConfig := providerSetup.Config
+	providerConfig.Condition.ObservedGeneration = bucket.Generation
+
+	if provider != nil {
+		defer func() {
+			if err := provider.Cleanup(ctx); err != nil {
+				logger.Error(err, "provider cleanup failed")
+			}
+		}()
+	}
+
+	if issue != nil {
+		bucket.Condition.Status = providerConfig.Condition.Status
+		bucket.Condition.Reason = providerConfig.Condition.Reason
+		bucket.Condition.Message = providerConfig.Condition.Message
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(p *vedro.Bucket) {
+			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
 		})
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")
 		}
-		return Reconciled()
-	}
+		switch issue.Kind {
+		case ProviderResolveFailed:
+			return ReconcileIgnoreNotFound(
+				ctx,
+				issue.Error,
+				"unable to fetch ProviderConfig",
+			)
 
-	defer func() {
-		if err := provider.Cleanup(ctx); err != nil {
-			logger.Error(err, "provider cleanup failed")
+		case ProviderSettingFailed:
+			return ReconcileError(ctx, issue.Error, "Error in setting NewProvider")
+
+		case ProviderConfigInvalid:
+			return Reconciled()
 		}
-	}()
-
-	validationResultCfg := provider.ValidateProviderConfigSpec(providerConfig.ProviderConfig)
-
-	if !validationResultCfg.Valid {
-		logger.Info("ProviderConfig.spec is invalid", "reason", validationResultCfg.Message)
-		providerConfig.Condition.Status = metav1.ConditionFalse
-		providerConfig.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
-		providerConfig.Condition.Message = validationResultCfg.Message
-		bucket.Condition.Status = metav1.ConditionFalse
-		bucket.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
-		bucket.Condition.Message = validationResultCfg.Message
-		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-			meta.SetStatusCondition(&b.Status.Conditions, providerConfig.Condition)
-			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
-		})
-		if patchErr != nil {
-			return ReconcileError(ctx, patchErr, "patch error")
-		}
-		return Reconciled()
 	}
-
-	// providerConfig is valid and provider is configured by now;
-	// set its final condition.
-	providerConfig.Condition.Status = metav1.ConditionTrue
-	providerConfig.Condition.Reason = conditions.ReasonProviderConfigReconciled
-	providerConfig.Condition.Message = "ProviderConfig Reconciled"
 
 	// If obj is being deleted and DeletionPolicy is Delete
 	// delete it in cloud then remove finalizers

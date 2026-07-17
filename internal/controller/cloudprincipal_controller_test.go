@@ -100,7 +100,7 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 		readyCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
 		Expect(readyCondition).NotTo(BeNil())
 		Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
-		Expect(readyCondition.Reason).To(Equal(conditions.ReasonProviderConfigError))
+		Expect(readyCondition.Reason).To(Equal(conditions.ReasonProviderConfigNotFound))
 	})
 
 	It("records provider factory errors", func() {
@@ -114,10 +114,9 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 			return nil, errors.New("provider setup failed")
 		}
 
-		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+		_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
 
-		Expect(err).NotTo(HaveOccurred())
-		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(err).To(HaveOccurred())
 
 		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
 		providerCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeProviderConfigReady)

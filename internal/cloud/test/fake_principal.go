@@ -32,8 +32,6 @@ type FakePrincipalAPI struct {
 	GetErr      error
 	CreateErr   error
 	DeleteErr   error
-
-	Deleted bool
 }
 
 func (f *FakePrincipalAPI) GetPrincipal(ctx context.Context, _ string) (*cloud.PrincipalAttrs, error) {
@@ -58,6 +56,5 @@ func (f *FakePrincipalAPI) CreatePrincipal(
 }
 
 func (f *FakePrincipalAPI) DeletePrincipal(ctx context.Context, _ string) error {
-	f.Deleted = true
 	return f.DeleteErr
 }

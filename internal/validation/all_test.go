@@ -198,20 +198,6 @@ func TestValidateCloudSpecificConfig(t *testing.T) {
 	}
 }
 
-func newBucket(name, specName, externalName string) vedro.Bucket {
-	return vedro.Bucket{
-		Spec: vedro.BucketSpec{
-			Name: specName,
-		},
-		Status: vedro.BucketStatus{
-			ExternalName: externalName,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
-}
-
 func TestValidateNameImmutability(t *testing.T) {
 	tests := []struct {
 		name         string

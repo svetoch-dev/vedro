@@ -79,34 +79,8 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	ctx = log.IntoContext(ctx, logger)
 
-	// when cr gets deleted metadata.deletionTimestamp
-	// is set to current timestamp. If its not in process
-	// of being deleted metadata.deletionTimestamp == 0
-	// If DeletionPolicy is Retain we just Delete the finalizers
-	// so that obj is deleted in k8s not in cloud
-	if !bucket.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
-			logger.Info("Bucket is being deleted, but finalizer is not set; skipping deletion handling")
-			return Reconciled()
-		}
-
-		if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
-			logger.Info("skipping Bucket deletion because deletionPolicy is Retain")
-
-			controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
-			if err := r.Update(ctx, &bucket.Bucket); err != nil {
-				return ReconcileError(ctx, err, "remove finalizer error")
-			}
-			return Reconciled()
-		}
-
-	} else {
-		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
-			controllerutil.AddFinalizer(&bucket.Bucket, bucketFinalizer)
-			if err := r.Update(ctx, &bucket.Bucket); err != nil {
-				return ReconcileError(ctx, err, "add finalizer error")
-			}
-		}
+	if result, err, handled := r.reconcileBucketFinalizer(ctx, &bucket); handled {
+		return result, err
 	}
 
 	providerFactory := r.ProviderFactory
@@ -276,6 +250,46 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	logger.Info("Bucket reconcile success")
 
 	return Reconciled()
+}
+
+// reconcileBucketFinalizer adds the finalizer to active buckets and handles
+// deletion paths that do not require a cloud provider.
+func (r *BucketReconciler) reconcileBucketFinalizer(
+	ctx context.Context,
+	bucket *resolvers.BucketResolver,
+) (ctrl.Result, error, bool) {
+	logger := log.FromContext(ctx)
+
+	if !bucket.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
+			logger.Info("Bucket is being deleted, but finalizer is not set; skipping deletion handling")
+			result, err := Reconciled()
+			return result, err, true
+		}
+
+		if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+			logger.Info("skipping Bucket deletion because deletionPolicy is Retain")
+			controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
+			if err := r.Update(ctx, &bucket.Bucket); err != nil {
+				result, reconcileErr := ReconcileError(ctx, err, "remove finalizer error")
+				return result, reconcileErr, true
+			}
+			result, err := Reconciled()
+			return result, err, true
+		}
+
+		return ctrl.Result{}, nil, false
+	}
+
+	if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
+		controllerutil.AddFinalizer(&bucket.Bucket, bucketFinalizer)
+		if err := r.Update(ctx, &bucket.Bucket); err != nil {
+			result, reconcileErr := ReconcileError(ctx, err, "add finalizer error")
+			return result, reconcileErr, true
+		}
+	}
+
+	return ctrl.Result{}, nil, false
 }
 
 func (r *BucketReconciler) patchStatus(

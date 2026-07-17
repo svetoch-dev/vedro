@@ -94,7 +94,7 @@ var _ = Describe("prepareProvider", func() {
 
 		Expect(issue).NotTo(BeNil())
 		Expect(issue.Kind).To(Equal(ProviderConfigInvalid))
-		Expect(issue.Error).To(BeNil())
+		Expect(issue.Error).ToNot(HaveOccurred())
 		Expect(setup.Provider).To(BeIdenticalTo(provider))
 		Expect(setup.Config.Condition.Status).To(Equal(metav1.ConditionFalse))
 		Expect(setup.Config.Condition.Reason).To(Equal(conditions.ReasonProviderConfigInvalidSpec))

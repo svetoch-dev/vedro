@@ -78,34 +78,8 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	ctx = log.IntoContext(ctx, logger)
 
-	// when cr gets deleted metadata.deletionTimestamp
-	// is set to current timestamp. If its not in process
-	// of being deleted metadata.deletionTimestamp == 0
-	// If DeletionPolicy is Retain we just Delete the finalizers
-	// so that obj is deleted in k8s not in cloud
-	if !principal.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
-			logger.Info("CloudPrincipal is being deleted, but finalizer is not set; skipping deletion handling")
-			return Reconciled()
-		}
-
-		if principal.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
-			logger.Info("skipping CloudPrincipal deletion because deletionPolicy is Retain")
-
-			controllerutil.RemoveFinalizer(&principal.CloudPrincipal, principalFinalizer)
-			if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
-				return ReconcileError(ctx, err, "remove finalizer error")
-			}
-			return Reconciled()
-		}
-	} else {
-		if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
-			controllerutil.AddFinalizer(&principal.CloudPrincipal, principalFinalizer)
-			if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
-				return ReconcileError(ctx, err, "add finalizer error")
-			}
-		}
-
+	if result, err, handled := r.reconcileCloudPrincipalFinalizer(ctx, &principal); handled {
+		return result, err
 	}
 
 	providerFactory := r.ProviderFactory
@@ -239,6 +213,46 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	logger.Info("CloudPrincipal reconcile success")
 
 	return Reconciled()
+}
+
+// reconcileCloudPrincipalFinalizer adds the finalizer to active principals and
+// handles deletion paths that do not require a cloud provider.
+func (r *CloudPrincipalReconciler) reconcileCloudPrincipalFinalizer(
+	ctx context.Context,
+	principal *resolvers.CloudPrincipalResolver,
+) (ctrl.Result, error, bool) {
+	logger := log.FromContext(ctx)
+
+	if !principal.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
+			logger.Info("CloudPrincipal is being deleted, but finalizer is not set; skipping deletion handling")
+			result, err := Reconciled()
+			return result, err, true
+		}
+
+		if principal.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+			logger.Info("skipping CloudPrincipal deletion because deletionPolicy is Retain")
+			controllerutil.RemoveFinalizer(&principal.CloudPrincipal, principalFinalizer)
+			if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
+				result, reconcileErr := ReconcileError(ctx, err, "remove finalizer error")
+				return result, reconcileErr, true
+			}
+			result, err := Reconciled()
+			return result, err, true
+		}
+
+		return ctrl.Result{}, nil, false
+	}
+
+	if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
+		controllerutil.AddFinalizer(&principal.CloudPrincipal, principalFinalizer)
+		if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
+			result, reconcileErr := ReconcileError(ctx, err, "add finalizer error")
+			return result, reconcileErr, true
+		}
+	}
+
+	return ctrl.Result{}, nil, false
 }
 
 func (r *CloudPrincipalReconciler) patchStatus(

@@ -32,7 +32,7 @@ func PrincipalNameFromCR(prncpl vedro.CloudPrincipal) string {
 
 func BucketNameForDelete(bckt vedro.Bucket) string {
 	// check needed if deletion starts before the first
-	// successfull reconcile
+	// successful reconcile
 	if bckt.Status.ExternalName == "" {
 		return BucketNameFromCR(bckt)
 	}
@@ -42,7 +42,7 @@ func BucketNameForDelete(bckt vedro.Bucket) string {
 
 func PrincipalNameForDelete(prncpl vedro.CloudPrincipal) string {
 	// check needed if deletion starts before the first
-	// successfull reconcile
+	// successful reconcile
 	if prncpl.Status.ExternalName == "" {
 		return PrincipalNameFromCR(prncpl)
 	}

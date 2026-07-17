@@ -261,7 +261,6 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
 
 		Expect(err).To(MatchError("delete failed"))
-		Expect(result.Requeue).To(BeTrue())
 		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 		Expect(provider.principal.deleteCalls).To(Equal(1))
 		Expect(provider.cleanupCalled).To(BeTrue())

@@ -8,9 +8,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
+	"github.com/svetoch-dev/vedro/internal/cloud"
+	cloudtest "github.com/svetoch-dev/vedro/internal/cloud/test"
 )
 
-var _ = Describe("Principal.ValidatePrincipalSpec", func() {
+var _ = cloudtest.PrincipalProviderTests(cloudtest.Config{
+	NewPrincipal: func(api cloud.PrincipalAPI) cloud.PrincipalProvider {
+		return &Principal{api: api}
+	},
+})
+
+var _ = cloudtest.PrincipalValidationTests(cloudtest.Config{
+	NewPrincipal: func(api cloud.PrincipalAPI) cloud.PrincipalProvider {
+		return &Principal{api: api}
+	},
+})
+
+var _ = Describe("Principal.ValidateGCPPrincipalSpec", func() {
 	newPrincipal := func(metadataName, specName, externalName string) vedro.CloudPrincipal {
 		return vedro.CloudPrincipal{
 			ObjectMeta: metav1.ObjectMeta{Name: metadataName},

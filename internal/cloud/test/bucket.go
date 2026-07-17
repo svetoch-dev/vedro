@@ -12,34 +12,6 @@ import (
 	"github.com/svetoch-dev/vedro/internal/helpers"
 )
 
-// Config parameterizes the shared bucket lifecycle specs with the details
-// that differ between providers.
-type Config struct {
-	// Location is a location the provider accepts in spec.location.
-	Location string
-	// NormalizedLocation is how the provider stores/returns Location
-	// (e.g. GCP upper-cases it: "europe-west1" -> "EUROPE-WEST1").
-	NormalizedLocation string
-
-	// OtherLocation is a different valid location, used to test the
-	// "bucket already exists in another location" case.
-	OtherLocation string
-	// OtherNormalizedLocation is the normalized form of OtherLocation.
-	OtherNormalizedLocation string
-
-	ProviderConfigType vedro.ProviderType
-
-	BucketPropertiesMods []func(*vedro.BucketProperties)
-
-	// Bucket provider capabilities
-	BucketCaps cloud.BucketCapabilities
-
-	// NewBucket wires the provider's cloud.BucketProvider to the supplied
-	// fake API. Implemented inside each provider's package so it can reach
-	// unexported fields.
-	NewBucket func(api cloud.BucketAPI) cloud.BucketProvider
-}
-
 // BucketProviderTests registers the provider-agnostic EnsureBucket and
 // DeleteBucket specs. Call it from each provider's Ginkgo suite, e.g.:
 //

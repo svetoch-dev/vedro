@@ -14,6 +14,30 @@ type ProviderConfigReference struct {
 	Name string `json:"name"`
 }
 
+type BucketReference struct {
+	// Name is the name of the Bucket.
+	//
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Namespace of the Bucket.
+	//
+	// +kubebuilder:validation:MinLength=1
+	Namespace string `json:"namespace"`
+}
+
+type PrincipalReference struct {
+	// Name is the name of the CloudPrincipal.
+	//
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Namespace of the CloudPrincipal.
+	//
+	// +kubebuilder:validation:MinLength=1
+	Namespace string `json:"namespace"`
+}
+
 type AuthMethod string
 
 const (

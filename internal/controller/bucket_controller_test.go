@@ -316,6 +316,7 @@ type fakeProvider struct {
 	capabilities cloud.Capabilities
 	bucket       *fakeBucketProvider
 	principal    *fakePrincipalProvider
+	bucketAccess *fakeBucketAccess
 	cleanupErr   error
 
 	cleanupCalled bool
@@ -331,6 +332,10 @@ func (p *fakeProvider) Bucket() cloud.BucketProvider {
 
 func (p *fakeProvider) Principal() cloud.PrincipalProvider {
 	return p.principal
+}
+
+func (p *fakeProvider) Access() cloud.BucketAccessProvider {
+	return p.bucketAccess
 }
 
 func (p *fakeProvider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {

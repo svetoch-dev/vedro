@@ -39,3 +39,9 @@ const (
 	ReasonProviderConfigReconciled  = "Reconciled"
 	ReasonProviderConfigSet         = "ProviderConfigSet"
 )
+
+// Condition reasons for BucketAccess resources.
+const (
+	ReasonBucketAccessNotFound  = "BucketAccessNotFound"
+	ReasonBucketAccessGetFailed = "BucketAccessGetFailed"
+)

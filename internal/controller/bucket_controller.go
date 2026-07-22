@@ -329,6 +329,7 @@ func (r *BucketReconciler) findBucketsOfProviderConfig(
 
 	var bucketList vedro.BucketList
 	if err := r.List(ctx, &bucketList); err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "unable to list Bucket objects")
 		return nil
 	}
 

@@ -17,13 +17,15 @@ var (
 type Provider interface {
 	Bucket() BucketProvider
 	Principal() PrincipalProvider
+	Access() BucketAccessProvider
 	Capabilities() Capabilities
 	Cleanup(ctx context.Context) error
 	ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult
 }
 
 type Capabilities struct {
-	Bucket BucketCapabilities
+	Bucket       BucketCapabilities
+	BucketAccess BucketAccessCapabilities
 }
 
 type BucketCapabilities struct {
@@ -49,11 +51,24 @@ func (bc BucketCapabilities) LifecycleSupported() bool {
 	return bc.Lifecycle.RuleExpiration
 }
 
+type BucketAccessCapabilities struct {
+	ObjectReader bool
+	ObjectWriter bool
+	ObjectAdmin  bool
+	BucketAdmin  bool
+}
+
 type BucketAttrs struct {
 	Name     string
 	Location string
 
 	Properties *vedro.BucketProperties
+}
+
+type BucketAccessAttrs struct {
+	GrantedAccess string
+	BucketName    string
+	PrincipalId   string
 }
 
 type PrincipalAttrs struct {
@@ -106,6 +121,20 @@ type BucketAPI interface {
 		object ObjectVersion,
 	) error
 
+	GrantAccess(
+		ctx context.Context,
+		bucket string,
+		principalId string,
+		access vedro.BucketAccessLevel,
+	) error
+
+	RevokeAccess(
+		ctx context.Context,
+		bucket string,
+		principalId string,
+		access vedro.BucketAccessLevel,
+	) error
+
 	DeleteBucket(ctx context.Context, name string) error
 
 	// Close releases resources owned by the BucketAPI implementation.
@@ -132,6 +161,17 @@ type BucketProvider interface {
 		ctx context.Context,
 		bckt vedro.Bucket,
 	) error
+}
+
+type BucketAccessProvider interface {
+	// ValidateBucketAccessSpec(spec BucketAccessSpec) ValidationResult
+	EnsureBucketAccess(
+		ctx context.Context,
+		bucket vedro.Bucket,
+		principal vedro.CloudPrincipal,
+		access vedro.BucketAccess,
+	) (*BucketAccessAttrs, error)
+	DeleteBucketAccess(ctx context.Context, access vedro.BucketAccess) error
 }
 
 type PrincipalProvider interface {

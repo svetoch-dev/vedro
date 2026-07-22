@@ -15,6 +15,7 @@ rules:
 - apiGroups:
   - vedro.svetoch.dev
   resources:
+  - bucketAccesss
   - buckets
   - cloudprincipals
   verbs:
@@ -28,6 +29,7 @@ rules:
 - apiGroups:
   - vedro.svetoch.dev
   resources:
+  - bucketAccesss/finalizers
   - buckets/finalizers
   - cloudprincipals/finalizers
   verbs:
@@ -35,6 +37,7 @@ rules:
 - apiGroups:
   - vedro.svetoch.dev
   resources:
+  - bucketAccesss/status
   - buckets/status
   - cloudprincipals/status
   verbs:

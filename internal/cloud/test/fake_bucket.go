@@ -160,6 +160,24 @@ func (f *FakeBucketAPI) CreateBucket(
 	return nil
 }
 
+func (f *FakeBucketAPI) GrantAccess(
+	ctx context.Context,
+	bucket string,
+	principalId string,
+	access vedro.BucketAccessLevel,
+) error {
+	return nil
+}
+
+func (f *FakeBucketAPI) RevokeAccess(
+	ctx context.Context,
+	bucket string,
+	principalId string,
+	access vedro.BucketAccessLevel,
+) error {
+	return nil
+}
+
 func (f *FakeBucketAPI) Close(ctx context.Context) error {
 	f.CloseCalled = true
 	return f.CloseErr

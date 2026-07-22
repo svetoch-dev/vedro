@@ -420,6 +420,24 @@ func (a *gcsAPI) DeleteBucket(ctx context.Context, name string) error {
 	return err
 }
 
+func (g *gcsAPI) GrantAccess(
+	ctx context.Context,
+	bucket string,
+	principalId string,
+	access vedro.BucketAccessLevel,
+) error {
+	return nil
+}
+
+func (g *gcsAPI) RevokeAccess(
+	ctx context.Context,
+	bucket string,
+	principalId string,
+	access vedro.BucketAccessLevel,
+) error {
+	return nil
+}
+
 func (a *gcsAPI) Close(ctx context.Context) error {
 	if a.client == nil {
 		return nil

@@ -416,6 +416,24 @@ func (y *ycsAPI) DeleteBucket(ctx context.Context, name string) error {
 	return nil
 }
 
+func (y *ycsAPI) GrantAccess(
+	ctx context.Context,
+	bucket string,
+	principalId string,
+	access vedro.BucketAccessLevel,
+) error {
+	return nil
+}
+
+func (y *ycsAPI) RevokeAccess(
+	ctx context.Context,
+	bucket string,
+	principalId string,
+	access vedro.BucketAccessLevel,
+) error {
+	return nil
+}
+
 func (y *ycsAPI) Close(ctx context.Context) error {
 	if y.accessKey != nil {
 		return deleteStaticS3AccessKey(ctx, y.sdk, y.accessKey.id)

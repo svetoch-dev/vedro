@@ -292,6 +292,7 @@ func (r *CloudPrincipalReconciler) findCloudPrincipalsOfProviderConfig(
 
 	var list vedro.CloudPrincipalList
 	if err := r.List(ctx, &list); err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "unable to list CloudPrincipal objects")
 		return nil
 	}
 

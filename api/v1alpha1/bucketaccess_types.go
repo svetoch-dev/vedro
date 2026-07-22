@@ -49,13 +49,16 @@ type BucketAccessSpec struct {
 type BucketAccessStatus struct {
 	// BucketName name of the bucket to which access is granted
 	//
-	BucketName string `json:"bucketName"`
+	// +optional
+	BucketName string `json:"bucketName,omitempty"`
 	// PrincipalId id of the cloud principal that access is granted too
 	//
-	PrincipalId string `json:"principalId"`
+	// +optional
+	PrincipalId string `json:"principalId,omitempty"`
 	// GrantedAccess cloud specific access name that is granted
 	//
-	GrantedAccess string `json:"grantedAccess"`
+	// +optional
+	GrantedAccess string `json:"grantedAccess,omitempty"`
 	// ObservedGeneration is the latest metadata.generation observed by the controller.
 	//
 	// +optional

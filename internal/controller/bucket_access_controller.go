@@ -20,6 +20,8 @@ import (
 	"context"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -31,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
+	"github.com/svetoch-dev/vedro/internal/conditions"
 	"github.com/svetoch-dev/vedro/internal/resolvers"
 )
 
@@ -45,9 +48,9 @@ type BucketAccessReconciler struct {
 }
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
-// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=bucketAccesss,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=bucketAccesss/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=bucketAccesss/finalizers,verbs=update
+// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=bucketaccesses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=bucketaccesses/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=bucketaccesses/finalizers,verbs=update
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=providerconfigs,verbs=create;update;get;list;watch
 
 func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -79,6 +82,82 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ReconcileError(ctx, err, "add finalizer error")
 		}
 	}
+
+	bucket := resolvers.BucketResolver{
+		KubeClient: r.Client,
+		Logger:     logger,
+	}
+
+	bucket.Resolve(ctx, types.NamespacedName{
+		Namespace: bucketAccess.Spec.BucketRef.Namespace,
+		Name:      bucketAccess.Spec.BucketRef.Name,
+	})
+	bucket.Condition.ObservedGeneration = bucketAccess.Generation
+
+	if !bucket.IsOk() {
+		bucketAccess.Condition.Status = bucket.Condition.Status
+		bucketAccess.Condition.Reason = bucket.Condition.Reason
+		bucketAccess.Condition.Message = bucket.Condition.Message
+		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+
+		return ReconcileIgnoreNotFound(
+			ctx,
+			bucket.Error,
+			"unable to fetch Bucket",
+		)
+	}
+
+	principal := resolvers.CloudPrincipalResolver{
+		KubeClient: r.Client,
+		Logger:     logger,
+	}
+
+	principal.Resolve(ctx, types.NamespacedName{
+		Namespace: bucketAccess.Spec.PrincipalRef.Namespace,
+		Name:      bucketAccess.Spec.PrincipalRef.Name,
+	})
+	principal.Condition.ObservedGeneration = bucketAccess.Generation
+
+	if !principal.IsOk() {
+		bucketAccess.Condition.Status = principal.Condition.Status
+		bucketAccess.Condition.Reason = principal.Condition.Reason
+		bucketAccess.Condition.Message = principal.Condition.Message
+		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+
+		return ReconcileIgnoreNotFound(
+			ctx,
+			principal.Error,
+			"unable to fetch Principal",
+		)
+	}
+
+	// Set bucketAccess condition to reconciled and do a final patch
+	bucketAccess.Condition.Status = metav1.ConditionTrue
+	bucketAccess.Condition.Reason = conditions.ReasonBucketAccessReconciled
+	bucketAccess.Condition.Message = "BucketAccess Reconciled"
+	patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+		meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+		meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+	})
+	if patchErr != nil {
+		return ReconcileError(ctx, patchErr, "patch error")
+	}
+
+	logger.Info("BucketAccess reconcile success")
 
 	return Reconciled()
 }
@@ -161,8 +240,8 @@ func (r *BucketAccessReconciler) findBucketAccessOfPrincipal(
 	requests := make([]reconcile.Request, 0, len(bucketAccessList.Items))
 
 	for _, bucketAccess := range bucketAccessList.Items {
-		if bucketAccess.Spec.BucketRef.Namespace != principal.Namespace ||
-			bucketAccess.Spec.BucketRef.Name != principal.Name {
+		if bucketAccess.Spec.PrincipalRef.Namespace != principal.Namespace ||
+			bucketAccess.Spec.PrincipalRef.Name != principal.Name {
 			continue
 		}
 

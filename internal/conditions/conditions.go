@@ -42,6 +42,7 @@ const (
 
 // Condition reasons for BucketAccess resources.
 const (
-	ReasonBucketAccessNotFound  = "BucketAccessNotFound"
-	ReasonBucketAccessGetFailed = "BucketAccessGetFailed"
+	ReasonBucketAccessNotFound   = "BucketAccessNotFound"
+	ReasonBucketAccessGetFailed  = "BucketAccessGetFailed"
+	ReasonBucketAccessReconciled = "Reconciled"
 )

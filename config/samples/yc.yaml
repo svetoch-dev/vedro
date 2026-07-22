@@ -57,3 +57,21 @@ metadata:
 spec:
   providerRef:
     name: providerconfig-sample-yc
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: BucketAccess
+metadata:
+  labels:
+    app.kubernetes.io/name: vedro
+    app.kubernetes.io/managed-by: kustomize
+  name: access-sample-yc
+  namespace: vedro-system
+spec:
+  principalRef:
+    name: principal-sample-yc
+    namespace: vedro-system
+  bucketRef:
+    name: bucket-sample-yc
+    namespace: vedro-system
+  access:
+    level: BucketAdmin

@@ -178,10 +178,6 @@ spec:
                 description: PrincipalId id of the cloud principal that access is
                   granted too
                 type: string
-            required:
-            - bucketName
-            - grantedAccess
-            - principalId
             type: object
         type: object
     served: true

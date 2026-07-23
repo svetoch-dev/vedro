@@ -278,7 +278,7 @@ var _ = Describe("BucketReconciler", func() {
 			NamespacedName: client.ObjectKeyFromObject(bucket),
 		})
 
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).To(MatchError("ensure failed"))
 		Expect(result).To(Equal(reconcile.Result{}))
 
 		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))

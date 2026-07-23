@@ -164,11 +164,10 @@ type BucketProvider interface {
 }
 
 type BucketAccessProvider interface {
-	// ValidateBucketAccessSpec(spec BucketAccessSpec) ValidationResult
 	EnsureBucketAccess(
 		ctx context.Context,
 		bucket vedro.Bucket,
-		principal *vedro.CloudPrincipal,
+		principal vedro.CloudPrincipal,
 		access vedro.BucketAccess,
 	) (*BucketAccessAttrs, error)
 	DeleteBucketAccess(ctx context.Context, access vedro.BucketAccess) error

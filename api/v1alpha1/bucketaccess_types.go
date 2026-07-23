@@ -29,6 +29,13 @@ const (
 	BucketAdmin  BucketAccessLevel = "BucketAdmin"
 )
 
+const (
+	BucketAccessUnsupportedObjectReader UnsupportedFeatureReason = "BucketAccessUnsupportedObjectReader"
+	BucketAccessUnsupportedObjectWriter UnsupportedFeatureReason = "BucketAccessUnsupportedObjectWriter"
+	BucketAccessUnsupportedObjectAdmin  UnsupportedFeatureReason = "BucketAccessUnsupportedObjectAdmin"
+	BucketAccessUnsupportedBucketAdmin  UnsupportedFeatureReason = "BucketAccessUnsupportedBucketAdmin"
+)
+
 type Access struct {
 	// +kubebuilder:validation:Enum=ObjectReader;ObjectWriter;ObjectAdmin;BucketAdmin
 	Level BucketAccessLevel `json:"level"`
@@ -63,6 +70,10 @@ type BucketAccessStatus struct {
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// List of unsupported features set on BucketAccess resource
+	//
+	// +optional
+	UnsupportedFeatures []UnsupportedFeature `json:"unsupported,omitempty"`
 	// Conditions represent the latest available observations of the BucketAccess state.
 	//
 	// +optional

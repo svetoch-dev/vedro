@@ -13,7 +13,7 @@ type fakeBucketAccess struct {
 func (b *fakeBucketAccess) EnsureBucketAccess(
 	ctx context.Context,
 	bucket vedro.Bucket,
-	principal *vedro.CloudPrincipal,
+	principal vedro.CloudPrincipal,
 	access vedro.BucketAccess,
 ) (*cloud.BucketAccessAttrs, error) {
 	return nil, nil

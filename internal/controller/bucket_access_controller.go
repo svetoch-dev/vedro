@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
+	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	"github.com/svetoch-dev/vedro/internal/resolvers"
@@ -277,11 +278,54 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return Reconciled()
 	}
 
+	caps := provider.Capabilities().BucketAccess
+	unsupported := capabilities.ValidateBucketAccessCapabilities(caps, bucketAccess.Spec)
+
+	bucketAccess.Status.UnsupportedFeatures = unsupported
+
+	if len(unsupported) > 0 {
+		logger.Info("BucketAccess Unsupported features found")
+		bucketAccess.Condition.Status = metav1.ConditionFalse
+		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessUnsupportedFeatures
+		bucketAccess.Condition.Message = "unsupported features found"
+		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+			p.Status.UnsupportedFeatures = bucketAccess.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
+	_, err := provider.Access().EnsureBucketAccess(ctx, bucket.Bucket, principal.CloudPrincipal, bucketAccess.BucketAccess)
+
+	if err != nil {
+		bucketAccess.Condition.Status = metav1.ConditionFalse
+		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessEnsureError
+		bucketAccess.Condition.Message = err.Error()
+		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+			p.Status.UnsupportedFeatures = bucketAccess.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return ReconcileError(ctx, err, "EnsureBucketAccess failed")
+	}
+
 	// Set bucketAccess condition to reconciled and do a final patch
 	bucketAccess.Condition.Status = metav1.ConditionTrue
 	bucketAccess.Condition.Reason = conditions.ReasonBucketAccessReconciled
 	bucketAccess.Condition.Message = "BucketAccess Reconciled"
 	patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+		p.Status.UnsupportedFeatures = bucketAccess.Status.UnsupportedFeatures
 		meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
 		meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)

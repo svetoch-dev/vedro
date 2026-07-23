@@ -165,7 +165,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	bucket.Status.UnsupportedFeatures = unsupported
 
 	if len(unsupported) > 0 {
-		logger.Info("Unsupported features found")
+		logger.Info("Bucket Unsupported features found")
 
 		if bucket.Spec.UnsupportedFeaturePolicy == vedro.UnsupportedFeaturePolicyFail {
 			logger.Info("UnsupportedFeaturePolicy set to Fail. stopping reconciliation")
@@ -214,7 +214,6 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err := provider.Bucket().EnsureBucket(ctx, bucket.Bucket)
 
 	if err != nil {
-		logger.Error(err, "EnsureBucket failed")
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketEnsureError
 		bucket.Condition.Message = err.Error()
@@ -224,7 +223,8 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")
 		}
-		return Reconciled()
+
+		return ReconcileError(ctx, err, "EnsureBucket failed")
 	}
 
 	// Set bucket condition to reconciled and do a final patch

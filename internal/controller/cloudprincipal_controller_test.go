@@ -188,7 +188,7 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 
 		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
 
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).To(MatchError("ensure failed"))
 		Expect(result).To(Equal(reconcile.Result{}))
 
 		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))

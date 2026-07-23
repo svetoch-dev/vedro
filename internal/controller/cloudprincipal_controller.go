@@ -179,7 +179,6 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	result, err := provider.Principal().EnsurePrincipal(ctx, principal.CloudPrincipal)
 
 	if err != nil {
-		logger.Error(err, "EnsurePrincipal failed")
 		principal.Condition.Status = metav1.ConditionFalse
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalEnsureError
 		principal.Condition.Message = err.Error()
@@ -189,7 +188,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")
 		}
-		return Reconciled()
+		return ReconcileError(ctx, err, "EnsurePrincipal failed")
 	}
 
 	// Set principal condition to reconciled and do a final patch

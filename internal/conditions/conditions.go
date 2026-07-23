@@ -58,5 +58,7 @@ const (
 	ReasonBucketAccessDependencyNotReady      = "BucketAccessDependencyNotReady"
 	ReasonBucketAccessProviderConfigMissMatch = "BucketAccessProviderConfigMissMatch"
 	ReasonBucketAccessDeleteError             = "BucketAccessDeleteError"
+	ReasonBucketAccessUnsupportedFeatures     = "BucketAccessUnsupportedFeatures"
+	ReasonBucketAccessEnsureError             = "BucketAccessEnsureError"
 	ReasonBucketAccessReconciled              = "Reconciled"
 )

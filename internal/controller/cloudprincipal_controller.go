@@ -102,9 +102,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if issue != nil {
-		principal.Condition.Status = providerConfig.Condition.Status
-		principal.Condition.Reason = providerConfig.Condition.Reason
-		principal.Condition.Message = providerConfig.Condition.Message
+		copyConditionState(&principal.Condition, providerConfig.Condition)
 		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)

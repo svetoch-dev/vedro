@@ -103,9 +103,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if issue != nil {
-		bucket.Condition.Status = providerConfig.Condition.Status
-		bucket.Condition.Reason = providerConfig.Condition.Reason
-		bucket.Condition.Message = providerConfig.Condition.Message
+		copyConditionState(&bucket.Condition, providerConfig.Condition)
 		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(p *vedro.Bucket) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)

@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
+	"github.com/svetoch-dev/vedro/internal/cloud/registry"
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	"github.com/svetoch-dev/vedro/internal/resolvers"
 )
@@ -93,11 +95,10 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Name:      bucketAccess.Spec.BucketRef.Name,
 	})
 	bucket.Condition.ObservedGeneration = bucketAccess.Generation
+	bucket.Condition.Type = conditions.TypeBucketReady
 
 	if !bucket.IsOk() {
-		bucketAccess.Condition.Status = bucket.Condition.Status
-		bucketAccess.Condition.Reason = bucket.Condition.Reason
-		bucketAccess.Condition.Message = bucket.Condition.Message
+		copyConditionState(&bucketAccess.Condition, bucket.Condition)
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
@@ -113,6 +114,20 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	notReadyCondition, ok := bucket.IsReady()
+
+	if !ok {
+		logger.Info("Bucket is not Ready")
+		copyConditionState(&bucket.Condition, *notReadyCondition)
+		bucketAccess.Condition.Status = metav1.ConditionFalse
+		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessDependencyNotReady
+		bucketAccess.Condition.Message = "Bucket is not Ready"
+	} else {
+		bucket.Condition.Status = metav1.ConditionTrue
+		bucket.Condition.Reason = conditions.ReasonBucketReady
+		bucket.Condition.Message = "Bucket Ready"
+	}
+
 	principal := resolvers.CloudPrincipalResolver{
 		KubeClient: r.Client,
 		Logger:     logger,
@@ -123,11 +138,10 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Name:      bucketAccess.Spec.PrincipalRef.Name,
 	})
 	principal.Condition.ObservedGeneration = bucketAccess.Generation
+	principal.Condition.Type = conditions.TypeCloudPrincipalReady
 
 	if !principal.IsOk() {
-		bucketAccess.Condition.Status = principal.Condition.Status
-		bucketAccess.Condition.Reason = principal.Condition.Reason
-		bucketAccess.Condition.Message = principal.Condition.Message
+		copyConditionState(&bucketAccess.Condition, principal.Condition)
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
@@ -144,6 +158,125 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	notReadyCondition, ok = principal.IsReady()
+
+	if !ok {
+		logger.Info("Principal is not Ready")
+		copyConditionState(&principal.Condition, *notReadyCondition)
+		bucketAccess.Condition.Status = metav1.ConditionFalse
+		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessDependencyNotReady
+		bucketAccess.Condition.Message = "CloudPrincipal is not Ready"
+	} else {
+		principal.Condition.Status = metav1.ConditionTrue
+		principal.Condition.Reason = conditions.ReasonCloudPrincipalReady
+		principal.Condition.Message = "CloudPrincipal Ready"
+	}
+
+	if principal.Condition.Status == metav1.ConditionFalse || bucket.Condition.Status == metav1.ConditionFalse {
+		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
+	if principal.Spec.ProviderRef != bucket.Spec.ProviderRef {
+		logger.Info("CloudPrincipal and Bucket reference different ProviderConfig")
+		bucketAccess.Condition.Status = metav1.ConditionFalse
+		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessProviderConfigMissMatch
+		bucketAccess.Condition.Message = "CloudPrincipal and Bucket reference different ProviderConfig"
+		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
+	providerFactory := r.ProviderFactory
+	if providerFactory == nil {
+		providerFactory = registry.NewProvider
+	}
+
+	providerSetup, issue := prepareProvider(ctx, bucket.Spec.ProviderRef, r.Client, providerFactory)
+
+	provider := providerSetup.Provider
+	providerConfig := providerSetup.Config
+	providerConfig.Condition.ObservedGeneration = bucket.Generation
+
+	if provider != nil {
+		defer func() {
+			if err := provider.Cleanup(ctx); err != nil {
+				logger.Error(err, "provider cleanup failed")
+			}
+		}()
+	}
+
+	if issue != nil {
+		copyConditionState(&bucket.Condition, providerConfig.Condition)
+		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		switch issue.Kind {
+		case ProviderResolveFailed:
+			return ReconcileIgnoreNotFound(
+				ctx,
+				issue.Error,
+				"unable to fetch ProviderConfig",
+			)
+
+		case ProviderSettingFailed:
+			return ReconcileError(ctx, issue.Error, "Error in setting NewProvider")
+
+		case ProviderConfigInvalid:
+			return Reconciled()
+		}
+	}
+
+	if !bucketAccess.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&bucketAccess.BucketAccess, bucketAccessFinalizer) {
+			logger.Info("BucketAccess is being deleted, but finalizer is not set; skipping deletion handling")
+			return Reconciled()
+		}
+
+		logger.Info("deleting BucketAccess")
+		err := provider.Access().DeleteBucketAccess(ctx, bucketAccess.BucketAccess)
+		if err != nil {
+			bucketAccess.Condition.Status = metav1.ConditionFalse
+			bucketAccess.Condition.Reason = conditions.ReasonBucketAccessDeleteError
+			bucketAccess.Condition.Message = err.Error()
+
+			patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+				meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+				meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+				meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+				meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+			})
+			if patchErr != nil {
+				return ReconcileError(ctx, patchErr, "patch error")
+			}
+			return ReconcileErrorRAfter(ctx, err, time.Second*10, "unable to delete external BucketAccess")
+		}
+		controllerutil.RemoveFinalizer(&bucketAccess.BucketAccess, bucketAccessFinalizer)
+		if err := r.Update(ctx, &bucketAccess.BucketAccess); err != nil {
+			return ReconcileError(ctx, err, "remove finalizer error")
+		}
+		return Reconciled()
+	}
+
 	// Set bucketAccess condition to reconciled and do a final patch
 	bucketAccess.Condition.Status = metav1.ConditionTrue
 	bucketAccess.Condition.Reason = conditions.ReasonBucketAccessReconciled
@@ -152,6 +285,7 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
 		meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+		meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
 	})
 	if patchErr != nil {
 		return ReconcileError(ctx, patchErr, "patch error")

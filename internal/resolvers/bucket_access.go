@@ -26,6 +26,10 @@ func (o *BucketAccessResolver) IsOk() bool {
 	return o.Error == nil
 }
 
+func (o *BucketAccessResolver) IsReady() (*metav1.Condition, bool) {
+	return isReady(o.Status.Conditions)
+}
+
 func (o *BucketAccessResolver) Resolve(
 	ctx context.Context,
 	name types.NamespacedName,

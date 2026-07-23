@@ -26,6 +26,10 @@ func (o *CloudPrincipalResolver) IsOk() bool {
 	return o.Error == nil
 }
 
+func (o *CloudPrincipalResolver) IsReady() (*metav1.Condition, bool) {
+	return isReady(o.Status.Conditions)
+}
+
 func (o *CloudPrincipalResolver) Resolve(
 	ctx context.Context,
 	name types.NamespacedName,

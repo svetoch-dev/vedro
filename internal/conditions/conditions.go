@@ -2,11 +2,19 @@ package conditions
 
 // Condition types used across Vedro resources.
 const (
-	// TypeReady is the standard Ready condition type for Bucket resources.
+	// TypeReady indicates whether a resource has been successfully reconciled
+	// and is ready for use.
 	TypeReady = "Ready"
 
-	// TypeProviderConfigReady is the Ready condition type for ProviderConfig resources.
+	// TypeProviderConfigReady indicates whether the referenced ProviderConfig
+	// is ready for use.
 	TypeProviderConfigReady = "ProviderConfigReady"
+
+	// TypeBucketReady indicates whether a Bucket dependency is ready for use.
+	TypeBucketReady = "BucketReady"
+
+	// TypeCloudPrincipalReady indicates whether a CloudPrincipal dependency is ready for use.
+	TypeCloudPrincipalReady = "CloudPrincipalReady"
 )
 
 // Condition reasons for Bucket resources.
@@ -18,6 +26,7 @@ const (
 	ReasonBucketEnsureError         = "BucketEnsureError"
 	ReasonBucketReconciled          = "Reconciled"
 	ReasonBucketDeleteError         = "BucketDeleteError"
+	ReasonBucketReady               = "BucketReady"
 )
 
 // Condition reasons for CloudPrincipal resources.
@@ -28,6 +37,7 @@ const (
 	ReasonCloudPrincipalDeleteError = "CloudPrincipalDeleteError"
 	ReasonCloudPrincipalEnsureError = "CloudPrincipalEnsureError"
 	ReasonCloudPrincipalReconciled  = "Reconciled"
+	ReasonCloudPrincipalReady       = "CloudPrincipalReady"
 )
 
 // Condition reasons for ProviderConfig resources.
@@ -38,11 +48,15 @@ const (
 	ReasonProviderConfigInvalidSpec = "ProviderConfigInvalidSpec"
 	ReasonProviderConfigReconciled  = "Reconciled"
 	ReasonProviderConfigSet         = "ProviderConfigSet"
+	ReasonProviderConfigReady       = "ProviderConfigReady"
 )
 
 // Condition reasons for BucketAccess resources.
 const (
-	ReasonBucketAccessNotFound   = "BucketAccessNotFound"
-	ReasonBucketAccessGetFailed  = "BucketAccessGetFailed"
-	ReasonBucketAccessReconciled = "Reconciled"
+	ReasonBucketAccessNotFound                = "BucketAccessNotFound"
+	ReasonBucketAccessGetFailed               = "BucketAccessGetFailed"
+	ReasonBucketAccessDependencyNotReady      = "BucketAccessDependencyNotReady"
+	ReasonBucketAccessProviderConfigMissMatch = "BucketAccessProviderConfigMissMatch"
+	ReasonBucketAccessDeleteError             = "BucketAccessDeleteError"
+	ReasonBucketAccessReconciled              = "Reconciled"
 )

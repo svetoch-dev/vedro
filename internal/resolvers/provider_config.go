@@ -12,11 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ResourceResolver interface {
-	Resolve(ctx context.Context, name types.NamespacedName)
-	IsOk() bool
-}
-
 // ProviderConfig
 type ProviderConfigResolver struct {
 	vedro.ProviderConfig
@@ -30,6 +25,10 @@ type ProviderConfigResolver struct {
 
 func (o *ProviderConfigResolver) IsOk() bool {
 	return o.Error == nil
+}
+
+func (o *ProviderConfigResolver) IsReady() (*metav1.Condition, bool) {
+	return nil, true
 }
 
 func (o *ProviderConfigResolver) Resolve(

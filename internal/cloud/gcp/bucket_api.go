@@ -223,6 +223,7 @@ func fromGCSBucketAttrs(attrs storage.BucketAttrs) (*cloud.BucketAttrs, error) {
 
 	return &cloud.BucketAttrs{
 		Name:     attrs.Name,
+		Id:       attrs.Name,
 		Location: attrs.Location,
 		Properties: &vedro.BucketProperties{
 			PublicAccessPrevention: pap,
@@ -334,16 +335,17 @@ func (a *gcsAPI) GetBucket(
 	return fromGCSBucketAttrs(*gcsAttrs)
 }
 
-func (a *gcsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
+func (a *gcsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) (*cloud.BucketAttrs, error) {
+	attrs.Id = attrs.Name
 	createAttrs, err := toGCSBucketAttrs(attrs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := a.client.Bucket(name).Create(ctx, a.projectID, createAttrs); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return &attrs, nil
 }
 
 func (a *gcsAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {

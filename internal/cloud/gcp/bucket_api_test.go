@@ -553,6 +553,7 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(result).NotTo(BeNil())
 		Expect(result.Name).To(Equal("my-bucket"))
+		Expect(result.Id).To(Equal("my-bucket"))
 		Expect(result.Location).To(Equal("EUROPE-WEST1"))
 		Expect(result.Properties).NotTo(BeNil())
 

@@ -67,14 +67,17 @@ type DeletedObject struct {
 }
 
 type FakeBucketAPI struct {
-	Attrs     *cloud.BucketAttrs
-	AttrsErr  error
-	CreateErr error
-	UpdateErr error
-	DeleteErr error
-	CloseErr  error
-	Created   *cloud.BucketAttrs
-	Updated   *cloud.BucketPatch
+	Attrs              *cloud.BucketAttrs
+	AttrsErr           error
+	CreateErr          error
+	UpdateErr          error
+	DeleteErr          error
+	CloseErr           error
+	Created            *cloud.BucketAttrs
+	Updated            *cloud.BucketPatch
+	HasAccessInputs    []cloud.BucketAccessAttrs
+	GrantAccessInputs  []cloud.BucketAccessAttrs
+	RevokeAccessInputs []cloud.BucketAccessAttrs
 
 	Deleted              bool
 	CloseCalled          bool
@@ -151,19 +154,20 @@ func (f *FakeBucketAPI) CreateBucket(
 	ctx context.Context,
 	_ string,
 	attrs cloud.BucketAttrs,
-) error {
+) (*cloud.BucketAttrs, error) {
 	f.Created = &attrs
 	if f.CreateErr != nil {
-		return f.CreateErr
+		return nil, f.CreateErr
 	}
 	f.Attrs = &attrs
-	return nil
+	return &attrs, nil
 }
 
 func (f *FakeBucketAPI) HasAccess(
 	ctx context.Context,
 	access cloud.BucketAccessAttrs,
 ) (bool, error) {
+	f.HasAccessInputs = append(f.HasAccessInputs, access)
 	return false, nil
 }
 
@@ -171,6 +175,7 @@ func (f *FakeBucketAPI) GrantAccess(
 	ctx context.Context,
 	access cloud.BucketAccessAttrs,
 ) error {
+	f.GrantAccessInputs = append(f.GrantAccessInputs, access)
 	return nil
 }
 
@@ -178,6 +183,7 @@ func (f *FakeBucketAPI) RevokeAccess(
 	ctx context.Context,
 	access cloud.BucketAccessAttrs,
 ) error {
+	f.RevokeAccessInputs = append(f.RevokeAccessInputs, access)
 	return nil
 }
 

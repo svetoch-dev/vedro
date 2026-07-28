@@ -234,6 +234,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 		b.Status.ExternalName = result.Name
+		b.Status.ExternalId = result.Id
 		b.Status.Location = result.Location
 		b.Status.Applied = result.Properties
 		b.Status.ObservedProvider = bucket.Spec.ProviderRef.Name

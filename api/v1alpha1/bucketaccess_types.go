@@ -45,6 +45,10 @@ type BucketAccessProperties struct {
 	// BucketName name of the bucket to which access is granted
 	//
 	BucketName string `json:"bucketName"`
+	// BucketId id of the bucket to which access is granted. Can
+	// be the equal to BucketName
+	//
+	BucketId string `json:"bucketId"`
 	// PrincipalId id of the cloud principal that access is granted too
 	//
 	PrincipalId string `json:"principalId"`

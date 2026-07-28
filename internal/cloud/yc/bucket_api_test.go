@@ -388,6 +388,18 @@ var _ = Describe("fromYcBucket", func() {
 		Entry("ice", "ICE", vedro.BucketStorageClassIce),
 		Entry("glacier", "GLACIER", vedro.BucketStorageClassIce),
 	)
+	It("maps the YC resource ID separately from the bucket name", func() {
+		result, err := fromYcBucket(&storageapi.Bucket{
+			Name:                "my-bucket",
+			ResourceId:          "e3r-resource-id",
+			DefaultStorageClass: "STANDARD",
+		}, "ru-central1")
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.Name).To(Equal("my-bucket"))
+		Expect(result.Id).To(Equal("e3r-resource-id"))
+	})
+
 })
 
 var _ = Describe("toCreateBucketRequest", func() {

@@ -108,6 +108,11 @@ spec:
               applied:
                 description: Applied - what has been already applied by this controller
                 properties:
+                  bucketId:
+                    description: |-
+                      BucketId id of the bucket to which access is granted. Can
+                      be the equal to BucketName
+                    type: string
                   bucketName:
                     description: BucketName name of the bucket to which access is
                       granted
@@ -121,6 +126,7 @@ spec:
                       is granted too
                     type: string
                 required:
+                - bucketId
                 - bucketName
                 - grantedAccess
                 - principalId

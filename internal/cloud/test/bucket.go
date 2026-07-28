@@ -144,6 +144,7 @@ func BucketProviderTests(cfg Config) bool {
 			fake.Attrs = newBucketAttrs(
 				"my-bucket", cfg.NormalizedLocation, vedro.BucketStorageClassStandard,
 			)
+			fake.Attrs.Id = "external-bucket-id"
 
 			bckt := newBucketCR(func(b *vedro.Bucket) {
 				b.Spec.StorageClass = vedro.BucketStorageClassStandard
@@ -153,6 +154,7 @@ func BucketProviderTests(cfg Config) bool {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fake.Updated).To(BeNil())
 			Expect(attrs.Name).To(Equal("my-bucket"))
+			Expect(attrs.Id).To(Equal("external-bucket-id"))
 			Expect(attrs.Location).To(Equal(cfg.NormalizedLocation))
 		})
 

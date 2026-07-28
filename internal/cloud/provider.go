@@ -61,6 +61,7 @@ type BucketAccessCapabilities struct {
 type BucketAttrs struct {
 	Name     string
 	Location string
+	Id       string
 
 	Properties *vedro.BucketProperties
 }
@@ -102,7 +103,7 @@ func (p BucketPatch) HasChanges() bool {
 
 type BucketAPI interface {
 	GetBucket(ctx context.Context, name string) (*BucketAttrs, error)
-	CreateBucket(ctx context.Context, name string, attrs BucketAttrs) error
+	CreateBucket(ctx context.Context, name string, attrs BucketAttrs) (*BucketAttrs, error)
 	UpdateBucket(ctx context.Context, name string, patch BucketPatch) (*BucketAttrs, error)
 
 	ProcessObjects(

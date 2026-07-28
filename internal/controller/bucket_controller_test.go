@@ -63,6 +63,7 @@ var _ = Describe("BucketReconciler", func() {
 				validateResult: validation.Valid(),
 				ensureResult: &cloud.BucketAttrs{
 					Name:     "external-bucket",
+					Id:       "external-bucket-id",
 					Location: "europe-west1",
 					Properties: &vedro.BucketProperties{
 						StorageClass: vedro.BucketStorageClassStandard,
@@ -231,6 +232,7 @@ var _ = Describe("BucketReconciler", func() {
 
 		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
 		Expect(fetched.Status.ExternalName).To(Equal("external-bucket"))
+		Expect(fetched.Status.ExternalId).To(Equal("external-bucket-id"))
 		Expect(fetched.Status.Location).To(Equal("europe-west1"))
 		Expect(fetched.Status.ObservedProvider).To(Equal("test-provider"))
 		Expect(fetched.Status.Applied).NotTo(BeNil())

@@ -26,6 +26,7 @@ func (b *BucketAccess) EnsureBucketAccess(
 
 	want := &cloud.BucketAccessAttrs{
 		BucketName:    bucket.Status.ExternalName,
+		BucketId:      bucket.Status.ExternalId,
 		PrincipalId:   principal.Status.ExternalId,
 		GrantedAccess: spec.Access.Level,
 	}

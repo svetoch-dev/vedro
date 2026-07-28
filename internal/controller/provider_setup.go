@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
@@ -38,7 +39,6 @@ type ProviderSetupIssue struct {
 }
 
 func prepareProvider(
-
 	ctx context.Context,
 	config vedro.ProviderConfigReference,
 	kubeClient client.Client,
@@ -89,7 +89,7 @@ func prepareProvider(
 		providerSetup.Config.Condition.Message = validationResultCfg.Message
 		issue := ProviderSetupIssue{
 			Kind:  ProviderConfigInvalid,
-			Error: nil,
+			Error: errors.New("ProviderConfig has invalid spec"),
 		}
 		return providerSetup, &issue
 	}

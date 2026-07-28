@@ -15,6 +15,8 @@ import (
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -328,7 +330,7 @@ func (a *gcsAPI) GetBucket(
 ) (*cloud.BucketAttrs, error) {
 	gcsAttrs, err := a.client.Bucket(name).Attrs(ctx)
 
-	if errors.Is(err, storage.ErrBucketNotExist) {
+	if isGoogleAPINotFound(err) {
 		return nil, cloud.ErrBucketNotFound
 	}
 	if err != nil {
@@ -441,7 +443,7 @@ func (g *gcsAPI) HasAccess(
 
 	policy, err := iam.Policy(ctx)
 	if err != nil {
-		if errors.Is(err, storage.ErrBucketNotExist) {
+		if isGoogleAPINotFound(err) {
 			return false, cloud.ErrBucketNotFound
 		}
 		return false, fmt.Errorf("get IAM policy: %w", err)
@@ -471,7 +473,7 @@ func (g *gcsAPI) GrantAccess(
 
 	policy, err := iam.Policy(ctx)
 	if err != nil {
-		if errors.Is(err, storage.ErrBucketNotExist) {
+		if isGoogleAPINotFound(err) {
 			return cloud.ErrBucketNotFound
 		}
 		return fmt.Errorf("get IAM policy: %w", err)
@@ -483,7 +485,9 @@ func (g *gcsAPI) GrantAccess(
 	}
 	policy.Add(access.PrincipalId, siam.RoleName(role))
 
-	if err := iam.SetPolicy(ctx, policy); err != nil {
+	if err := iam.SetPolicy(ctx, policy); isGoogleAPINotFound(err) {
+		return cloud.ErrBucketNotFound
+	} else if err != nil {
 		return fmt.Errorf("set IAM policy: %w", err)
 	}
 
@@ -499,7 +503,7 @@ func (g *gcsAPI) RevokeAccess(
 
 	policy, err := iam.Policy(ctx)
 	if err != nil {
-		if errors.Is(err, storage.ErrBucketNotExist) {
+		if isGoogleAPINotFound(err) {
 			return cloud.ErrBucketNotFound
 		}
 		return fmt.Errorf("get IAM policy: %w", err)
@@ -510,7 +514,9 @@ func (g *gcsAPI) RevokeAccess(
 	}
 	policy.Remove(access.PrincipalId, siam.RoleName(role))
 
-	if err := iam.SetPolicy(ctx, policy); err != nil {
+	if err := iam.SetPolicy(ctx, policy); isGoogleAPINotFound(err) {
+		return cloud.ErrBucketNotFound
+	} else if err != nil {
 		return fmt.Errorf("set IAM policy: %w", err)
 	}
 	return nil
@@ -524,6 +530,14 @@ func (a *gcsAPI) Close(ctx context.Context) error {
 }
 
 func isGoogleAPINotFound(err error) bool {
+	if errors.Is(err, storage.ErrBucketNotExist) {
+		return true
+	}
+
 	var gErr *googleapi.Error
-	return errors.As(err, &gErr) && gErr.Code == 404
+	if errors.As(err, &gErr) && gErr.Code == 404 {
+		return true
+	}
+
+	return status.Code(err) == codes.NotFound
 }

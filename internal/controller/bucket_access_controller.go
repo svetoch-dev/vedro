@@ -283,7 +283,6 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		bucketAccess.Condition.Message = err.Error()
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 			p.Status.UnsupportedFeatures = bucketAccess.Status.UnsupportedFeatures
-			p.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
 			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
@@ -301,6 +300,7 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	bucketAccess.Condition.Message = "BucketAccess Reconciled"
 	patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 		p.Status.UnsupportedFeatures = bucketAccess.Status.UnsupportedFeatures
+		p.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
 		p.Status.Applied = (*vedro.BucketAccessProperties)(result)
 		meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
 		meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
@@ -337,7 +337,11 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 		}
 
 		providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
+
 		if issue != nil {
+			if issue.Kind == ProviderConfigInvalid {
+				providerSetup.Provider.Cleanup(ctx)
+			}
 			return ReconcileErrorRAfter(
 				ctx,
 				issue.Error,
@@ -347,7 +351,6 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 		}
 
 		provider := providerSetup.Provider
-
 		defer provider.Cleanup(ctx)
 
 		err := provider.Access().DeleteBucketAccess(ctx, access.BucketAccess)

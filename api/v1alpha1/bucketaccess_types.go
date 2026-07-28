@@ -41,6 +41,18 @@ type Access struct {
 	Level BucketAccessLevel `json:"level"`
 }
 
+type BucketAccessProperties struct {
+	// BucketName name of the bucket to which access is granted
+	//
+	BucketName string `json:"bucketName"`
+	// PrincipalId id of the cloud principal that access is granted too
+	//
+	PrincipalId string `json:"principalId"`
+	// GrantedAccess cloud specific access name that is granted
+	//
+	GrantedAccess BucketAccessLevel `json:"grantedAccess"`
+}
+
 type BucketAccessSpec struct {
 	// BucketRef references the Bucket to which access is granted.
 	//
@@ -54,18 +66,10 @@ type BucketAccessSpec struct {
 
 // ProviderConfigStatus defines the observed provider configuration state.
 type BucketAccessStatus struct {
-	// BucketName name of the bucket to which access is granted
+	// Applied - what has been already applied by this controller
 	//
 	// +optional
-	BucketName string `json:"bucketName,omitempty"`
-	// PrincipalId id of the cloud principal that access is granted too
-	//
-	// +optional
-	PrincipalId string `json:"principalId,omitempty"`
-	// GrantedAccess cloud specific access name that is granted
-	//
-	// +optional
-	GrantedAccess string `json:"grantedAccess,omitempty"`
+	Applied *BucketAccessProperties `json:"applied,omitempty"`
 	// ObservedGeneration is the latest metadata.generation observed by the controller.
 	//
 	// +optional
@@ -74,6 +78,10 @@ type BucketAccessStatus struct {
 	//
 	// +optional
 	UnsupportedFeatures []UnsupportedFeature `json:"unsupported,omitempty"`
+	// Provider used for this BucketAccess
+	//
+	// +optional
+	ObservedProvider string `json:"observedProvider,omitempty"`
 	// Conditions represent the latest available observations of the BucketAccess state.
 	//
 	// +optional

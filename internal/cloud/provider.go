@@ -65,11 +65,7 @@ type BucketAttrs struct {
 	Properties *vedro.BucketProperties
 }
 
-type BucketAccessAttrs struct {
-	GrantedAccess string
-	BucketName    string
-	PrincipalId   string
-}
+type BucketAccessAttrs vedro.BucketAccessProperties
 
 type PrincipalAttrs struct {
 	Name string
@@ -123,16 +119,17 @@ type BucketAPI interface {
 
 	GrantAccess(
 		ctx context.Context,
-		bucket string,
-		principalId string,
-		access vedro.BucketAccessLevel,
+		access BucketAccessAttrs,
 	) error
+
+	HasAccess(
+		ctx context.Context,
+		access BucketAccessAttrs,
+	) (bool, error)
 
 	RevokeAccess(
 		ctx context.Context,
-		bucket string,
-		principalId string,
-		access vedro.BucketAccessLevel,
+		access BucketAccessAttrs,
 	) error
 
 	DeleteBucket(ctx context.Context, name string) error

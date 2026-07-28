@@ -416,20 +416,23 @@ func (y *ycsAPI) DeleteBucket(ctx context.Context, name string) error {
 	return nil
 }
 
+func (y *ycsAPI) HasAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) (bool, error) {
+	return false, nil
+}
+
 func (y *ycsAPI) GrantAccess(
 	ctx context.Context,
-	bucket string,
-	principalId string,
-	access vedro.BucketAccessLevel,
+	access cloud.BucketAccessAttrs,
 ) error {
 	return nil
 }
 
 func (y *ycsAPI) RevokeAccess(
 	ctx context.Context,
-	bucket string,
-	principalId string,
-	access vedro.BucketAccessLevel,
+	access cloud.BucketAccessAttrs,
 ) error {
 	return nil
 }

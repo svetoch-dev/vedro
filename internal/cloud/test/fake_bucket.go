@@ -160,20 +160,23 @@ func (f *FakeBucketAPI) CreateBucket(
 	return nil
 }
 
+func (f *FakeBucketAPI) HasAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) (bool, error) {
+	return false, nil
+}
+
 func (f *FakeBucketAPI) GrantAccess(
 	ctx context.Context,
-	bucket string,
-	principalId string,
-	access vedro.BucketAccessLevel,
+	access cloud.BucketAccessAttrs,
 ) error {
 	return nil
 }
 
 func (f *FakeBucketAPI) RevokeAccess(
 	ctx context.Context,
-	bucket string,
-	principalId string,
-	access vedro.BucketAccessLevel,
+	access cloud.BucketAccessAttrs,
 ) error {
 	return nil
 }

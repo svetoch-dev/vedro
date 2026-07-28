@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	siam "cloud.google.com/go/iam"
 	"cloud.google.com/go/storage"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
@@ -19,6 +20,18 @@ import (
 )
 
 var (
+	gcsAccessMapping = map[string]vedro.BucketAccessLevel{
+		"roles/storage.objectViewer":  vedro.ObjectReader,
+		"roles/storage.objectCreator": vedro.ObjectWriter,
+		"roles/storage.objectAdmin":   vedro.ObjectAdmin,
+		"roles/storage.admin":         vedro.BucketAdmin,
+	}
+	accessLevelMapping = map[vedro.BucketAccessLevel]string{
+		vedro.ObjectReader: "roles/storage.objectViewer",
+		vedro.ObjectWriter: "roles/storage.objectCreator",
+		vedro.ObjectAdmin:  "roles/storage.objectAdmin",
+		vedro.BucketAdmin:  "roles/storage.admin",
+	}
 	gcsStorageClassMapping = map[string]vedro.BucketStorageClass{
 		"STANDARD": vedro.BucketStorageClassStandard,
 		"NEARLINE": vedro.BucketStorageClassWarm,
@@ -420,21 +433,86 @@ func (a *gcsAPI) DeleteBucket(ctx context.Context, name string) error {
 	return err
 }
 
+func (g *gcsAPI) HasAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) (bool, error) {
+	iam := g.client.Bucket(access.BucketName).IAM()
+
+	policy, err := iam.Policy(ctx)
+	if err != nil {
+		if errors.Is(err, storage.ErrBucketNotExist) {
+			return false, cloud.ErrBucketNotFound
+		}
+		return false, fmt.Errorf("get IAM policy: %w", err)
+	}
+
+	role, ok := accessLevelMapping[access.GrantedAccess]
+
+	if !ok {
+		return false, fmt.Errorf("Access level does not map to any gcp role")
+	}
+
+	for _, existingMember := range policy.Members(siam.RoleName(role)) {
+		if existingMember == access.PrincipalId {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (g *gcsAPI) GrantAccess(
 	ctx context.Context,
-	bucket string,
-	principalId string,
-	access vedro.BucketAccessLevel,
+	access cloud.BucketAccessAttrs,
 ) error {
+	log.FromContext(ctx).Info("Granting access")
+	iam := g.client.Bucket(access.BucketName).IAM()
+
+	policy, err := iam.Policy(ctx)
+	if err != nil {
+		if errors.Is(err, storage.ErrBucketNotExist) {
+			return cloud.ErrBucketNotFound
+		}
+		return fmt.Errorf("get IAM policy: %w", err)
+	}
+
+	role, ok := accessLevelMapping[access.GrantedAccess]
+	if !ok {
+		return fmt.Errorf("Access level does not map to any gcp role")
+	}
+	policy.Add(access.PrincipalId, siam.RoleName(role))
+
+	if err := iam.SetPolicy(ctx, policy); err != nil {
+		return fmt.Errorf("set IAM policy: %w", err)
+	}
+
 	return nil
 }
 
 func (g *gcsAPI) RevokeAccess(
 	ctx context.Context,
-	bucket string,
-	principalId string,
-	access vedro.BucketAccessLevel,
+	access cloud.BucketAccessAttrs,
 ) error {
+	log.FromContext(ctx).Info("Revoking access")
+	iam := g.client.Bucket(access.BucketName).IAM()
+
+	policy, err := iam.Policy(ctx)
+	if err != nil {
+		if errors.Is(err, storage.ErrBucketNotExist) {
+			return cloud.ErrBucketNotFound
+		}
+		return fmt.Errorf("get IAM policy: %w", err)
+	}
+	role, ok := accessLevelMapping[access.GrantedAccess]
+	if !ok {
+		return fmt.Errorf("Access level does not map to any gcp role")
+	}
+	policy.Remove(access.PrincipalId, siam.RoleName(role))
+
+	if err := iam.SetPolicy(ctx, policy); err != nil {
+		return fmt.Errorf("set IAM policy: %w", err)
+	}
 	return nil
 }
 

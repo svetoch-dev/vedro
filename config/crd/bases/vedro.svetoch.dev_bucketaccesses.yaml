@@ -105,9 +105,26 @@ spec:
             description: ProviderConfigStatus defines the observed provider configuration
               state.
             properties:
-              bucketName:
-                description: BucketName name of the bucket to which access is granted
-                type: string
+              applied:
+                description: Applied - what has been already applied by this controller
+                properties:
+                  bucketName:
+                    description: BucketName name of the bucket to which access is
+                      granted
+                    type: string
+                  grantedAccess:
+                    description: GrantedAccess cloud specific access name that is
+                      granted
+                    type: string
+                  principalId:
+                    description: PrincipalId id of the cloud principal that access
+                      is granted too
+                    type: string
+                required:
+                - bucketName
+                - grantedAccess
+                - principalId
+                type: object
               conditions:
                 description: Conditions represent the latest available observations
                   of the BucketAccess state.
@@ -166,17 +183,13 @@ spec:
                   - type
                   type: object
                 type: array
-              grantedAccess:
-                description: GrantedAccess cloud specific access name that is granted
-                type: string
               observedGeneration:
                 description: ObservedGeneration is the latest metadata.generation
                   observed by the controller.
                 format: int64
                 type: integer
-              principalId:
-                description: PrincipalId id of the cloud principal that access is
-                  granted too
+              observedProvider:
+                description: Provider used for this BucketAccess
                 type: string
               unsupported:
                 description: List of unsupported features set on BucketAccess resource

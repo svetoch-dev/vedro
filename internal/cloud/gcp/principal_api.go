@@ -43,7 +43,7 @@ func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, name string) (*cloud
 
 	return &cloud.PrincipalAttrs{
 		Name: name,
-		Id:   account.Name,
+		Id:   account.Email,
 	}, nil
 }
 
@@ -66,7 +66,7 @@ func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, name string) (*cl
 
 	return &cloud.PrincipalAttrs{
 		Name: name,
-		Id:   account.Name,
+		Id:   account.Email,
 	}, nil
 }
 

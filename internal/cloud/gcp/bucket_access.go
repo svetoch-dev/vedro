@@ -34,7 +34,7 @@ func (b *BucketAccess) EnsureBucketAccess(
 		gotAttrs := cloud.BucketAccessAttrs(*got)
 		hasAccess, err := b.api.HasAccess(ctx, gotAttrs)
 
-		if err != nil {
+		if err != nil && !errors.Is(err, cloud.ErrBucketNotFound) {
 			return nil, fmt.Errorf("Has access check failed: %w", err)
 		}
 

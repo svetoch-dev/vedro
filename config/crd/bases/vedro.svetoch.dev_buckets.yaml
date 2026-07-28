@@ -346,6 +346,11 @@ spec:
                   - type
                   type: object
                 type: array
+              externalId:
+                description: |-
+                  ExternalId is the provider-side immutable resource identifier.
+                  It may differ from ExternalName.
+                type: string
               externalName:
                 description: ExternalName is the provider-side bucket name.
                 type: string

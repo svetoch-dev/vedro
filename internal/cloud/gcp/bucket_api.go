@@ -22,12 +22,6 @@ import (
 )
 
 var (
-	gcsAccessMapping = map[string]vedro.BucketAccessLevel{
-		"roles/storage.objectViewer":  vedro.ObjectReader,
-		"roles/storage.objectCreator": vedro.ObjectWriter,
-		"roles/storage.objectAdmin":   vedro.ObjectAdmin,
-		"roles/storage.admin":         vedro.BucketAdmin,
-	}
 	accessLevelMapping = map[vedro.BucketAccessLevel]string{
 		vedro.ObjectReader: "roles/storage.objectViewer",
 		vedro.ObjectWriter: "roles/storage.objectCreator",

@@ -27,7 +27,7 @@ func (o *CloudPrincipalResolver) IsOk() bool {
 }
 
 func (o *CloudPrincipalResolver) IsReady() (*metav1.Condition, bool) {
-	return isReady(o.Status.Conditions)
+	return isReady(o.Generation, o.Status.Conditions)
 }
 
 func (o *CloudPrincipalResolver) Resolve(

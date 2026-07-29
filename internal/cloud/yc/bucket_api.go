@@ -454,9 +454,9 @@ func (y *ycsAPI) HasAccess(
 	}
 
 	if err := it.Error(); err != nil {
-		//if isNotFound(err) {
-		//	return false, cloud.ErrBucketNotFound
-		//}
+		if isNotFound(err) {
+			return false, cloud.ErrBucketNotFound
+		}
 		return false, fmt.Errorf(
 			"list access bindings for bucket %q: %w",
 			access.BucketName,

@@ -27,7 +27,7 @@ func (o *BucketResolver) IsOk() bool {
 }
 
 func (o *BucketResolver) IsReady() (*metav1.Condition, bool) {
-	return isReady(o.Status.Conditions)
+	return isReady(o.Generation, o.Status.Conditions)
 }
 
 func (o *BucketResolver) Resolve(

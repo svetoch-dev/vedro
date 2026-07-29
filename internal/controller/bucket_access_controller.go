@@ -178,7 +178,7 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		principal.Condition.Message = "CloudPrincipal Ready"
 	}
 
-	if principal.Condition.Status == metav1.ConditionFalse || bucket.Condition.Status == metav1.ConditionFalse {
+	if principal.Condition.Status != metav1.ConditionTrue || bucket.Condition.Status != metav1.ConditionTrue {
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)

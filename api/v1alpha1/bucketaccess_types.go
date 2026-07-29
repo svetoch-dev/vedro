@@ -60,8 +60,9 @@ type BucketAccessProperties struct {
 type BucketAccessSpec struct {
 	// BucketRef references the Bucket to which access is granted.
 	//
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="bucketRef is immutable"
 	BucketRef BucketReference `json:"bucketRef"`
-	// PrincipalRef references the CloudPrincipal to whic access is granted.
+	// PrincipalRef references the CloudPrincipal to which access is granted.
 	//
 	PrincipalRef PrincipalReference `json:"principalRef"`
 

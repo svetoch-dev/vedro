@@ -17,6 +17,13 @@ const (
 	TypeCloudPrincipalReady = "CloudPrincipalReady"
 )
 
+// Generic condition reasons
+
+const (
+	ReasonNoConditions        = "NoConditions"
+	ReasonGenerationMissmatch = "GenerationMissmatch"
+)
+
 // Condition reasons for Bucket resources.
 const (
 	ReasonBucketNotFound            = "BucketNotFound"

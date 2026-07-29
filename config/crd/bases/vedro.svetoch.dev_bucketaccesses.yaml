@@ -80,8 +80,11 @@ spec:
                 - name
                 - namespace
                 type: object
+                x-kubernetes-validations:
+                - message: bucketRef is immutable
+                  rule: self == oldSelf
               principalRef:
-                description: PrincipalRef references the CloudPrincipal to whic access
+                description: PrincipalRef references the CloudPrincipal to which access
                   is granted.
                 properties:
                   name:

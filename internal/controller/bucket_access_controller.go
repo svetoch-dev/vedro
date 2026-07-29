@@ -208,7 +208,7 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	provider := providerSetup.Provider
 	providerConfig := providerSetup.Config
-	providerConfig.Condition.ObservedGeneration = bucket.Generation
+	providerConfig.Condition.ObservedGeneration = bucketAccess.Generation
 
 	if provider != nil {
 		defer func() {
@@ -219,7 +219,7 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if issue != nil {
-		copyConditionState(&bucket.Condition, providerConfig.Condition)
+		copyConditionState(&bucketAccess.Condition, providerConfig.Condition)
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)

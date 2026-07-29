@@ -16,6 +16,7 @@ import (
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/conditions"
+	"github.com/svetoch-dev/vedro/internal/validation"
 )
 
 var _ = Describe("BucketAccessReconciler", func() {
@@ -257,6 +258,20 @@ var _ = Describe("BucketAccessReconciler", func() {
 		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(access))
 	})
 
+	It("removes the finalizer without calling the provider when access was not applied", func() {
+		access := createBucketAccess(ctx, "delete-unapplied", "bucket", "principal")
+		addBucketAccessFinalizer(ctx, access)
+		Expect(k8sClient.Delete(ctx, access)).To(Succeed())
+
+		result, err := reconcileBucketAccess(ctx, reconciler, access)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(bucketAccess.deleteCalls).To(BeZero())
+		Expect(provider.cleanupCalled).To(BeFalse())
+		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(access))
+	})
+
 	It("records deletion errors and keeps the finalizer", func() {
 		createProviderConfig(ctx)
 		access := createAppliedBucketAccess(ctx, "delete-error")
@@ -277,6 +292,32 @@ var _ = Describe("BucketAccessReconciler", func() {
 			metav1.ConditionFalse,
 			conditions.ReasonBucketAccessDeleteError,
 		)
+	})
+
+	It("cleans up an initialized provider when its config is invalid during deletion", func() {
+		createProviderConfig(ctx)
+		access := createAppliedBucketAccess(ctx, "delete-invalid-provider")
+		addBucketAccessFinalizer(ctx, access)
+		invalidProvider := &providerConfigValidationProvider{
+			fakeProvider: provider,
+			result:       validation.Invalid("invalid provider config"),
+		}
+		reconciler.ProviderFactory = func(
+			context.Context,
+			vedro.ProviderConfig,
+			client.Client,
+		) (cloud.Provider, error) {
+			return invalidProvider, nil
+		}
+		Expect(k8sClient.Delete(ctx, access)).To(Succeed())
+
+		_, err := reconcileBucketAccess(ctx, reconciler, access)
+
+		Expect(err).To(MatchError("ProviderConfig has invalid spec"))
+		Expect(bucketAccess.deleteCalls).To(BeZero())
+		Expect(provider.cleanupCalled).To(BeTrue())
+		fetched := getBucketAccess(ctx, client.ObjectKeyFromObject(access))
+		Expect(fetched.Finalizers).To(ContainElement(bucketAccessFinalizer))
 	})
 })
 

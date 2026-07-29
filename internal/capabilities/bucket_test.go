@@ -1,19 +1,14 @@
 package capabilities
 
 import (
-	// 	"reflect"
-
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	// 	"cloud.google.com/go/storage"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
-	// "github.com/svetoch-dev/vedro/internal/cloud"
-	// "github.com/svetoch-dev/vedro/internal/helpers"
 )
 
 var _ = Describe("ValidateBucketCapabilities", func() {

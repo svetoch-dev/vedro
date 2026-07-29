@@ -32,6 +32,11 @@ type Config struct {
 	// unexported fields.
 	NewBucket func(api cloud.BucketAPI) cloud.BucketProvider
 
+	// NewBucketAccess wires the provider's cloud.BucketAccessProvider to the supplied
+	// fake API. Implemented inside each provider's package so it can reach
+	// unexported fields.
+	NewBucketAccess func(api cloud.BucketAPI) cloud.BucketAccessProvider
+
 	// NewPrincipal wires the provider's cloud.PrincipalProvider to the supplied
 	// fake API. Implemented inside each provider's package so it can reach
 	// unexported fields.

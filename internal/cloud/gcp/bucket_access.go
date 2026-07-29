@@ -36,26 +36,26 @@ func (b *BucketAccess) EnsureBucketAccess(
 		hasAccess, err := b.api.HasAccess(ctx, gotAttrs)
 
 		if err != nil && !errors.Is(err, cloud.ErrBucketNotFound) {
-			return nil, fmt.Errorf("Has access check failed: %w", err)
+			return nil, fmt.Errorf("has access check failed: %w", err)
 		}
 
 		if hasAccess {
 			revokeErr := b.api.RevokeAccess(ctx, gotAttrs)
 			if revokeErr != nil {
-				return nil, fmt.Errorf("Revoke access from principal failed: %w", revokeErr)
+				return nil, fmt.Errorf("revoke access from principal failed: %w", revokeErr)
 			}
 		}
 	}
 
 	hasAccess, err := b.api.HasAccess(ctx, *want)
 	if err != nil {
-		return nil, fmt.Errorf("Has access check failed: %w", err)
+		return nil, fmt.Errorf("has access check failed: %w", err)
 	}
 
 	if !hasAccess {
 		grantErr := b.api.GrantAccess(ctx, *want)
 		if grantErr != nil {
-			return nil, fmt.Errorf("Granting access to principal failed: %w", grantErr)
+			return nil, fmt.Errorf("granting access to principal failed: %w", grantErr)
 		}
 	}
 
@@ -73,7 +73,7 @@ func (b *BucketAccess) DeleteBucketAccess(ctx context.Context, access vedro.Buck
 		if errors.Is(err, cloud.ErrBucketNotFound) {
 			return nil
 		}
-		return fmt.Errorf("Has access check failed: %w", err)
+		return fmt.Errorf("has access check failed: %w", err)
 	}
 
 	if hasAccess {
@@ -82,7 +82,7 @@ func (b *BucketAccess) DeleteBucketAccess(ctx context.Context, access vedro.Buck
 			if errors.Is(revokeErr, cloud.ErrBucketNotFound) {
 				return nil
 			}
-			return fmt.Errorf("Revoke access from principal failed: %w", revokeErr)
+			return fmt.Errorf("revoke access from principal failed: %w", revokeErr)
 		}
 	}
 

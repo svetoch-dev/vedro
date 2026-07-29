@@ -73,7 +73,7 @@ var _ = Describe("BucketAccessReconciler", func() {
 	})
 
 	It("adds the finalizer and reports a missing Bucket dependency", func() {
-		access := createBucketAccess(ctx, "missing-bucket", "missing", "principal")
+		access := createBucketAccess(ctx, "missing-bucket", "missing")
 
 		result, err := reconcileBucketAccess(ctx, reconciler, access)
 
@@ -101,7 +101,7 @@ var _ = Describe("BucketAccessReconciler", func() {
 		createBucket(ctx, "bucket")
 		principal := createCloudPrincipal(ctx, "principal")
 		markCloudPrincipalReady(ctx, principal)
-		access := createBucketAccess(ctx, "dependencies-not-ready", "bucket", "principal")
+		access := createBucketAccess(ctx, "dependencies-not-ready", "bucket")
 
 		result, err := reconcileBucketAccess(ctx, reconciler, access)
 
@@ -130,7 +130,7 @@ var _ = Describe("BucketAccessReconciler", func() {
 		})
 		markBucketReady(ctx, bucket)
 		markCloudPrincipalReady(ctx, principal)
-		access := createBucketAccess(ctx, "provider-mismatch", "bucket", "principal")
+		access := createBucketAccess(ctx, "provider-mismatch", "bucket")
 
 		result, err := reconcileBucketAccess(ctx, reconciler, access)
 
@@ -152,7 +152,7 @@ var _ = Describe("BucketAccessReconciler", func() {
 		principal := createCloudPrincipal(ctx, "principal")
 		markBucketReady(ctx, bucket)
 		markCloudPrincipalReady(ctx, principal)
-		access := createBucketAccess(ctx, "unsupported-access", "bucket", "principal")
+		access := createBucketAccess(ctx, "unsupported-access", "bucket")
 		provider.capabilities.BucketAccess.ObjectReader = false
 
 		result, err := reconcileBucketAccess(ctx, reconciler, access)
@@ -180,7 +180,7 @@ var _ = Describe("BucketAccessReconciler", func() {
 		principal := createCloudPrincipal(ctx, "principal")
 		markBucketReady(ctx, bucket)
 		markCloudPrincipalReady(ctx, principal)
-		access := createBucketAccess(ctx, "successful-reconcile", "bucket", "principal")
+		access := createBucketAccess(ctx, "successful-reconcile", "bucket")
 
 		result, err := reconcileBucketAccess(ctx, reconciler, access)
 
@@ -224,7 +224,7 @@ var _ = Describe("BucketAccessReconciler", func() {
 		principal := createCloudPrincipal(ctx, "principal")
 		markBucketReady(ctx, bucket)
 		markCloudPrincipalReady(ctx, principal)
-		access := createBucketAccess(ctx, "ensure-error", "bucket", "principal")
+		access := createBucketAccess(ctx, "ensure-error", "bucket")
 		bucketAccess.ensureErr = errors.New("ensure access failed")
 
 		result, err := reconcileBucketAccess(ctx, reconciler, access)
@@ -259,7 +259,7 @@ var _ = Describe("BucketAccessReconciler", func() {
 	})
 
 	It("removes the finalizer without calling the provider when access was not applied", func() {
-		access := createBucketAccess(ctx, "delete-unapplied", "bucket", "principal")
+		access := createBucketAccess(ctx, "delete-unapplied", "bucket")
 		addBucketAccessFinalizer(ctx, access)
 		Expect(k8sClient.Delete(ctx, access)).To(Succeed())
 
@@ -359,7 +359,6 @@ func createBucketAccess(
 	ctx context.Context,
 	name string,
 	bucketName string,
-	principalName string,
 ) *vedro.BucketAccess {
 	access := &vedro.BucketAccess{
 		TypeMeta: metav1.TypeMeta{
@@ -376,7 +375,7 @@ func createBucketAccess(
 				Namespace: "default",
 			},
 			PrincipalRef: vedro.PrincipalReference{
-				Name:      principalName,
+				Name:      "principal",
 				Namespace: "default",
 			},
 			Access: vedro.Access{Level: vedro.ObjectReader},
@@ -391,7 +390,7 @@ func createBucketAccess(
 }
 
 func createAppliedBucketAccess(ctx context.Context, name string) *vedro.BucketAccess {
-	access := createBucketAccess(ctx, name, "bucket", "principal")
+	access := createBucketAccess(ctx, name, "bucket")
 	fetched := getBucketAccess(ctx, client.ObjectKeyFromObject(access))
 	fetched.Status.ObservedProvider = "test-provider"
 	fetched.Status.Applied = &vedro.BucketAccessProperties{

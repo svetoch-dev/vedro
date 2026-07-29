@@ -76,8 +76,12 @@ type FakeBucketAPI struct {
 	Created            *cloud.BucketAttrs
 	Updated            *cloud.BucketPatch
 	HasAccessInputs    []cloud.BucketAccessAttrs
+	HasAccessResult    bool
+	HasAccessErr       error
 	GrantAccessInputs  []cloud.BucketAccessAttrs
+	GrantAccessErr     error
 	RevokeAccessInputs []cloud.BucketAccessAttrs
+	RevokeAccessErr    error
 
 	Deleted              bool
 	CloseCalled          bool
@@ -168,7 +172,11 @@ func (f *FakeBucketAPI) HasAccess(
 	access cloud.BucketAccessAttrs,
 ) (bool, error) {
 	f.HasAccessInputs = append(f.HasAccessInputs, access)
-	return false, nil
+	return f.HasAccessResult, f.HasAccessErr
+}
+
+func (f *FakeBucketAPI) HasAccessCalls() int {
+	return len(f.HasAccessInputs)
 }
 
 func (f *FakeBucketAPI) GrantAccess(
@@ -176,7 +184,11 @@ func (f *FakeBucketAPI) GrantAccess(
 	access cloud.BucketAccessAttrs,
 ) error {
 	f.GrantAccessInputs = append(f.GrantAccessInputs, access)
-	return nil
+	return f.GrantAccessErr
+}
+
+func (f *FakeBucketAPI) GrantAccessCalls() int {
+	return len(f.GrantAccessInputs)
 }
 
 func (f *FakeBucketAPI) RevokeAccess(
@@ -184,7 +196,11 @@ func (f *FakeBucketAPI) RevokeAccess(
 	access cloud.BucketAccessAttrs,
 ) error {
 	f.RevokeAccessInputs = append(f.RevokeAccessInputs, access)
-	return nil
+	return f.RevokeAccessErr
+}
+
+func (f *FakeBucketAPI) RevokeAccessCalls() int {
+	return len(f.RevokeAccessInputs)
 }
 
 func (f *FakeBucketAPI) Close(ctx context.Context) error {

@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"reflect"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/go-logr/logr"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
@@ -80,15 +80,8 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	ctx = log.IntoContext(ctx, logger)
 
-	if !bucketAccess.DeletionTimestamp.IsZero() {
-		return r.deleteBucketAccess(ctx, req, &bucketAccess)
-	}
-
-	if !controllerutil.ContainsFinalizer(&bucketAccess.BucketAccess, bucketAccessFinalizer) {
-		controllerutil.AddFinalizer(&bucketAccess.BucketAccess, bucketAccessFinalizer)
-		if err := r.Update(ctx, &bucketAccess.BucketAccess); err != nil {
-			return ReconcileError(ctx, err, "add finalizer error")
-		}
+	if result, err, handled := r.reconcileBucketAccessFinalizer(ctx, req, &bucketAccess); handled {
+		return result, err
 	}
 
 	bucket := resolvers.BucketResolver{
@@ -316,18 +309,45 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return Reconciled()
 }
 
+// reconcileBucketAccessFinalizer adds the finalizer to active principals and
+// handles deletion paths
+func (r *BucketAccessReconciler) reconcileBucketAccessFinalizer(
+	ctx context.Context,
+	req ctrl.Request,
+	bucketAccess *resolvers.BucketAccessResolver,
+) (ctrl.Result, error, bool) {
+	logger := log.FromContext(ctx)
+
+	if !bucketAccess.DeletionTimestamp.IsZero() {
+		result, err := r.deleteBucketAccess(ctx, logger, req, bucketAccess)
+		return result, err, true
+	}
+
+	if !controllerutil.ContainsFinalizer(&bucketAccess.BucketAccess, bucketAccessFinalizer) {
+		controllerutil.AddFinalizer(&bucketAccess.BucketAccess, bucketAccessFinalizer)
+		if err := r.Update(ctx, &bucketAccess.BucketAccess); err != nil {
+			result, reconcileErr := ReconcileError(ctx, err, "add finalizer error")
+
+			return result, reconcileErr, true
+		}
+	}
+
+	return ctrl.Result{}, nil, false
+}
+
 func (r *BucketAccessReconciler) deleteBucketAccess(
 	ctx context.Context,
+	logger logr.Logger,
 	req ctrl.Request,
 	access *resolvers.BucketAccessResolver,
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(&access.BucketAccess, bucketAccessFinalizer) {
-		log.FromContext(ctx).Info("BucketAccess is being deleted, but finalizer is not set; skipping deletion handling")
+		logger.Info("BucketAccess is being deleted, but finalizer is not set; skipping deletion handling")
 		return Reconciled()
 	}
 
 	if access.Status.Applied != nil {
-		log.FromContext(ctx).Info("deleting BucketAccess")
+		logger.Info("deleting BucketAccess")
 		providerFactory := r.ProviderFactory
 		if providerFactory == nil {
 			providerFactory = registry.NewProvider
@@ -338,20 +358,23 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 
 		providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
 
+		provider := providerSetup.Provider
+
+		if provider != nil {
+			defer func() {
+				if err := provider.Cleanup(ctx); err != nil {
+					logger.Error(err, "provider cleanup failed")
+				}
+			}()
+		}
+
 		if issue != nil {
-			if issue.Kind == ProviderConfigInvalid {
-				providerSetup.Provider.Cleanup(ctx)
-			}
-			return ReconcileErrorRAfter(
+			return ReconcileError(
 				ctx,
 				issue.Error,
-				10*time.Second,
 				"unable to prepare provider for BucketAccess deletion",
 			)
 		}
-
-		provider := providerSetup.Provider
-		defer provider.Cleanup(ctx)
 
 		err := provider.Access().DeleteBucketAccess(ctx, access.BucketAccess)
 		if err != nil {
@@ -365,7 +388,7 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 			if patchErr != nil {
 				return ReconcileError(ctx, patchErr, "patch error")
 			}
-			return ReconcileErrorRAfter(ctx, err, time.Second*10, "unable to delete external BucketAccess")
+			return ReconcileError(ctx, err, "unable to delete external BucketAccess")
 		}
 
 	}

@@ -29,27 +29,22 @@ func ReconcileError(ctx context.Context, err error, msg string, keysAndValues ..
 	return reconcile.Result{}, err
 }
 
-func ReconcileErrorRAfter(
+func ReconcileAfter(
 	ctx context.Context,
-	err error,
 	duration time.Duration,
 	msg string,
 	keysAndValues ...any,
 ) (reconcile.Result, error) {
-	if err == nil {
-		return Reconciled()
-	}
-
 	if msg == "" {
 		msg = fmt.Sprintf("reconcile failed. Requeuing after %v", duration)
 	}
 
-	log.FromContext(ctx).Error(err, msg, keysAndValues...)
+	log.FromContext(ctx).Info(msg, keysAndValues...)
 
 	return reconcile.Result{
 		Requeue:      true,
 		RequeueAfter: duration,
-	}, err
+	}, nil
 }
 
 func ReconcileIgnoreNotFound(ctx context.Context, err error, msg string, keysAndValues ...any) (reconcile.Result, error) {

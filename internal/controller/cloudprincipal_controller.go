@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"reflect"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/go-logr/logr"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
 	"github.com/svetoch-dev/vedro/internal/conditions"
@@ -78,7 +78,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	ctx = log.IntoContext(ctx, logger)
 
-	if result, err, handled := r.reconcileCloudPrincipalFinalizer(ctx, &principal); handled {
+	if result, err, handled := r.reconcileCloudPrincipalFinalizer(ctx, req, &principal); handled {
 		return result, err
 	}
 
@@ -122,38 +122,6 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			return ReconcileError(ctx, issue.Error, "Error in setting NewProvider")
 
 		case ProviderConfigInvalid:
-			return Reconciled()
-		}
-	}
-
-	// If obj is being deleted and DeletionPolicy is Delete
-	// delete it in cloud then remove finalizers
-	if !principal.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
-			logger.Info("CloudPrincipal is being deleted, but finalizer is not set; skipping deletion handling")
-			return Reconciled()
-		}
-
-		if principal.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
-			logger.Info("deleting CloudPrincipal")
-			err := provider.Principal().DeletePrincipal(ctx, principal.CloudPrincipal)
-			if err != nil {
-				principal.Condition.Status = metav1.ConditionFalse
-				principal.Condition.Reason = conditions.ReasonCloudPrincipalDeleteError
-				principal.Condition.Message = err.Error()
-
-				patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
-					meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
-				})
-				if patchErr != nil {
-					return ReconcileError(ctx, patchErr, "patch error")
-				}
-				return ReconcileErrorRAfter(ctx, err, time.Second*10, "unable to delete external CloudPrincipal")
-			}
-			controllerutil.RemoveFinalizer(&principal.CloudPrincipal, principalFinalizer)
-			if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
-				return ReconcileError(ctx, err, "remove finalizer error")
-			}
 			return Reconciled()
 		}
 	}
@@ -213,32 +181,17 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 // reconcileCloudPrincipalFinalizer adds the finalizer to active principals and
-// handles deletion paths that do not require a cloud provider.
+// handles deletion paths
 func (r *CloudPrincipalReconciler) reconcileCloudPrincipalFinalizer(
 	ctx context.Context,
+	req ctrl.Request,
 	principal *resolvers.CloudPrincipalResolver,
 ) (ctrl.Result, error, bool) {
 	logger := log.FromContext(ctx)
 
 	if !principal.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
-			logger.Info("CloudPrincipal is being deleted, but finalizer is not set; skipping deletion handling")
-			result, err := Reconciled()
-			return result, err, true
-		}
-
-		if principal.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
-			logger.Info("skipping CloudPrincipal deletion because deletionPolicy is Retain")
-			controllerutil.RemoveFinalizer(&principal.CloudPrincipal, principalFinalizer)
-			if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
-				result, reconcileErr := ReconcileError(ctx, err, "remove finalizer error")
-				return result, reconcileErr, true
-			}
-			result, err := Reconciled()
-			return result, err, true
-		}
-
-		return ctrl.Result{}, nil, false
+		result, err := r.deleteCloudPrincipal(ctx, logger, req, principal)
+		return result, err, true
 	}
 
 	if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
@@ -250,6 +203,78 @@ func (r *CloudPrincipalReconciler) reconcileCloudPrincipalFinalizer(
 	}
 
 	return ctrl.Result{}, nil, false
+}
+
+func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
+	ctx context.Context,
+	logger logr.Logger,
+	req ctrl.Request,
+	principal *resolvers.CloudPrincipalResolver,
+) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
+		logger.Info("CloudPrincipal is being deleted, but finalizer is not set; skipping deletion handling")
+		return Reconciled()
+	}
+
+	if principal.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+		logger.Info("skipping CloudPrincipal deletion because deletionPolicy is Retain")
+	}
+	if principal.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
+		logger.Info("deleting CloudPrincipal")
+		providerFactory := r.ProviderFactory
+		if providerFactory == nil {
+			providerFactory = registry.NewProvider
+		}
+		providerName := principal.Status.ObservedProvider
+		if providerName == "" {
+			providerName = principal.Spec.ProviderRef.Name
+		}
+		providerRef := vedro.ProviderConfigReference{
+			Name: providerName,
+		}
+
+		providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
+
+		provider := providerSetup.Provider
+
+		if provider != nil {
+			defer func() {
+				if err := provider.Cleanup(ctx); err != nil {
+					logger.Error(err, "provider cleanup failed")
+				}
+			}()
+		}
+
+		if issue != nil {
+			return ReconcileError(
+				ctx,
+				issue.Error,
+				"unable to prepare provider for CloudPrincipal deletion",
+			)
+		}
+
+		err := provider.Principal().DeletePrincipal(ctx, principal.CloudPrincipal)
+		if err != nil {
+			principal.Condition.Status = metav1.ConditionFalse
+			principal.Condition.Reason = conditions.ReasonCloudPrincipalDeleteError
+			principal.Condition.Message = err.Error()
+
+			patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+				meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+			})
+			if patchErr != nil {
+				return ReconcileError(ctx, patchErr, "patch error")
+			}
+			return ReconcileError(ctx, err, "unable to delete external CloudPrincipal")
+		}
+	}
+
+	controllerutil.RemoveFinalizer(&principal.CloudPrincipal, principalFinalizer)
+	if err := r.Update(ctx, &principal.CloudPrincipal); err != nil {
+		return ReconcileError(ctx, err, "remove finalizer error")
+	}
+	return Reconciled()
+
 }
 
 func (r *CloudPrincipalReconciler) patchStatus(

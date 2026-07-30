@@ -437,6 +437,8 @@ func (g *gcsAPI) HasAccess(
 ) (bool, error) {
 	iam := g.client.Bucket(access.BucketName).IAM()
 
+	principalId := fmt.Sprintf("serviceAccount:%s", access.PrincipalId)
+
 	policy, err := iam.Policy(ctx)
 	if err != nil {
 		if isGoogleAPINotFound(err) {
@@ -452,7 +454,7 @@ func (g *gcsAPI) HasAccess(
 	}
 
 	for _, existingMember := range policy.Members(siam.RoleName(role)) {
-		if existingMember == access.PrincipalId {
+		if existingMember == principalId {
 			return true, nil
 		}
 	}
@@ -466,6 +468,7 @@ func (g *gcsAPI) GrantAccess(
 ) error {
 	log.FromContext(ctx).Info("Granting access")
 	iam := g.client.Bucket(access.BucketName).IAM()
+	principalId := fmt.Sprintf("serviceAccount:%s", access.PrincipalId)
 
 	policy, err := iam.Policy(ctx)
 	if err != nil {
@@ -479,7 +482,7 @@ func (g *gcsAPI) GrantAccess(
 	if !ok {
 		return fmt.Errorf("Access level does not map to any gcp role")
 	}
-	policy.Add(access.PrincipalId, siam.RoleName(role))
+	policy.Add(principalId, siam.RoleName(role))
 
 	if err := iam.SetPolicy(ctx, policy); isGoogleAPINotFound(err) {
 		return cloud.ErrBucketNotFound
@@ -496,6 +499,7 @@ func (g *gcsAPI) RevokeAccess(
 ) error {
 	log.FromContext(ctx).Info("Revoking access")
 	iam := g.client.Bucket(access.BucketName).IAM()
+	principalId := fmt.Sprintf("serviceAccount:%s", access.PrincipalId)
 
 	policy, err := iam.Policy(ctx)
 	if err != nil {
@@ -508,7 +512,7 @@ func (g *gcsAPI) RevokeAccess(
 	if !ok {
 		return fmt.Errorf("Access level does not map to any gcp role")
 	}
-	policy.Remove(access.PrincipalId, siam.RoleName(role))
+	policy.Remove(principalId, siam.RoleName(role))
 
 	if err := iam.SetPolicy(ctx, policy); isGoogleAPINotFound(err) {
 		return cloud.ErrBucketNotFound

@@ -76,8 +76,8 @@ type FakeBucketAPI struct {
 	Created            *cloud.BucketAttrs
 	Updated            *cloud.BucketPatch
 	HasAccessInputs    []cloud.BucketAccessAttrs
-	HasAccessResult    bool
-	HasAccessErr       error
+	HasAccessResults   []bool
+	HasAccessErrors    []error
 	GrantAccessInputs  []cloud.BucketAccessAttrs
 	GrantAccessErr     error
 	RevokeAccessInputs []cloud.BucketAccessAttrs
@@ -172,7 +172,14 @@ func (f *FakeBucketAPI) HasAccess(
 	access cloud.BucketAccessAttrs,
 ) (bool, error) {
 	f.HasAccessInputs = append(f.HasAccessInputs, access)
-	return f.HasAccessResult, f.HasAccessErr
+	var err error
+	if len(f.HasAccessErrors) >= len(f.HasAccessInputs) {
+		err = f.HasAccessErrors[len(f.HasAccessInputs)-1]
+	}
+	if len(f.HasAccessResults) >= len(f.HasAccessInputs) {
+		return f.HasAccessResults[len(f.HasAccessInputs)-1], err
+	}
+	return false, err
 }
 
 func (f *FakeBucketAPI) HasAccessCalls() int {

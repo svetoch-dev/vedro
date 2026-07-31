@@ -38,8 +38,8 @@ func (s *S3API) GetBucket(
 	return &cloud.BucketAttrs{}, nil
 }
 
-func (s *S3API) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
-	return nil
+func (s *S3API) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) (*cloud.BucketAttrs, error) {
+	return nil, nil
 }
 
 func (s *S3API) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {

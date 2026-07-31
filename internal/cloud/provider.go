@@ -17,13 +17,15 @@ var (
 type Provider interface {
 	Bucket() BucketProvider
 	Principal() PrincipalProvider
+	Access() BucketAccessProvider
 	Capabilities() Capabilities
 	Cleanup(ctx context.Context) error
 	ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult
 }
 
 type Capabilities struct {
-	Bucket BucketCapabilities
+	Bucket       BucketCapabilities
+	BucketAccess BucketAccessCapabilities
 }
 
 type BucketCapabilities struct {
@@ -49,12 +51,22 @@ func (bc BucketCapabilities) LifecycleSupported() bool {
 	return bc.Lifecycle.RuleExpiration
 }
 
+type BucketAccessCapabilities struct {
+	ObjectReader bool
+	ObjectWriter bool
+	ObjectAdmin  bool
+	BucketAdmin  bool
+}
+
 type BucketAttrs struct {
 	Name     string
 	Location string
+	Id       string
 
 	Properties *vedro.BucketProperties
 }
+
+type BucketAccessAttrs vedro.BucketAccessProperties
 
 type PrincipalAttrs struct {
 	Name string
@@ -91,7 +103,7 @@ func (p BucketPatch) HasChanges() bool {
 
 type BucketAPI interface {
 	GetBucket(ctx context.Context, name string) (*BucketAttrs, error)
-	CreateBucket(ctx context.Context, name string, attrs BucketAttrs) error
+	CreateBucket(ctx context.Context, name string, attrs BucketAttrs) (*BucketAttrs, error)
 	UpdateBucket(ctx context.Context, name string, patch BucketPatch) (*BucketAttrs, error)
 
 	ProcessObjects(
@@ -104,6 +116,21 @@ type BucketAPI interface {
 		ctx context.Context,
 		bucket string,
 		object ObjectVersion,
+	) error
+
+	GrantAccess(
+		ctx context.Context,
+		access BucketAccessAttrs,
+	) error
+
+	HasAccess(
+		ctx context.Context,
+		access BucketAccessAttrs,
+	) (bool, error)
+
+	RevokeAccess(
+		ctx context.Context,
+		access BucketAccessAttrs,
 	) error
 
 	DeleteBucket(ctx context.Context, name string) error
@@ -132,6 +159,16 @@ type BucketProvider interface {
 		ctx context.Context,
 		bckt vedro.Bucket,
 	) error
+}
+
+type BucketAccessProvider interface {
+	EnsureBucketAccess(
+		ctx context.Context,
+		bucket vedro.Bucket,
+		principal vedro.CloudPrincipal,
+		access vedro.BucketAccess,
+	) (*BucketAccessAttrs, error)
+	DeleteBucketAccess(ctx context.Context, access vedro.BucketAccess) error
 }
 
 type PrincipalProvider interface {

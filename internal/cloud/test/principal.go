@@ -16,7 +16,7 @@ import (
 //	var _ = cloudtest.PrincipalProviderTests(cloudtest.Config{...})
 func PrincipalProviderTests(cfg Config) bool {
 	newPrincipalCR := func(mods ...func(*vedro.CloudPrincipal)) vedro.CloudPrincipal {
-		return newPrincipalCR("my-principal", mods...)
+		return NewPrincipalCR("my-principal", mods...)
 	}
 
 	Describe("PrincipalProvider.EnsurePrincipal", func() {
@@ -114,7 +114,7 @@ func PrincipalProviderTests(cfg Config) bool {
 
 func PrincipalValidationTests(cfg Config) bool {
 	newPrincipalCR := func(mods ...func(*vedro.CloudPrincipal)) vedro.CloudPrincipal {
-		return newPrincipalCR("my-principal", mods...)
+		return NewPrincipalCR("my-principal", mods...)
 	}
 	Describe("Principal.ValidatePrincipalSpec", func() {
 		var (

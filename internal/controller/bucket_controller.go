@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"reflect"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/go-logr/logr"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
@@ -79,7 +79,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	ctx = log.IntoContext(ctx, logger)
 
-	if result, err, handled := r.reconcileBucketFinalizer(ctx, &bucket); handled {
+	if result, err, handled := r.reconcileBucketFinalizer(ctx, req, &bucket); handled {
 		return result, err
 	}
 
@@ -103,9 +103,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if issue != nil {
-		bucket.Condition.Status = providerConfig.Condition.Status
-		bucket.Condition.Reason = providerConfig.Condition.Reason
-		bucket.Condition.Message = providerConfig.Condition.Message
+		copyConditionState(&bucket.Condition, providerConfig.Condition)
 		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(p *vedro.Bucket) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
@@ -129,45 +127,13 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	// If obj is being deleted and DeletionPolicy is Delete
-	// delete it in cloud then remove finalizers
-	if !bucket.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
-			logger.Info("bucket is being deleted, but finalizer is not set; skipping deletion handling")
-			return Reconciled()
-		}
-
-		if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
-			logger.Info("deleting bucket and all of its objects")
-			err := provider.Bucket().DeleteBucket(ctx, bucket.Bucket)
-			if err != nil {
-				bucket.Condition.Status = metav1.ConditionFalse
-				bucket.Condition.Reason = conditions.ReasonBucketDeleteError
-				bucket.Condition.Message = err.Error()
-
-				patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-					meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
-				})
-				if patchErr != nil {
-					return ReconcileError(ctx, patchErr, "patch error")
-				}
-				return ReconcileErrorRAfter(ctx, err, time.Second*10, "unable to delete external bucket")
-			}
-			controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
-			if err := r.Update(ctx, &bucket.Bucket); err != nil {
-				return ReconcileError(ctx, err, "remove finalizer error")
-			}
-			return Reconciled()
-		}
-	}
-
 	// check bucket capabilities
 	caps := provider.Capabilities().Bucket
 	unsupported := capabilities.ValidateBucketCapabilities(caps, bucket.Spec)
 	bucket.Status.UnsupportedFeatures = unsupported
 
 	if len(unsupported) > 0 {
-		logger.Info("Unsupported features found")
+		logger.Info("Bucket Unsupported features found")
 
 		if bucket.Spec.UnsupportedFeaturePolicy == vedro.UnsupportedFeaturePolicyFail {
 			logger.Info("UnsupportedFeaturePolicy set to Fail. stopping reconciliation")
@@ -216,7 +182,6 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err := provider.Bucket().EnsureBucket(ctx, bucket.Bucket)
 
 	if err != nil {
-		logger.Error(err, "EnsureBucket failed")
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketEnsureError
 		bucket.Condition.Message = err.Error()
@@ -226,7 +191,8 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")
 		}
-		return Reconciled()
+
+		return ReconcileError(ctx, err, "EnsureBucket failed")
 	}
 
 	// Set bucket condition to reconciled and do a final patch
@@ -236,6 +202,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
 		b.Status.ExternalName = result.Name
+		b.Status.ExternalId = result.Id
 		b.Status.Location = result.Location
 		b.Status.Applied = result.Properties
 		b.Status.ObservedProvider = bucket.Spec.ProviderRef.Name
@@ -253,32 +220,17 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // reconcileBucketFinalizer adds the finalizer to active buckets and handles
-// deletion paths that do not require a cloud provider.
+// deletion paths
 func (r *BucketReconciler) reconcileBucketFinalizer(
 	ctx context.Context,
+	req ctrl.Request,
 	bucket *resolvers.BucketResolver,
 ) (ctrl.Result, error, bool) {
 	logger := log.FromContext(ctx)
 
 	if !bucket.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
-			logger.Info("Bucket is being deleted, but finalizer is not set; skipping deletion handling")
-			result, err := Reconciled()
-			return result, err, true
-		}
-
-		if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
-			logger.Info("skipping Bucket deletion because deletionPolicy is Retain")
-			controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
-			if err := r.Update(ctx, &bucket.Bucket); err != nil {
-				result, reconcileErr := ReconcileError(ctx, err, "remove finalizer error")
-				return result, reconcileErr, true
-			}
-			result, err := Reconciled()
-			return result, err, true
-		}
-
-		return ctrl.Result{}, nil, false
+		result, err := r.deleteBucket(ctx, logger, req, bucket)
+		return result, err, true
 	}
 
 	if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
@@ -290,6 +242,80 @@ func (r *BucketReconciler) reconcileBucketFinalizer(
 	}
 
 	return ctrl.Result{}, nil, false
+}
+
+func (r *BucketReconciler) deleteBucket(
+	ctx context.Context,
+	logger logr.Logger,
+	req ctrl.Request,
+	bucket *resolvers.BucketResolver,
+) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
+		logger.Info("Bucket is being deleted, but finalizer is not set; skipping deletion handling")
+		return Reconciled()
+	}
+
+	if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+		logger.Info("skipping Bucket deletion because deletionPolicy is Retain")
+	}
+
+	if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
+		logger.Info("deleting bucket and all of its objects")
+		providerFactory := r.ProviderFactory
+		if providerFactory == nil {
+			providerFactory = registry.NewProvider
+		}
+		providerName := bucket.Status.ObservedProvider
+		if providerName == "" {
+			providerName = bucket.Spec.ProviderRef.Name
+		}
+		providerRef := vedro.ProviderConfigReference{
+			Name: providerName,
+		}
+
+		providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
+
+		provider := providerSetup.Provider
+
+		if provider != nil {
+			defer func() {
+				if err := provider.Cleanup(ctx); err != nil {
+					logger.Error(err, "provider cleanup failed")
+				}
+			}()
+		}
+		if issue != nil {
+			return ReconcileError(
+				ctx,
+				issue.Error,
+				"unable to prepare provider for Bucket deletion",
+			)
+		}
+
+		err := provider.Bucket().DeleteBucket(ctx, bucket.Bucket)
+
+		if err != nil {
+			bucket.Condition.Status = metav1.ConditionFalse
+			bucket.Condition.Reason = conditions.ReasonBucketDeleteError
+			bucket.Condition.Message = err.Error()
+
+			patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+				meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+			})
+			if patchErr != nil {
+				return ReconcileError(ctx, patchErr, "patch error")
+			}
+			return ReconcileError(ctx, err, "unable to delete external bucket")
+		}
+
+	}
+	controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
+	if err := r.Update(ctx, &bucket.Bucket); err != nil {
+		return ReconcileError(ctx, err, "remove finalizer error")
+	}
+
+	return Reconciled()
+
 }
 
 func (r *BucketReconciler) patchStatus(
@@ -329,6 +355,7 @@ func (r *BucketReconciler) findBucketsOfProviderConfig(
 
 	var bucketList vedro.BucketList
 	if err := r.List(ctx, &bucketList); err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "unable to list Bucket objects")
 		return nil
 	}
 

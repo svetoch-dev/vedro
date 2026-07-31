@@ -8,17 +8,26 @@ import (
 	"strconv"
 	"time"
 
+	siam "cloud.google.com/go/iam"
 	"cloud.google.com/go/storage"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
+	accessLevelMapping = map[vedro.BucketAccessLevel]string{
+		vedro.ObjectReader: "roles/storage.objectViewer",
+		vedro.ObjectWriter: "roles/storage.objectCreator",
+		vedro.ObjectAdmin:  "roles/storage.objectAdmin",
+		vedro.BucketAdmin:  "roles/storage.admin",
+	}
 	gcsStorageClassMapping = map[string]vedro.BucketStorageClass{
 		"STANDARD": vedro.BucketStorageClassStandard,
 		"NEARLINE": vedro.BucketStorageClassWarm,
@@ -214,6 +223,7 @@ func fromGCSBucketAttrs(attrs storage.BucketAttrs) (*cloud.BucketAttrs, error) {
 
 	return &cloud.BucketAttrs{
 		Name:     attrs.Name,
+		Id:       attrs.Name,
 		Location: attrs.Location,
 		Properties: &vedro.BucketProperties{
 			PublicAccessPrevention: pap,
@@ -315,7 +325,7 @@ func (a *gcsAPI) GetBucket(
 ) (*cloud.BucketAttrs, error) {
 	gcsAttrs, err := a.client.Bucket(name).Attrs(ctx)
 
-	if errors.Is(err, storage.ErrBucketNotExist) {
+	if isGoogleAPINotFound(err) {
 		return nil, cloud.ErrBucketNotFound
 	}
 	if err != nil {
@@ -325,16 +335,17 @@ func (a *gcsAPI) GetBucket(
 	return fromGCSBucketAttrs(*gcsAttrs)
 }
 
-func (a *gcsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
+func (a *gcsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) (*cloud.BucketAttrs, error) {
+	attrs.Id = attrs.Name
 	createAttrs, err := toGCSBucketAttrs(attrs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := a.client.Bucket(name).Create(ctx, a.projectID, createAttrs); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return &attrs, nil
 }
 
 func (a *gcsAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
@@ -420,6 +431,97 @@ func (a *gcsAPI) DeleteBucket(ctx context.Context, name string) error {
 	return err
 }
 
+func (g *gcsAPI) HasAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) (bool, error) {
+	iam := g.client.Bucket(access.BucketName).IAM()
+
+	principalId := fmt.Sprintf("serviceAccount:%s", access.PrincipalId)
+
+	policy, err := iam.Policy(ctx)
+	if err != nil {
+		if isGoogleAPINotFound(err) {
+			return false, cloud.ErrBucketNotFound
+		}
+		return false, fmt.Errorf("get IAM policy: %w", err)
+	}
+
+	role, ok := accessLevelMapping[access.GrantedAccess]
+
+	if !ok {
+		return false, fmt.Errorf("Access level does not map to any gcp role")
+	}
+
+	for _, existingMember := range policy.Members(siam.RoleName(role)) {
+		if existingMember == principalId {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (g *gcsAPI) GrantAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) error {
+	log.FromContext(ctx).Info("Granting access")
+	iam := g.client.Bucket(access.BucketName).IAM()
+	principalId := fmt.Sprintf("serviceAccount:%s", access.PrincipalId)
+
+	policy, err := iam.Policy(ctx)
+	if err != nil {
+		if isGoogleAPINotFound(err) {
+			return cloud.ErrBucketNotFound
+		}
+		return fmt.Errorf("get IAM policy: %w", err)
+	}
+
+	role, ok := accessLevelMapping[access.GrantedAccess]
+	if !ok {
+		return fmt.Errorf("Access level does not map to any gcp role")
+	}
+	policy.Add(principalId, siam.RoleName(role))
+
+	if err := iam.SetPolicy(ctx, policy); isGoogleAPINotFound(err) {
+		return cloud.ErrBucketNotFound
+	} else if err != nil {
+		return fmt.Errorf("set IAM policy: %w", err)
+	}
+
+	return nil
+}
+
+func (g *gcsAPI) RevokeAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) error {
+	log.FromContext(ctx).Info("Revoking access")
+	iam := g.client.Bucket(access.BucketName).IAM()
+	principalId := fmt.Sprintf("serviceAccount:%s", access.PrincipalId)
+
+	policy, err := iam.Policy(ctx)
+	if err != nil {
+		if isGoogleAPINotFound(err) {
+			return cloud.ErrBucketNotFound
+		}
+		return fmt.Errorf("get IAM policy: %w", err)
+	}
+	role, ok := accessLevelMapping[access.GrantedAccess]
+	if !ok {
+		return fmt.Errorf("Access level does not map to any gcp role")
+	}
+	policy.Remove(principalId, siam.RoleName(role))
+
+	if err := iam.SetPolicy(ctx, policy); isGoogleAPINotFound(err) {
+		return cloud.ErrBucketNotFound
+	} else if err != nil {
+		return fmt.Errorf("set IAM policy: %w", err)
+	}
+	return nil
+}
+
 func (a *gcsAPI) Close(ctx context.Context) error {
 	if a.client == nil {
 		return nil
@@ -428,6 +530,14 @@ func (a *gcsAPI) Close(ctx context.Context) error {
 }
 
 func isGoogleAPINotFound(err error) bool {
+	if errors.Is(err, storage.ErrBucketNotExist) {
+		return true
+	}
+
 	var gErr *googleapi.Error
-	return errors.As(err, &gErr) && gErr.Code == 404
+	if errors.As(err, &gErr) && gErr.Code == 404 {
+		return true
+	}
+
+	return status.Code(err) == codes.NotFound
 }

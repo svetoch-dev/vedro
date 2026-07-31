@@ -6,6 +6,7 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -28,27 +29,22 @@ func ReconcileError(ctx context.Context, err error, msg string, keysAndValues ..
 	return reconcile.Result{}, err
 }
 
-func ReconcileErrorRAfter(
+func ReconcileAfter(
 	ctx context.Context,
-	err error,
 	duration time.Duration,
 	msg string,
 	keysAndValues ...any,
 ) (reconcile.Result, error) {
-	if err == nil {
-		return Reconciled()
-	}
-
 	if msg == "" {
 		msg = fmt.Sprintf("reconcile failed. Requeuing after %v", duration)
 	}
 
-	log.FromContext(ctx).Error(err, msg, keysAndValues...)
+	log.FromContext(ctx).Info(msg, keysAndValues...)
 
 	return reconcile.Result{
 		Requeue:      true,
 		RequeueAfter: duration,
-	}, err
+	}, nil
 }
 
 func ReconcileIgnoreNotFound(ctx context.Context, err error, msg string, keysAndValues ...any) (reconcile.Result, error) {
@@ -57,4 +53,10 @@ func ReconcileIgnoreNotFound(ctx context.Context, err error, msg string, keysAnd
 	}
 
 	return ReconcileError(ctx, err, msg, keysAndValues...)
+}
+
+func copyConditionState(dst *metav1.Condition, src metav1.Condition) {
+	dst.Message = src.Message
+	dst.Reason = src.Reason
+	dst.Status = src.Status
 }

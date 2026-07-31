@@ -63,6 +63,7 @@ var _ = Describe("BucketReconciler", func() {
 				validateResult: validation.Valid(),
 				ensureResult: &cloud.BucketAttrs{
 					Name:     "external-bucket",
+					Id:       "external-bucket-id",
 					Location: "europe-west1",
 					Properties: &vedro.BucketProperties{
 						StorageClass: vedro.BucketStorageClassStandard,
@@ -231,6 +232,7 @@ var _ = Describe("BucketReconciler", func() {
 
 		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
 		Expect(fetched.Status.ExternalName).To(Equal("external-bucket"))
+		Expect(fetched.Status.ExternalId).To(Equal("external-bucket-id"))
 		Expect(fetched.Status.Location).To(Equal("europe-west1"))
 		Expect(fetched.Status.ObservedProvider).To(Equal("test-provider"))
 		Expect(fetched.Status.Applied).NotTo(BeNil())
@@ -278,7 +280,7 @@ var _ = Describe("BucketReconciler", func() {
 			NamespacedName: client.ObjectKeyFromObject(bucket),
 		})
 
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).To(MatchError("ensure failed"))
 		Expect(result).To(Equal(reconcile.Result{}))
 
 		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
@@ -288,6 +290,25 @@ var _ = Describe("BucketReconciler", func() {
 		Expect(condition.Reason).To(Equal(conditions.ReasonBucketEnsureError))
 		Expect(condition.Message).To(Equal("ensure failed"))
 		Expect(provider.bucket.ensureCalls).To(Equal(1))
+	})
+
+	It("retains the external bucket and removes the finalizer for Retain policy", func() {
+		bucket := createBucket(ctx, "retain-policy")
+		controllerutilAddFinalizer(ctx, bucket)
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(provider.bucket.deleteCalls).To(BeZero())
+		Expect(provider.cleanupCalled).To(BeFalse())
+
+		fetched := &vedro.Bucket{}
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(bucket), fetched)
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
 
 	It("deletes the external bucket and removes the finalizer for Delete policy", func() {
@@ -310,12 +331,69 @@ var _ = Describe("BucketReconciler", func() {
 		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(bucket), fetched)
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
+
+	It("uses the observed ProviderConfig when deleting a bucket", func() {
+		bucket := createBucket(ctx, "observed-provider", func(spec *vedro.BucketSpec) {
+			spec.DeletionPolicy = vedro.DeletionPolicyDelete
+		})
+		createProviderConfigNamed(ctx, "observed-provider")
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		fetched.Status.ObservedProvider = "observed-provider"
+		Expect(k8sClient.Status().Update(ctx, fetched)).To(Succeed())
+		controllerutilAddFinalizer(ctx, bucket)
+
+		var configuredProvider string
+		reconciler.ProviderFactory = func(
+			_ context.Context,
+			cfg vedro.ProviderConfig,
+			_ client.Client,
+		) (cloud.Provider, error) {
+			configuredProvider = cfg.Name
+			return provider, nil
+		}
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(configuredProvider).To(Equal("observed-provider"))
+		Expect(provider.bucket.deleteCalls).To(Equal(1))
+	})
+
+	It("records delete errors and keeps the bucket finalizer", func() {
+		bucket := createBucket(ctx, "delete-error", func(spec *vedro.BucketSpec) {
+			spec.DeletionPolicy = vedro.DeletionPolicyDelete
+		})
+		createProviderConfig(ctx)
+		provider.bucket.deleteErr = errors.New("delete failed")
+		controllerutilAddFinalizer(ctx, bucket)
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).To(MatchError("delete failed"))
+		Expect(provider.bucket.deleteCalls).To(Equal(1))
+		Expect(provider.cleanupCalled).To(BeTrue())
+
+		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		Expect(fetched.Finalizers).To(ContainElement(bucketFinalizer))
+		condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(condition).NotTo(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal(conditions.ReasonBucketDeleteError))
+		Expect(condition.Message).To(Equal("delete failed"))
+	})
 })
 
 type fakeProvider struct {
 	capabilities cloud.Capabilities
 	bucket       *fakeBucketProvider
 	principal    *fakePrincipalProvider
+	bucketAccess *fakeBucketAccess
 	cleanupErr   error
 
 	cleanupCalled bool
@@ -331,6 +409,10 @@ func (p *fakeProvider) Bucket() cloud.BucketProvider {
 
 func (p *fakeProvider) Principal() cloud.PrincipalProvider {
 	return p.principal
+}
+
+func (p *fakeProvider) Access() cloud.BucketAccessProvider {
+	return p.bucketAccess
 }
 
 func (p *fakeProvider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {
@@ -406,13 +488,17 @@ func createBucket(
 }
 
 func createProviderConfig(ctx context.Context) {
+	createProviderConfigNamed(ctx, "test-provider")
+}
+
+func createProviderConfigNamed(ctx context.Context, name string) {
 	providerConfig := &vedro.ProviderConfig{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "vedro.svetoch.dev/v1alpha1",
 			Kind:       "ProviderConfig",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-provider",
+			Name: name,
 		},
 		Spec: vedro.ProviderConfigSpec{
 			Type:      vedro.ProviderTypeGCP,

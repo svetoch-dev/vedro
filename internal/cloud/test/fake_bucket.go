@@ -67,14 +67,21 @@ type DeletedObject struct {
 }
 
 type FakeBucketAPI struct {
-	Attrs     *cloud.BucketAttrs
-	AttrsErr  error
-	CreateErr error
-	UpdateErr error
-	DeleteErr error
-	CloseErr  error
-	Created   *cloud.BucketAttrs
-	Updated   *cloud.BucketPatch
+	Attrs              *cloud.BucketAttrs
+	AttrsErr           error
+	CreateErr          error
+	UpdateErr          error
+	DeleteErr          error
+	CloseErr           error
+	Created            *cloud.BucketAttrs
+	Updated            *cloud.BucketPatch
+	HasAccessInputs    []cloud.BucketAccessAttrs
+	HasAccessResults   []bool
+	HasAccessErrors    []error
+	GrantAccessInputs  []cloud.BucketAccessAttrs
+	GrantAccessErr     error
+	RevokeAccessInputs []cloud.BucketAccessAttrs
+	RevokeAccessErr    error
 
 	Deleted              bool
 	CloseCalled          bool
@@ -151,13 +158,56 @@ func (f *FakeBucketAPI) CreateBucket(
 	ctx context.Context,
 	_ string,
 	attrs cloud.BucketAttrs,
-) error {
+) (*cloud.BucketAttrs, error) {
 	f.Created = &attrs
 	if f.CreateErr != nil {
-		return f.CreateErr
+		return nil, f.CreateErr
 	}
 	f.Attrs = &attrs
-	return nil
+	return &attrs, nil
+}
+
+func (f *FakeBucketAPI) HasAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) (bool, error) {
+	f.HasAccessInputs = append(f.HasAccessInputs, access)
+	var err error
+	if len(f.HasAccessErrors) >= len(f.HasAccessInputs) {
+		err = f.HasAccessErrors[len(f.HasAccessInputs)-1]
+	}
+	if len(f.HasAccessResults) >= len(f.HasAccessInputs) {
+		return f.HasAccessResults[len(f.HasAccessInputs)-1], err
+	}
+	return false, err
+}
+
+func (f *FakeBucketAPI) HasAccessCalls() int {
+	return len(f.HasAccessInputs)
+}
+
+func (f *FakeBucketAPI) GrantAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) error {
+	f.GrantAccessInputs = append(f.GrantAccessInputs, access)
+	return f.GrantAccessErr
+}
+
+func (f *FakeBucketAPI) GrantAccessCalls() int {
+	return len(f.GrantAccessInputs)
+}
+
+func (f *FakeBucketAPI) RevokeAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) error {
+	f.RevokeAccessInputs = append(f.RevokeAccessInputs, access)
+	return f.RevokeAccessErr
+}
+
+func (f *FakeBucketAPI) RevokeAccessCalls() int {
+	return len(f.RevokeAccessInputs)
 }
 
 func (f *FakeBucketAPI) Close(ctx context.Context) error {

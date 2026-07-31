@@ -196,6 +196,10 @@ type BucketStatus struct {
 	//
 	// +optional
 	ExternalName string `json:"externalName,omitempty"`
+	// ExternalId is the provider-side immutable resource identifier.
+	// It may differ from ExternalName.
+	// +optional
+	ExternalId string `json:"externalId,omitempty"`
 	// Location is the provider-side bucket region.
 	//
 	// +optional

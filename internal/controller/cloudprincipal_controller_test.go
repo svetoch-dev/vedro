@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -79,8 +78,8 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 	})
 
 	It("adds the finalizer and marks ProviderConfig missing", func() {
-		principal := createCloudPrincipal(ctx, "missing-provider", func(spec *vedro.CloudPrincipalSpec) {
-			spec.ProviderRef.Name = "missing-provider"
+		principal := createCloudPrincipal(ctx, "missing-provider", func(p *vedro.CloudPrincipal) {
+			p.Spec.ProviderRef.Name = "missing-provider"
 		})
 
 		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
@@ -188,7 +187,7 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 
 		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
 
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).To(MatchError("ensure failed"))
 		Expect(result).To(Equal(reconcile.Result{}))
 
 		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
@@ -233,8 +232,8 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 	})
 
 	It("deletes the external principal and removes the finalizer for Delete policy", func() {
-		principal := createCloudPrincipal(ctx, "delete-policy", func(spec *vedro.CloudPrincipalSpec) {
-			spec.DeletionPolicy = vedro.DeletionPolicyDelete
+		principal := createCloudPrincipal(ctx, "delete-policy", func(p *vedro.CloudPrincipal) {
+			p.Spec.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfig(ctx)
 		addPrincipalFinalizer(ctx, principal)
@@ -249,19 +248,47 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 		expectCloudPrincipalNotFound(ctx, client.ObjectKeyFromObject(principal))
 	})
 
+	It("uses the observed ProviderConfig when deleting a CloudPrincipal", func() {
+		principal := createCloudPrincipal(ctx, "observed-provider", func(p *vedro.CloudPrincipal) {
+			p.Spec.DeletionPolicy = vedro.DeletionPolicyDelete
+		})
+		createProviderConfigNamed(ctx, "observed-provider")
+		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+		fetched.Status.ObservedProvider = "observed-provider"
+		Expect(k8sClient.Status().Update(ctx, fetched)).To(Succeed())
+		addPrincipalFinalizer(ctx, principal)
+
+		var configuredProvider string
+		reconciler.ProviderFactory = func(
+			_ context.Context,
+			cfg vedro.ProviderConfig,
+			_ client.Client,
+		) (cloud.Provider, error) {
+			configuredProvider = cfg.Name
+			return provider, nil
+		}
+		Expect(k8sClient.Delete(ctx, principal)).To(Succeed())
+
+		_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(configuredProvider).To(Equal("observed-provider"))
+		Expect(provider.principal.deleteCalls).To(Equal(1))
+		expectCloudPrincipalNotFound(ctx, client.ObjectKeyFromObject(principal))
+	})
+
 	It("records delete errors and requeues the CloudPrincipal", func() {
-		principal := createCloudPrincipal(ctx, "delete-error", func(spec *vedro.CloudPrincipalSpec) {
-			spec.DeletionPolicy = vedro.DeletionPolicyDelete
+		principal := createCloudPrincipal(ctx, "delete-error", func(p *vedro.CloudPrincipal) {
+			p.Spec.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfig(ctx)
 		provider.principal.deleteErr = errors.New("delete failed")
 		addPrincipalFinalizer(ctx, principal)
 		Expect(k8sClient.Delete(ctx, principal)).To(Succeed())
 
-		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+		_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
 
 		Expect(err).To(MatchError("delete failed"))
-		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
 		Expect(provider.principal.deleteCalls).To(Equal(1))
 		Expect(provider.cleanupCalled).To(BeTrue())
 
@@ -309,7 +336,7 @@ func (p *fakePrincipalProvider) DeletePrincipal(
 func createCloudPrincipal(
 	ctx context.Context,
 	name string,
-	mutators ...func(*vedro.CloudPrincipalSpec),
+	mutators ...func(*vedro.CloudPrincipal),
 ) *vedro.CloudPrincipal {
 	principal := &vedro.CloudPrincipal{
 		TypeMeta: metav1.TypeMeta{
@@ -327,7 +354,7 @@ func createCloudPrincipal(
 	}
 
 	for _, mutate := range mutators {
-		mutate(&principal.Spec)
+		mutate(principal)
 	}
 
 	Expect(k8sClient.Create(ctx, principal)).To(Succeed())

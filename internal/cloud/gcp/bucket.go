@@ -156,11 +156,12 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 			},
 		}
 
-		if err := b.api.CreateBucket(ctx, bucketName, createAttrs); err != nil {
+		cattrs, err := b.api.CreateBucket(ctx, bucketName, createAttrs)
+		if err != nil {
 			return nil, fmt.Errorf("create bucket %q: %w", bucketName, err)
 		}
 
-		return &createAttrs, nil
+		return cattrs, nil
 	}
 
 	if err != nil {
@@ -176,7 +177,7 @@ func (b *Bucket) EnsureBucket(ctx context.Context, bckt vedro.Bucket) (*cloud.Bu
 		)
 	}
 
-	appliedState := appliedState(attrs.Location, bckt)
+	appliedState := appliedState(attrs.Id, attrs.Location, bckt)
 
 	patch := cloud.BucketPatch{}
 

@@ -9,6 +9,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/cloud/aws"
 	"github.com/svetoch-dev/vedro/internal/helpers"
+	ycaccess "github.com/yandex-cloud/go-genproto/yandex/cloud/access"
 	storageapi "github.com/yandex-cloud/go-genproto/yandex/cloud/storage/v1"
 	storagesdk "github.com/yandex-cloud/go-sdk/services/storage/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk/v2"
@@ -20,6 +21,12 @@ import (
 )
 
 var (
+	accessLevelMapping = map[vedro.BucketAccessLevel]string{
+		vedro.ObjectReader: "storage.viewer",
+		vedro.ObjectWriter: "storage.uploader",
+		vedro.ObjectAdmin:  "storage.editor",
+		vedro.BucketAdmin:  "storage.admin",
+	}
 	ycStorageClassMapping = map[string]vedro.BucketStorageClass{
 		"STANDARD":    vedro.BucketStorageClassStandard,
 		"NEARLINE":    vedro.BucketStorageClassCold,
@@ -193,6 +200,7 @@ func fromYcBucket(bucket *storageapi.Bucket, location string) (*cloud.BucketAttr
 
 	return &cloud.BucketAttrs{
 		Name:     bucket.Name,
+		Id:       bucket.ResourceId,
 		Location: location,
 		Properties: &vedro.BucketProperties{
 			Versioning:   fromYcVersioning(bucket.Versioning),
@@ -286,23 +294,23 @@ func (y *ycsAPI) GetBucket(
 
 }
 
-func (y *ycsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) error {
+func (y *ycsAPI) CreateBucket(ctx context.Context, name string, attrs cloud.BucketAttrs) (*cloud.BucketAttrs, error) {
 	bucketClient := storagesdk.NewBucketClient(y.sdk)
 	request, err := toCreateBucketRequest(attrs, y.folderId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	op, err := bucketClient.Create(ctx, request)
 	if err != nil {
-		return fmt.Errorf("yc create bucket operation: %v", err)
+		return nil, fmt.Errorf("yc create bucket operation: %v", err)
 	}
 
-	_, err = op.Wait(ctx)
+	bucket, err := op.Wait(ctx)
 	if err != nil {
-		return fmt.Errorf("yc wait create bucket: %v", err)
+		return nil, fmt.Errorf("yc wait create bucket: %v", err)
 	}
 
-	return nil
+	return fromYcBucket(bucket, y.location)
 }
 
 func (y *ycsAPI) UpdateBucket(ctx context.Context, name string, patch cloud.BucketPatch) (*cloud.BucketAttrs, error) {
@@ -414,6 +422,117 @@ func (y *ycsAPI) DeleteBucket(ctx context.Context, name string) error {
 	}
 
 	return nil
+}
+
+func (y *ycsAPI) HasAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) (bool, error) {
+	it := storagesdk.NewBucketClient(y.sdk).AccessBindingsIterator(ctx, &ycaccess.ListAccessBindingsRequest{
+		ResourceId: access.BucketId,
+	})
+
+	roleId, ok := accessLevelMapping[access.GrantedAccess]
+
+	if !ok {
+		return false, fmt.Errorf("Access level does not map to any yc role")
+	}
+
+	for it.Next() {
+		binding := it.Value()
+		subject := binding.GetSubject()
+
+		if subject == nil {
+			continue
+		}
+
+		if subject.GetType() == "serviceAccount" &&
+			subject.GetId() == access.PrincipalId &&
+			binding.GetRoleId() == roleId {
+			return true, nil
+		}
+	}
+
+	if err := it.Error(); err != nil {
+		if isNotFound(err) {
+			return false, cloud.ErrBucketNotFound
+		}
+		return false, fmt.Errorf(
+			"list access bindings for bucket %q: %w",
+			access.BucketName,
+			err,
+		)
+	}
+
+	return false, nil
+}
+
+func (y *ycsAPI) accessControl(
+	ctx context.Context,
+	action ycaccess.AccessBindingAction,
+	access cloud.BucketAccessAttrs,
+) error {
+	roleId, ok := accessLevelMapping[access.GrantedAccess]
+
+	if !ok {
+		return fmt.Errorf("Access level does not map to any yc role")
+	}
+
+	op, err := storagesdk.NewBucketClient(y.sdk).UpdateAccessBindings(
+		ctx,
+		&ycaccess.UpdateAccessBindingsRequest{
+			ResourceId: access.BucketId,
+			AccessBindingDeltas: []*ycaccess.AccessBindingDelta{
+				{
+					Action: action,
+					AccessBinding: &ycaccess.AccessBinding{
+						RoleId: roleId,
+						Subject: &ycaccess.Subject{
+							Id:   access.PrincipalId,
+							Type: "serviceAccount",
+						},
+					},
+				},
+			},
+		},
+	)
+	if err != nil {
+		if isNotFound(err) {
+			return cloud.ErrBucketNotFound
+		}
+		return fmt.Errorf(
+			"update access bindings for bucket %q: %w",
+			access.BucketName,
+			err,
+		)
+	}
+
+	if _, err := op.Wait(ctx); err != nil {
+		if isNotFound(err) {
+			return cloud.ErrBucketNotFound
+		}
+		return fmt.Errorf(
+			"wait for bucket %q access binding update: %w",
+			access.BucketName,
+			err,
+		)
+	}
+
+	return nil
+}
+
+func (y *ycsAPI) GrantAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) error {
+	return y.accessControl(ctx, ycaccess.AccessBindingAction_ADD, access)
+}
+
+func (y *ycsAPI) RevokeAccess(
+	ctx context.Context,
+	access cloud.BucketAccessAttrs,
+) error {
+	return y.accessControl(ctx, ycaccess.AccessBindingAction_REMOVE, access)
 }
 
 func (y *ycsAPI) Close(ctx context.Context) error {

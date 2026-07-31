@@ -9,6 +9,7 @@ import (
 )
 
 func appliedState(
+	id string,
 	location string,
 	bckt vedro.Bucket,
 ) *cloud.BucketAttrs {
@@ -17,6 +18,7 @@ func appliedState(
 
 	return &cloud.BucketAttrs{
 		Name:     bucketName,
+		Id:       id,
 		Location: location,
 		Properties: &vedro.BucketProperties{
 			StorageClass:           spec.StorageClass,

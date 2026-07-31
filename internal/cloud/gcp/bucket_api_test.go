@@ -1,17 +1,38 @@
 package gcp
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"google.golang.org/api/googleapi"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"cloud.google.com/go/storage"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
+)
+
+var _ = DescribeTable(
+	"isGoogleAPINotFound",
+	func(err error, expected bool) {
+		Expect(isGoogleAPINotFound(err)).To(Equal(expected))
+	},
+	Entry("nil error", nil, false),
+	Entry("storage bucket sentinel", storage.ErrBucketNotExist, true),
+	Entry("wrapped storage bucket sentinel", fmt.Errorf("get policy: %w", storage.ErrBucketNotExist), true),
+	Entry("Google API 404", &googleapi.Error{Code: 404}, true),
+	Entry("wrapped Google API 404", fmt.Errorf("get policy: %w", &googleapi.Error{Code: 404}), true),
+	Entry("gRPC NotFound", status.Error(codes.NotFound, "bucket not found"), true),
+	Entry("wrapped gRPC NotFound", fmt.Errorf("get policy: %w", status.Error(codes.NotFound, "bucket not found")), true),
+	Entry("Google API non-404", &googleapi.Error{Code: 403}, false),
+	Entry("gRPC non-NotFound", status.Error(codes.PermissionDenied, "denied"), false),
+	Entry("unrelated error", fmt.Errorf("boom"), false),
 )
 
 // gcsSetLabels reads the unexported setLabels map from a
@@ -532,6 +553,7 @@ var _ = Describe("fromGCSBucketAttrs", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(result).NotTo(BeNil())
 		Expect(result.Name).To(Equal("my-bucket"))
+		Expect(result.Id).To(Equal("my-bucket"))
 		Expect(result.Location).To(Equal("EUROPE-WEST1"))
 		Expect(result.Properties).NotTo(BeNil())
 

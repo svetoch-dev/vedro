@@ -12,8 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type CloudPrincipalResolver struct {
-	vedro.CloudPrincipal
+type BucketAccessResolver struct {
+	vedro.BucketAccess
 
 	KubeClient client.Client
 	Logger     logr.Logger
@@ -22,40 +22,40 @@ type CloudPrincipalResolver struct {
 	Error     error
 }
 
-func (o *CloudPrincipalResolver) IsOk() bool {
+func (o *BucketAccessResolver) IsOk() bool {
 	return o.Error == nil
 }
 
-func (o *CloudPrincipalResolver) IsReady() (*metav1.Condition, bool) {
+func (o *BucketAccessResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
 }
 
-func (o *CloudPrincipalResolver) Resolve(
+func (o *BucketAccessResolver) Resolve(
 	ctx context.Context,
 	name types.NamespacedName,
 ) {
 	o.Error = nil
-	o.CloudPrincipal = vedro.CloudPrincipal{}
-	o.Logger.V(1).Info("getting CloudPrincipal")
+	o.BucketAccess = vedro.BucketAccess{}
+	o.Logger.V(1).Info("getting BucketAccess")
 
 	o.Condition = metav1.Condition{
 		Type:   conditions.TypeReady,
 		Status: metav1.ConditionFalse,
 	}
 
-	err := o.KubeClient.Get(ctx, name, &o.CloudPrincipal)
+	err := o.KubeClient.Get(ctx, name, &o.BucketAccess)
 	if err != nil {
 		o.Error = err
 
 		if apierrors.IsNotFound(err) {
-			o.Logger.Info("CloudPrincipal not found")
+			o.Logger.Info("BucketAccess not found")
 			o.Condition.Reason = conditions.ReasonCloudPrincipalNotFound
-			o.Condition.Message = "CloudPrincipal was not found"
+			o.Condition.Message = "BucketAccess was not found"
 			return
 		}
-		o.Logger.Error(err, "failed to get CloudPrincipal")
+		o.Logger.Error(err, "failed to get BucketAccess")
 
-		o.Condition.Reason = conditions.ReasonCloudPrincipalGetFailed
+		o.Condition.Reason = conditions.ReasonBucketAccessGetFailed
 		o.Condition.Message = err.Error()
 	}
 }

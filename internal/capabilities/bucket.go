@@ -7,56 +7,6 @@ import (
 	"github.com/svetoch-dev/vedro/internal/cloud"
 )
 
-var (
-	unsupportedFeatures = map[string]vedro.UnsupportedFeature{
-		"Versioning": {
-			Field:   "spec.Versioning",
-			Message: "Versioning is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedVersioning,
-		},
-		"Lifecycle": {
-			Field:   "spec.lifecycle",
-			Message: "Lifecycle is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLifecycle,
-		},
-		"LifecycleEpiration": {
-			Field:   "spec.lifecycle.rules[%d].AgeDays",
-			Message: "Object expiration is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLifecycleExpiration,
-		},
-		"LifecycleNamed": {
-			Field:   "spec.lifecycle.rules[%d].Name",
-			Message: "Named lifecycle rules are not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLifecycleNamed,
-		},
-		"Labels": {
-			Field:   "spec.Labels",
-			Message: "Labels are not supported by this provider",
-			Reason:  vedro.BucketUnsupportedLabels,
-		},
-		"PublicAccessPrevention": {
-			Field:   "spec.PublicAccessPrevention",
-			Message: "PublicAccessPrevention is not supported by this provider",
-			Reason:  vedro.BucketUnsupportedPublicAccessPrevention,
-		},
-		"StorageClassWarm": {
-			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassWarm),
-			Reason:  vedro.BucketUnsupportedStorageClass,
-		},
-		"StorageClassIce": {
-			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassIce),
-			Reason:  vedro.BucketUnsupportedStorageClass,
-		},
-		"StorageClassCold": {
-			Field:   "spec.StorageClass",
-			Message: fmt.Sprintf("StorageClass %s is not supported by this provider", vedro.BucketStorageClassCold),
-			Reason:  vedro.BucketUnsupportedStorageClass,
-		},
-	}
-)
-
 func lifecycleHasExpiredRule(rules []vedro.BucketLifecycleRule) (bool, int) {
 	for i, rule := range rules {
 		if rule.AgeDays != nil {

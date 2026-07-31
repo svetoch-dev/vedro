@@ -5,6 +5,7 @@ resources:
 - bases/vedro.svetoch.dev_providerconfigs.yaml
 - bases/vedro.svetoch.dev_buckets.yaml
 - bases/vedro.svetoch.dev_cloudprincipals.yaml
+- bases/vedro.svetoch.dev_bucketaccesses.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

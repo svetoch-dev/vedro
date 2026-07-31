@@ -57,3 +57,21 @@ metadata:
 spec:
   providerRef:
     name: providerconfig-sample-gcp
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: BucketAccess
+metadata:
+  labels:
+    app.kubernetes.io/name: vedro
+    app.kubernetes.io/managed-by: kustomize
+  name: access-sample-gcp
+  namespace: vedro-system
+spec:
+  principalRef:
+    name: principal-sample-gcp
+    namespace: vedro-system
+  bucketRef:
+    name: bucket-sample-gcp
+    namespace: vedro-system
+  access:
+    level: BucketAdmin

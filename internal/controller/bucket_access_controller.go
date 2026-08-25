@@ -390,8 +390,8 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 			}
 			return ReconcileError(ctx, err, "unable to delete external BucketAccess")
 		}
-
 	}
+
 	controllerutil.RemoveFinalizer(&access.BucketAccess, bucketAccessFinalizer)
 	if err := r.Update(ctx, &access.BucketAccess); err != nil {
 		return ReconcileError(ctx, err, "remove finalizer error")

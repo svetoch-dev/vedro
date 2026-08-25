@@ -18,6 +18,7 @@ rules:
   - bucketaccesses
   - buckets
   - cloudprincipals
+  - providerconfigs
   verbs:
   - create
   - delete
@@ -32,6 +33,7 @@ rules:
   - bucketaccesses/finalizers
   - buckets/finalizers
   - cloudprincipals/finalizers
+  - providerconfigs/finalizers
   verbs:
   - update
 - apiGroups:
@@ -40,17 +42,8 @@ rules:
   - bucketaccesses/status
   - buckets/status
   - cloudprincipals/status
+  - providerconfigs/status
   verbs:
   - get
   - patch
   - update
-- apiGroups:
-  - vedro.svetoch.dev
-  resources:
-  - providerconfigs
-  verbs:
-  - create
-  - get
-  - list
-  - update
-  - watch

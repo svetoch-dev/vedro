@@ -55,6 +55,7 @@ const (
 	ReasonProviderConfigInvalidSpec = "ProviderConfigInvalidSpec"
 	ReasonProviderConfigReconciled  = "Reconciled"
 	ReasonProviderConfigSet         = "ProviderConfigSet"
+	ReasonProviderConfigNotReady    = "ProviderConfigNotReady"
 	ReasonProviderConfigReady       = "ProviderConfigReady"
 )
 

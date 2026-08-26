@@ -29,7 +29,6 @@ import (
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/conditions"
-	"github.com/svetoch-dev/vedro/internal/validation"
 )
 
 var _ = Describe("prepareProvider", func() {
@@ -76,38 +75,9 @@ var _ = Describe("prepareProvider", func() {
 		Expect(setup.Config.Condition.Message).To(Equal(factoryErr.Error()))
 	})
 
-	It("returns the provider and reports an invalid ProviderConfig", func() {
-		createProviderConfig(ctx)
-		provider := &providerConfigValidationProvider{
-			fakeProvider: &fakeProvider{},
-			result:       validation.Invalid("invalid provider config"),
-		}
-
-		setup, issue := prepareProvider(
-			ctx,
-			vedro.ProviderConfigReference{Name: "test-provider"},
-			k8sClient,
-			func(context.Context, vedro.ProviderConfig, client.Client) (cloud.Provider, error) {
-				return provider, nil
-			},
-		)
-
-		Expect(issue).NotTo(BeNil())
-		Expect(issue.Kind).To(Equal(ProviderConfigInvalid))
-		Expect(issue.Error).To(HaveOccurred())
-		Expect(setup.Provider).To(BeIdenticalTo(provider))
-		Expect(setup.Config.Condition.Status).To(Equal(metav1.ConditionFalse))
-		Expect(setup.Config.Condition.Reason).To(Equal(conditions.ReasonProviderConfigInvalidSpec))
-		Expect(setup.Config.Condition.Message).To(Equal("invalid provider config"))
-	})
-
 	It("returns a configured provider with a ready condition", func() {
 		createProviderConfig(ctx)
-		provider := &providerConfigValidationProvider{
-			fakeProvider: &fakeProvider{},
-			result:       validation.Valid(),
-		}
-
+		provider := &fakeProvider{}
 		setup, issue := prepareProvider(
 			ctx,
 			vedro.ProviderConfigReference{Name: "test-provider"},
@@ -118,21 +88,9 @@ var _ = Describe("prepareProvider", func() {
 		)
 
 		Expect(issue).To(BeNil())
-		Expect(setup.Provider).To(BeIdenticalTo(provider))
 		Expect(setup.Config.Name).To(Equal("test-provider"))
 		Expect(setup.Config.Condition.Status).To(Equal(metav1.ConditionTrue))
 		Expect(setup.Config.Condition.Reason).To(Equal(conditions.ReasonProviderConfigReconciled))
 		Expect(setup.Config.Condition.Message).To(Equal("ProviderConfig Reconciled"))
 	})
 })
-
-type providerConfigValidationProvider struct {
-	*fakeProvider
-	result validation.ValidationResult
-}
-
-func (p *providerConfigValidationProvider) ValidateProviderConfigSpec(
-	vedro.ProviderConfig,
-) validation.ValidationResult {
-	return p.result
-}

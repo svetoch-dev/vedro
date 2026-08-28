@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/go-logr/logr"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
@@ -316,10 +315,8 @@ func (r *BucketAccessReconciler) reconcileBucketAccessFinalizer(
 	req ctrl.Request,
 	bucketAccess *resolvers.BucketAccessResolver,
 ) (ctrl.Result, error, bool) {
-	logger := log.FromContext(ctx)
-
 	if !bucketAccess.DeletionTimestamp.IsZero() {
-		result, err := r.deleteBucketAccess(ctx, logger, req, bucketAccess)
+		result, err := r.deleteBucketAccess(ctx, req, bucketAccess)
 		return result, err, true
 	}
 
@@ -337,10 +334,11 @@ func (r *BucketAccessReconciler) reconcileBucketAccessFinalizer(
 
 func (r *BucketAccessReconciler) deleteBucketAccess(
 	ctx context.Context,
-	logger logr.Logger,
 	req ctrl.Request,
 	access *resolvers.BucketAccessResolver,
 ) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	if !controllerutil.ContainsFinalizer(&access.BucketAccess, bucketAccessFinalizer) {
 		logger.Info("BucketAccess is being deleted, but finalizer is not set; skipping deletion handling")
 		return Reconciled()

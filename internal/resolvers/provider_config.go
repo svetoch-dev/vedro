@@ -28,7 +28,7 @@ func (o *ProviderConfigResolver) IsOk() bool {
 }
 
 func (o *ProviderConfigResolver) IsReady() (*metav1.Condition, bool) {
-	return isReady(o.Generation, o.Status.Conditions)
+	return isReady(o.ObjectMeta, o.Status.Conditions)
 }
 
 func (o *ProviderConfigResolver) Resolve(

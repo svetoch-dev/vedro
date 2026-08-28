@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/go-logr/logr"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
@@ -226,10 +225,8 @@ func (r *BucketReconciler) reconcileBucketFinalizer(
 	req ctrl.Request,
 	bucket *resolvers.BucketResolver,
 ) (ctrl.Result, error, bool) {
-	logger := log.FromContext(ctx)
-
 	if !bucket.DeletionTimestamp.IsZero() {
-		result, err := r.deleteBucket(ctx, logger, req, bucket)
+		result, err := r.deleteBucket(ctx, req, bucket)
 		return result, err, true
 	}
 
@@ -246,10 +243,11 @@ func (r *BucketReconciler) reconcileBucketFinalizer(
 
 func (r *BucketReconciler) deleteBucket(
 	ctx context.Context,
-	logger logr.Logger,
 	req ctrl.Request,
 	bucket *resolvers.BucketResolver,
 ) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
 		logger.Info("Bucket is being deleted, but finalizer is not set; skipping deletion handling")
 		return Reconciled()

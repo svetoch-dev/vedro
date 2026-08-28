@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/go-logr/logr"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
 	"github.com/svetoch-dev/vedro/internal/conditions"
@@ -138,10 +138,8 @@ func (r *ProviderConfigReconciler) reconcileProviderConfigFinalizer(
 	req ctrl.Request,
 	providerConfig *resolvers.ProviderConfigResolver,
 ) (ctrl.Result, error, bool) {
-	logger := log.FromContext(ctx)
-
 	if !providerConfig.DeletionTimestamp.IsZero() {
-		result, err := r.deleteProviderConfig(ctx, logger, req, providerConfig)
+		result, err := r.deleteProviderConfig(ctx, req, providerConfig)
 		return result, err, true
 	}
 
@@ -158,13 +156,24 @@ func (r *ProviderConfigReconciler) reconcileProviderConfigFinalizer(
 
 func (r *ProviderConfigReconciler) deleteProviderConfig(
 	ctx context.Context,
-	logger logr.Logger,
 	req ctrl.Request,
 	providerConfig *resolvers.ProviderConfigResolver,
 ) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	if !controllerutil.ContainsFinalizer(&providerConfig.ProviderConfig, providerConfigFinalizer) {
 		logger.Info("ProviderConfig is being deleted, but finalizer is not set; skipping deletion handling")
 		return Reconciled()
+	}
+
+	hasCRs, err := r.providerConfigHasCRs(ctx, providerConfig.ProviderConfig)
+
+	if err != nil {
+		return ReconcileError(ctx, err, "Unable to list Bucket, CloudPrincipal objects")
+	}
+
+	if hasCRs {
+		return ReconcileAfter(ctx, time.Second*10, "ProviderConfig is referenced by CustomResources waiting for them to be deleted. Requeuing after 10s")
 	}
 
 	controllerutil.RemoveFinalizer(&providerConfig.ProviderConfig, providerConfigFinalizer)
@@ -173,6 +182,35 @@ func (r *ProviderConfigReconciler) deleteProviderConfig(
 	}
 
 	return Reconciled()
+
+}
+
+func (r *ProviderConfigReconciler) providerConfigHasCRs(
+	ctx context.Context,
+	providerConfig vedro.ProviderConfig,
+) (bool, error) {
+	var bucketList vedro.BucketList
+	if err := r.List(ctx, &bucketList); err != nil {
+		return false, err
+	}
+
+	for _, bucket := range bucketList.Items {
+		if bucket.Spec.ProviderRef.Name == providerConfig.Name {
+			return true, nil
+		}
+	}
+	var principalList vedro.CloudPrincipalList
+	if err := r.List(ctx, &principalList); err != nil {
+		return false, err
+	}
+
+	for _, obj := range principalList.Items {
+		if obj.Spec.ProviderRef.Name == providerConfig.Name {
+			return true, nil
+		}
+	}
+
+	return false, nil
 
 }
 

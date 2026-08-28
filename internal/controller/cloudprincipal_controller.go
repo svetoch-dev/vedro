@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/go-logr/logr"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
 	"github.com/svetoch-dev/vedro/internal/conditions"
@@ -187,10 +186,8 @@ func (r *CloudPrincipalReconciler) reconcileCloudPrincipalFinalizer(
 	req ctrl.Request,
 	principal *resolvers.CloudPrincipalResolver,
 ) (ctrl.Result, error, bool) {
-	logger := log.FromContext(ctx)
-
 	if !principal.DeletionTimestamp.IsZero() {
-		result, err := r.deleteCloudPrincipal(ctx, logger, req, principal)
+		result, err := r.deleteCloudPrincipal(ctx, req, principal)
 		return result, err, true
 	}
 
@@ -207,10 +204,11 @@ func (r *CloudPrincipalReconciler) reconcileCloudPrincipalFinalizer(
 
 func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 	ctx context.Context,
-	logger logr.Logger,
 	req ctrl.Request,
 	principal *resolvers.CloudPrincipalResolver,
 ) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	if !controllerutil.ContainsFinalizer(&principal.CloudPrincipal, principalFinalizer) {
 		logger.Info("CloudPrincipal is being deleted, but finalizer is not set; skipping deletion handling")
 		return Reconciled()

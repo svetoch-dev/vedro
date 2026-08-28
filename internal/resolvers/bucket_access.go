@@ -27,7 +27,7 @@ func (o *BucketAccessResolver) IsOk() bool {
 }
 
 func (o *BucketAccessResolver) IsReady() (*metav1.Condition, bool) {
-	return isReady(o.Generation, o.Status.Conditions)
+	return isReady(o.ObjectMeta, o.Status.Conditions)
 }
 
 func (o *BucketAccessResolver) Resolve(

@@ -14,7 +14,7 @@ type ResourceResolver interface {
 	IsReady() (*metav1.Condition, bool)
 }
 
-func isReady(gen int64, conditions []metav1.Condition) (*metav1.Condition, bool) {
+func isReady(meta metav1.ObjectMeta, conditions []metav1.Condition) (*metav1.Condition, bool) {
 	if len(conditions) == 0 {
 		return &metav1.Condition{
 			Type:    cond.TypeReady,
@@ -27,7 +27,11 @@ func isReady(gen int64, conditions []metav1.Condition) (*metav1.Condition, bool)
 		if condition.Status != metav1.ConditionTrue {
 			return &condition, false
 		}
-		if gen != condition.ObservedGeneration {
+		if condition.ObservedGeneration == meta.Generation-1 &&
+			!meta.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if meta.Generation != condition.ObservedGeneration {
 			return &metav1.Condition{
 				Type:    condition.Type,
 				Status:  metav1.ConditionFalse,

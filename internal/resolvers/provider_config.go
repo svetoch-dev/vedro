@@ -31,12 +31,36 @@ func (o *ProviderConfigResolver) IsBeingDeleted() bool {
 	return !o.DeletionTimestamp.IsZero()
 }
 
-func (o *ProviderConfigResolver) IsDeletingExternalResource() bool {
-	return false
-}
-
 func (o *ProviderConfigResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
+}
+
+func (o *ProviderConfigResolver) IsReferenced(
+	ctx context.Context,
+) (bool, error) {
+	var bucketList vedro.BucketList
+	if err := o.KubeClient.List(ctx, &bucketList); err != nil {
+		return false, err
+	}
+
+	for _, bucket := range bucketList.Items {
+		if bucket.Spec.ProviderRef.Name == o.Name {
+			return true, nil
+		}
+	}
+	var principalList vedro.CloudPrincipalList
+	if err := o.KubeClient.List(ctx, &principalList); err != nil {
+		return false, err
+	}
+
+	for _, obj := range principalList.Items {
+		if obj.Spec.ProviderRef.Name == o.Name {
+			return true, nil
+		}
+	}
+
+	return false, nil
+
 }
 
 func (o *ProviderConfigResolver) Resolve(

@@ -368,7 +368,7 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 	}
 
 	if access.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
-		logger.Info("skipping BucketAccess deletion because deletionPolicy is Retain")
+		logger.Info("not revoking permissions because deletionPolicy is Retain")
 	}
 
 	if access.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {

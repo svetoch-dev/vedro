@@ -166,13 +166,13 @@ func (r *ProviderConfigReconciler) deleteProviderConfig(
 		return Reconciled()
 	}
 
-	hasReference, err := r.hasReference(ctx, providerConfig.ProviderConfig)
+	referenced, err := providerConfig.IsReferenced(ctx)
 
 	if err != nil {
 		return ReconcileError(ctx, err, "Unable to list Bucket, CloudPrincipal objects")
 	}
 
-	if hasReference {
+	if referenced {
 		return ReconcileAfter(ctx, time.Second*10, "ProviderConfig is referenced by CustomResources waiting for them to be deleted. Requeuing after 10s")
 	}
 
@@ -182,35 +182,6 @@ func (r *ProviderConfigReconciler) deleteProviderConfig(
 	}
 
 	return Reconciled()
-
-}
-
-func (r *ProviderConfigReconciler) hasReference(
-	ctx context.Context,
-	providerConfig vedro.ProviderConfig,
-) (bool, error) {
-	var bucketList vedro.BucketList
-	if err := r.List(ctx, &bucketList); err != nil {
-		return false, err
-	}
-
-	for _, bucket := range bucketList.Items {
-		if bucket.Spec.ProviderRef.Name == providerConfig.Name {
-			return true, nil
-		}
-	}
-	var principalList vedro.CloudPrincipalList
-	if err := r.List(ctx, &principalList); err != nil {
-		return false, err
-	}
-
-	for _, obj := range principalList.Items {
-		if obj.Spec.ProviderRef.Name == providerConfig.Name {
-			return true, nil
-		}
-	}
-
-	return false, nil
 
 }
 

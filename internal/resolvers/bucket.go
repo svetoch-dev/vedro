@@ -34,8 +34,22 @@ func (o *BucketResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
 }
 
-func (o *BucketResolver) IsDeletingExternalResource() bool {
-	return o.IsBeingDeleted() && o.Spec.DeletionPolicy == vedro.DeletionPolicyDelete
+func (o *BucketResolver) IsReferenced(
+	ctx context.Context,
+) (bool, error) {
+	var bucketAccessList vedro.BucketAccessList
+	if err := o.KubeClient.List(ctx, &bucketAccessList); err != nil {
+		return false, err
+	}
+
+	for _, bucketAccess := range bucketAccessList.Items {
+		if bucketAccess.Spec.BucketRef.Name == o.Name &&
+			bucketAccess.Spec.BucketRef.Namespace == o.Namespace {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (o *BucketResolver) Resolve(

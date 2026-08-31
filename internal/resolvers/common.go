@@ -12,7 +12,7 @@ type ResourceResolver interface {
 	Resolve(ctx context.Context, name types.NamespacedName)
 	IsOk() bool
 	IsBeingDeleted() bool
-	IsDeletingExternalResource() bool
+	IsReferenced(ctx context.Context) (bool, error)
 	IsReady() (*metav1.Condition, bool)
 }
 

@@ -70,7 +70,7 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	ctx = log.IntoContext(ctx, logger)
 
-	if result, err, handled := r.reconcileProviderConfigFinalizer(ctx, req, &providerConfig); handled {
+	if result, err, handled := r.reconcileProviderConfigFinalizer(ctx, &providerConfig); handled {
 		return result, err
 	}
 
@@ -135,11 +135,10 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 // handles deletion paths
 func (r *ProviderConfigReconciler) reconcileProviderConfigFinalizer(
 	ctx context.Context,
-	req ctrl.Request,
 	providerConfig *resolvers.ProviderConfigResolver,
 ) (ctrl.Result, error, bool) {
 	if providerConfig.IsBeingDeleted() {
-		result, err := r.deleteProviderConfig(ctx, req, providerConfig)
+		result, err := r.deleteProviderConfig(ctx, providerConfig)
 		return result, err, true
 	}
 
@@ -156,7 +155,6 @@ func (r *ProviderConfigReconciler) reconcileProviderConfigFinalizer(
 
 func (r *ProviderConfigReconciler) deleteProviderConfig(
 	ctx context.Context,
-	req ctrl.Request,
 	providerConfig *resolvers.ProviderConfigResolver,
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)

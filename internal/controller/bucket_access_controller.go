@@ -84,30 +84,18 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return result, err
 	}
 
-	bucket := resolvers.BucketResolver{
-		KubeClient: r.Client,
-		Logger:     logger,
-	}
-
-	bucket.Resolve(ctx, types.NamespacedName{
-		Namespace: bucketAccess.Spec.BucketRef.Namespace,
-		Name:      bucketAccess.Spec.BucketRef.Name,
-	})
+	bucket, bucketStatus := prepareBucket(ctx, r.Client, bucketAccess.Spec.BucketRef)
 	bucket.Condition.ObservedGeneration = bucketAccess.Generation
-	bucket.Condition.Type = conditions.TypeBucketReady
-
-	if bucket.IsBeingDeleted() {
-		logger.Info("deleting BucketAccess because referenced Bucket is terminating")
-
+	switch bucketStatus {
+	case BucketBeingDeleted:
 		if err := r.Delete(ctx, &bucketAccess.BucketAccess); err != nil &&
 			!apierrors.IsNotFound(err) {
 			return ReconcileError(ctx, err, "delete BucketAccess")
 		}
 
 		return Reconciled()
-	}
 
-	if !bucket.IsOk() {
+	case BucketNotOk:
 		copyConditionState(&bucketAccess.Condition, bucket.Condition)
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
@@ -122,46 +110,30 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			bucket.Error,
 			"unable to fetch Bucket",
 		)
-	}
 
-	notReadyCondition, ok := bucket.IsReady()
-
-	if !ok {
-		logger.Info("Bucket is not Ready")
-		copyConditionState(&bucket.Condition, *notReadyCondition)
+	case BucketNotReady:
 		bucketAccess.Condition.Status = metav1.ConditionFalse
 		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessDependencyNotReady
 		bucketAccess.Condition.Message = "Bucket is not Ready"
-	} else {
+	case BucketOk:
 		bucket.Condition.Status = metav1.ConditionTrue
 		bucket.Condition.Reason = conditions.ReasonBucketReady
 		bucket.Condition.Message = "Bucket Ready"
 	}
 
-	principal := resolvers.CloudPrincipalResolver{
-		KubeClient: r.Client,
-		Logger:     logger,
-	}
-
-	principal.Resolve(ctx, types.NamespacedName{
-		Namespace: bucketAccess.Spec.PrincipalRef.Namespace,
-		Name:      bucketAccess.Spec.PrincipalRef.Name,
-	})
+	principal, principalStatus := prepareCloudPrincipal(ctx, r.Client, bucketAccess.Spec.PrincipalRef)
 	principal.Condition.ObservedGeneration = bucketAccess.Generation
-	principal.Condition.Type = conditions.TypeCloudPrincipalReady
 
-	if principal.IsBeingDeleted() {
-		logger.Info("deleting BucketAccess because referenced CloudPrincipal is terminating")
-
+	switch principalStatus {
+	case CloudPrincipalBeingDeleted:
 		if err := r.Delete(ctx, &bucketAccess.BucketAccess); err != nil &&
 			!apierrors.IsNotFound(err) {
 			return ReconcileError(ctx, err, "delete BucketAccess")
 		}
 
 		return Reconciled()
-	}
 
-	if !principal.IsOk() {
+	case CloudPrincipalNotOk:
 		copyConditionState(&bucketAccess.Condition, principal.Condition)
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
@@ -177,17 +149,12 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			principal.Error,
 			"unable to fetch Principal",
 		)
-	}
 
-	notReadyCondition, ok = principal.IsReady()
-
-	if !ok {
-		logger.Info("Principal is not Ready")
-		copyConditionState(&principal.Condition, *notReadyCondition)
+	case CloudPrincipalNotReady:
 		bucketAccess.Condition.Status = metav1.ConditionFalse
 		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessDependencyNotReady
 		bucketAccess.Condition.Message = "CloudPrincipal is not Ready"
-	} else {
+	case CloudPrincipalOk:
 		principal.Condition.Status = metav1.ConditionTrue
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalReady
 		principal.Condition.Message = "CloudPrincipal Ready"
@@ -220,6 +187,24 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		return Reconciled()
 	}
+
+	return r.reconcileBucketAccess(
+		ctx,
+		req,
+		&bucket,
+		&bucketAccess,
+		&principal,
+	)
+}
+
+func (r *BucketAccessReconciler) reconcileBucketAccess(
+	ctx context.Context,
+	req ctrl.Request,
+	bucket *resolvers.BucketResolver,
+	bucketAccess *resolvers.BucketAccessResolver,
+	principal *resolvers.CloudPrincipalResolver,
+) (reconcile.Result, error) {
+	logger := log.FromContext(ctx)
 
 	providerFactory := r.ProviderFactory
 	if providerFactory == nil {

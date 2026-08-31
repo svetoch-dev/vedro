@@ -27,8 +27,16 @@ func (o *ProviderConfigResolver) IsOk() bool {
 	return o.Error == nil
 }
 
+func (o *ProviderConfigResolver) IsBeingDeleted() bool {
+	return !o.DeletionTimestamp.IsZero()
+}
+
+func (o *ProviderConfigResolver) IsDeletingExternalResource() bool {
+	return false
+}
+
 func (o *ProviderConfigResolver) IsReady() (*metav1.Condition, bool) {
-	return isReady(o.ObjectMeta, o.Status.Conditions)
+	return isReady(o.Generation, o.Status.Conditions)
 }
 
 func (o *ProviderConfigResolver) Resolve(

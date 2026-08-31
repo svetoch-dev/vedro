@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -186,7 +187,7 @@ func (r *CloudPrincipalReconciler) reconcileCloudPrincipalFinalizer(
 	req ctrl.Request,
 	principal *resolvers.CloudPrincipalResolver,
 ) (ctrl.Result, error, bool) {
-	if !principal.DeletionTimestamp.IsZero() {
+	if principal.IsBeingDeleted() {
 		result, err := r.deleteCloudPrincipal(ctx, req, principal)
 		return result, err, true
 	}
@@ -217,7 +218,19 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 	if principal.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
 		logger.Info("skipping CloudPrincipal deletion because deletionPolicy is Retain")
 	}
+
+	hasReference, err := r.hasReference(ctx, principal.CloudPrincipal)
+
+	if err != nil {
+		return ReconcileError(ctx, err, "Unable to list BucketAccess objects")
+	}
+
+	if hasReference {
+		return ReconcileAfter(ctx, time.Second*10, "CloudPrincipal Is referenced by BucketAcces objects waiting for them to be deleted. Requeuing after 10s")
+	}
+
 	if principal.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
+
 		logger.Info("deleting CloudPrincipal")
 		providerFactory := r.ProviderFactory
 		if providerFactory == nil {
@@ -273,6 +286,25 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 	}
 	return Reconciled()
 
+}
+
+func (r *CloudPrincipalReconciler) hasReference(
+	ctx context.Context,
+	principal vedro.CloudPrincipal,
+) (bool, error) {
+	var bucketAccessList vedro.BucketAccessList
+	if err := r.List(ctx, &bucketAccessList); err != nil {
+		return false, err
+	}
+
+	for _, bucketAccess := range bucketAccessList.Items {
+		if bucketAccess.Spec.PrincipalRef.Name == principal.Name &&
+			bucketAccess.Spec.PrincipalRef.Namespace == principal.Namespace {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (r *CloudPrincipalReconciler) patchStatus(

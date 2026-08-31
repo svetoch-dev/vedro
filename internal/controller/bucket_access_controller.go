@@ -20,6 +20,7 @@ import (
 	"context"
 	"reflect"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -95,6 +96,17 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	bucket.Condition.ObservedGeneration = bucketAccess.Generation
 	bucket.Condition.Type = conditions.TypeBucketReady
 
+	if bucket.IsBeingDeleted() {
+		logger.Info("deleting BucketAccess because referenced Bucket is terminating")
+
+		if err := r.Delete(ctx, &bucketAccess.BucketAccess); err != nil &&
+			!apierrors.IsNotFound(err) {
+			return ReconcileError(ctx, err, "delete BucketAccess")
+		}
+
+		return Reconciled()
+	}
+
 	if !bucket.IsOk() {
 		copyConditionState(&bucketAccess.Condition, bucket.Condition)
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
@@ -137,6 +149,17 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	})
 	principal.Condition.ObservedGeneration = bucketAccess.Generation
 	principal.Condition.Type = conditions.TypeCloudPrincipalReady
+
+	if principal.IsBeingDeleted() {
+		logger.Info("deleting BucketAccess because referenced CloudPrincipal is terminating")
+
+		if err := r.Delete(ctx, &bucketAccess.BucketAccess); err != nil &&
+			!apierrors.IsNotFound(err) {
+			return ReconcileError(ctx, err, "delete BucketAccess")
+		}
+
+		return Reconciled()
+	}
 
 	if !principal.IsOk() {
 		copyConditionState(&bucketAccess.Condition, principal.Condition)
@@ -315,7 +338,7 @@ func (r *BucketAccessReconciler) reconcileBucketAccessFinalizer(
 	req ctrl.Request,
 	bucketAccess *resolvers.BucketAccessResolver,
 ) (ctrl.Result, error, bool) {
-	if !bucketAccess.DeletionTimestamp.IsZero() {
+	if bucketAccess.IsBeingDeleted() {
 		result, err := r.deleteBucketAccess(ctx, req, bucketAccess)
 		return result, err, true
 	}
@@ -344,49 +367,55 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 		return Reconciled()
 	}
 
-	if access.Status.Applied != nil {
-		logger.Info("deleting BucketAccess")
-		providerFactory := r.ProviderFactory
-		if providerFactory == nil {
-			providerFactory = registry.NewProvider
-		}
-		providerRef := vedro.ProviderConfigReference{
-			Name: access.Status.ObservedProvider,
-		}
+	if access.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+		logger.Info("skipping BucketAccess deletion because deletionPolicy is Retain")
+	}
 
-		providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
-
-		provider := providerSetup.Provider
-
-		if provider != nil {
-			defer func() {
-				if err := provider.Cleanup(ctx); err != nil {
-					logger.Error(err, "provider cleanup failed")
-				}
-			}()
-		}
-
-		if issue != nil {
-			return ReconcileError(
-				ctx,
-				issue.Error,
-				"unable to prepare provider for BucketAccess deletion",
-			)
-		}
-
-		err := provider.Access().DeleteBucketAccess(ctx, access.BucketAccess)
-		if err != nil {
-			access.Condition.Status = metav1.ConditionFalse
-			access.Condition.Reason = conditions.ReasonBucketAccessDeleteError
-			access.Condition.Message = err.Error()
-
-			patchErr := r.patchStatus(ctx, req, access.Generation, func(p *vedro.BucketAccess) {
-				meta.SetStatusCondition(&p.Status.Conditions, access.Condition)
-			})
-			if patchErr != nil {
-				return ReconcileError(ctx, patchErr, "patch error")
+	if access.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
+		if access.Status.Applied != nil {
+			logger.Info("deleting BucketAccess")
+			providerFactory := r.ProviderFactory
+			if providerFactory == nil {
+				providerFactory = registry.NewProvider
 			}
-			return ReconcileError(ctx, err, "unable to delete external BucketAccess")
+			providerRef := vedro.ProviderConfigReference{
+				Name: access.Status.ObservedProvider,
+			}
+
+			providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
+
+			provider := providerSetup.Provider
+
+			if provider != nil {
+				defer func() {
+					if err := provider.Cleanup(ctx); err != nil {
+						logger.Error(err, "provider cleanup failed")
+					}
+				}()
+			}
+
+			if issue != nil {
+				return ReconcileError(
+					ctx,
+					issue.Error,
+					"unable to prepare provider for BucketAccess deletion",
+				)
+			}
+
+			err := provider.Access().DeleteBucketAccess(ctx, access.BucketAccess)
+			if err != nil {
+				access.Condition.Status = metav1.ConditionFalse
+				access.Condition.Reason = conditions.ReasonBucketAccessDeleteError
+				access.Condition.Message = err.Error()
+
+				patchErr := r.patchStatus(ctx, req, access.Generation, func(p *vedro.BucketAccess) {
+					meta.SetStatusCondition(&p.Status.Conditions, access.Condition)
+				})
+				if patchErr != nil {
+					return ReconcileError(ctx, patchErr, "patch error")
+				}
+				return ReconcileError(ctx, err, "unable to delete external BucketAccess")
+			}
 		}
 	}
 

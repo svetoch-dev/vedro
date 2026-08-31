@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -225,7 +226,7 @@ func (r *BucketReconciler) reconcileBucketFinalizer(
 	req ctrl.Request,
 	bucket *resolvers.BucketResolver,
 ) (ctrl.Result, error, bool) {
-	if !bucket.DeletionTimestamp.IsZero() {
+	if bucket.IsBeingDeleted() {
 		result, err := r.deleteBucket(ctx, req, bucket)
 		return result, err, true
 	}
@@ -255,6 +256,16 @@ func (r *BucketReconciler) deleteBucket(
 
 	if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
 		logger.Info("skipping Bucket deletion because deletionPolicy is Retain")
+	}
+
+	hasReference, err := r.hasReference(ctx, bucket.Bucket)
+
+	if err != nil {
+		return ReconcileError(ctx, err, "Unable to list BucketAccess objects")
+	}
+
+	if hasReference {
+		return ReconcileAfter(ctx, time.Second*10, "Bucket is referenced by BucketAcces objects waiting for them to be deleted. Requeuing after 10s")
 	}
 
 	if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
@@ -314,6 +325,25 @@ func (r *BucketReconciler) deleteBucket(
 
 	return Reconciled()
 
+}
+
+func (r *BucketReconciler) hasReference(
+	ctx context.Context,
+	bucket vedro.Bucket,
+) (bool, error) {
+	var bucketAccessList vedro.BucketAccessList
+	if err := r.List(ctx, &bucketAccessList); err != nil {
+		return false, err
+	}
+
+	for _, bucketAccess := range bucketAccessList.Items {
+		if bucketAccess.Spec.BucketRef.Name == bucket.Name &&
+			bucketAccess.Spec.BucketRef.Namespace == bucket.Namespace {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (r *BucketReconciler) patchStatus(

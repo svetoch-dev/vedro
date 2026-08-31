@@ -90,7 +90,7 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")
 		}
-		return Reconciled()
+		return ReconcileError(ctx, err, "ProviderConfig error")
 	}
 
 	defer func() {
@@ -138,7 +138,7 @@ func (r *ProviderConfigReconciler) reconcileProviderConfigFinalizer(
 	req ctrl.Request,
 	providerConfig *resolvers.ProviderConfigResolver,
 ) (ctrl.Result, error, bool) {
-	if !providerConfig.DeletionTimestamp.IsZero() {
+	if providerConfig.IsBeingDeleted() {
 		result, err := r.deleteProviderConfig(ctx, req, providerConfig)
 		return result, err, true
 	}
@@ -166,13 +166,13 @@ func (r *ProviderConfigReconciler) deleteProviderConfig(
 		return Reconciled()
 	}
 
-	hasCRs, err := r.providerConfigHasCRs(ctx, providerConfig.ProviderConfig)
+	hasReference, err := r.hasReference(ctx, providerConfig.ProviderConfig)
 
 	if err != nil {
 		return ReconcileError(ctx, err, "Unable to list Bucket, CloudPrincipal objects")
 	}
 
-	if hasCRs {
+	if hasReference {
 		return ReconcileAfter(ctx, time.Second*10, "ProviderConfig is referenced by CustomResources waiting for them to be deleted. Requeuing after 10s")
 	}
 
@@ -185,7 +185,7 @@ func (r *ProviderConfigReconciler) deleteProviderConfig(
 
 }
 
-func (r *ProviderConfigReconciler) providerConfigHasCRs(
+func (r *ProviderConfigReconciler) hasReference(
 	ctx context.Context,
 	providerConfig vedro.ProviderConfig,
 ) (bool, error) {

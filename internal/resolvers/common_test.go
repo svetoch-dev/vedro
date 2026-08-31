@@ -11,11 +11,8 @@ import (
 var _ = Describe("isReady", func() {
 	const generation int64 = 3
 
-	meta := metav1.ObjectMeta{}
-	meta.Generation = generation
-
 	It("reports a resource without conditions as not ready", func() {
-		condition, ready := isReady(meta, nil)
+		condition, ready := isReady(generation, nil)
 
 		Expect(ready).To(BeFalse())
 		Expect(condition).To(Equal(&metav1.Condition{
@@ -28,7 +25,7 @@ var _ = Describe("isReady", func() {
 
 	DescribeTable("evaluates existing conditions",
 		func(conditions []metav1.Condition, expectedReady bool, expectedCondition *metav1.Condition) {
-			condition, ready := isReady(meta, conditions)
+			condition, ready := isReady(generation, conditions)
 
 			Expect(ready).To(Equal(expectedReady))
 			Expect(condition).To(Equal(expectedCondition))

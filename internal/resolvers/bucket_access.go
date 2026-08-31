@@ -26,8 +26,16 @@ func (o *BucketAccessResolver) IsOk() bool {
 	return o.Error == nil
 }
 
+func (o *BucketAccessResolver) IsBeingDeleted() bool {
+	return !o.DeletionTimestamp.IsZero()
+}
+
+func (o *BucketAccessResolver) IsDeletingExternalResource() bool {
+	return o.IsBeingDeleted()
+}
+
 func (o *BucketAccessResolver) IsReady() (*metav1.Condition, bool) {
-	return isReady(o.ObjectMeta, o.Status.Conditions)
+	return isReady(o.Generation, o.Status.Conditions)
 }
 
 func (o *BucketAccessResolver) Resolve(

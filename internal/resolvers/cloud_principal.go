@@ -26,8 +26,16 @@ func (o *CloudPrincipalResolver) IsOk() bool {
 	return o.Error == nil
 }
 
+func (o *CloudPrincipalResolver) IsBeingDeleted() bool {
+	return !o.DeletionTimestamp.IsZero()
+}
+
 func (o *CloudPrincipalResolver) IsReady() (*metav1.Condition, bool) {
-	return isReady(o.ObjectMeta, o.Status.Conditions)
+	return isReady(o.Generation, o.Status.Conditions)
+}
+
+func (o *CloudPrincipalResolver) IsDeletingExternalResource() bool {
+	return o.IsBeingDeleted() && o.Spec.DeletionPolicy == vedro.DeletionPolicyDelete
 }
 
 func (o *CloudPrincipalResolver) Resolve(

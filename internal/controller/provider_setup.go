@@ -69,7 +69,7 @@ func prepareProvider(
 
 	_, ok := providerConfig.IsReady()
 
-	if !ok {
+	if !ok && !providerConfig.IsBeingDeleted() {
 		msg := "ProviderConfig is not Ready"
 		logger.Info(msg)
 		providerSetup.Config.Condition.Status = metav1.ConditionFalse

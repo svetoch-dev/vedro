@@ -63,6 +63,10 @@ type ProviderConfigStatus struct {
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	// ObservedGeneration is the latest metadata.generation observed by the controller.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +kubebuilder:object:root=true

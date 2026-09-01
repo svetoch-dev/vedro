@@ -487,34 +487,6 @@ func createBucket(
 	return bucket
 }
 
-func createProviderConfig(ctx context.Context) {
-	createProviderConfigNamed(ctx, "test-provider")
-}
-
-func createProviderConfigNamed(ctx context.Context, name string) {
-	providerConfig := &vedro.ProviderConfig{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "vedro.svetoch.dev/v1alpha1",
-			Kind:       "ProviderConfig",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: vedro.ProviderConfigSpec{
-			Type:      vedro.ProviderTypeGCP,
-			ProjectId: "test-project",
-			Region:    "europe-west1",
-			Method:    vedro.AuthMethodWorkloadIdentity,
-		},
-	}
-
-	Expect(k8sClient.Create(ctx, providerConfig)).To(Succeed())
-	DeferCleanup(func() {
-		cleanupProviderConfig(ctx, client.ObjectKeyFromObject(providerConfig))
-	})
-
-}
-
 func getBucket(ctx context.Context, key client.ObjectKey) *vedro.Bucket {
 	bucket := &vedro.Bucket{}
 	Expect(k8sClient.Get(ctx, key, bucket)).To(Succeed())
@@ -532,19 +504,6 @@ func cleanupBucket(ctx context.Context, key client.ObjectKey) {
 	bucket.Finalizers = nil
 	Expect(k8sClient.Update(ctx, bucket)).To(Succeed())
 	err = k8sClient.Delete(ctx, bucket)
-	if err != nil {
-		Expect(apierrors.IsNotFound(err)).To(BeTrue())
-	}
-}
-
-func cleanupProviderConfig(ctx context.Context, key client.ObjectKey) {
-	providerConfig := &vedro.ProviderConfig{}
-	err := k8sClient.Get(ctx, key, providerConfig)
-	if apierrors.IsNotFound(err) {
-		return
-	}
-	Expect(err).NotTo(HaveOccurred())
-	err = k8sClient.Delete(ctx, providerConfig)
 	if err != nil {
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	}

@@ -26,8 +26,30 @@ func (o *CloudPrincipalResolver) IsOk() bool {
 	return o.Error == nil
 }
 
+func (o *CloudPrincipalResolver) IsBeingDeleted() bool {
+	return !o.DeletionTimestamp.IsZero()
+}
+
 func (o *CloudPrincipalResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
+}
+
+func (o *CloudPrincipalResolver) IsReferenced(
+	ctx context.Context,
+) (bool, error) {
+	var bucketAccessList vedro.BucketAccessList
+	if err := o.KubeClient.List(ctx, &bucketAccessList); err != nil {
+		return false, err
+	}
+
+	for _, bucketAccess := range bucketAccessList.Items {
+		if bucketAccess.Spec.PrincipalRef.Name == o.Name &&
+			bucketAccess.Spec.PrincipalRef.Namespace == o.Namespace {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (o *CloudPrincipalResolver) Resolve(

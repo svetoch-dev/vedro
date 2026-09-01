@@ -20,6 +20,7 @@ import (
 	"context"
 	"reflect"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/go-logr/logr"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
@@ -84,19 +84,18 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return result, err
 	}
 
-	bucket := resolvers.BucketResolver{
-		KubeClient: r.Client,
-		Logger:     logger,
-	}
-
-	bucket.Resolve(ctx, types.NamespacedName{
-		Namespace: bucketAccess.Spec.BucketRef.Namespace,
-		Name:      bucketAccess.Spec.BucketRef.Name,
-	})
+	bucket, bucketStatus := prepareBucket(ctx, r.Client, bucketAccess.Spec.BucketRef)
 	bucket.Condition.ObservedGeneration = bucketAccess.Generation
-	bucket.Condition.Type = conditions.TypeBucketReady
+	switch bucketStatus {
+	case BucketBeingDeleted:
+		if err := r.Delete(ctx, &bucketAccess.BucketAccess); err != nil &&
+			!apierrors.IsNotFound(err) {
+			return ReconcileError(ctx, err, "delete BucketAccess")
+		}
 
-	if !bucket.IsOk() {
+		return Reconciled()
+
+	case BucketNotOk:
 		copyConditionState(&bucketAccess.Condition, bucket.Condition)
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
@@ -111,35 +110,30 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			bucket.Error,
 			"unable to fetch Bucket",
 		)
-	}
 
-	notReadyCondition, ok := bucket.IsReady()
-
-	if !ok {
-		logger.Info("Bucket is not Ready")
-		copyConditionState(&bucket.Condition, *notReadyCondition)
+	case BucketNotReady:
 		bucketAccess.Condition.Status = metav1.ConditionFalse
 		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessDependencyNotReady
 		bucketAccess.Condition.Message = "Bucket is not Ready"
-	} else {
+	case BucketOk:
 		bucket.Condition.Status = metav1.ConditionTrue
 		bucket.Condition.Reason = conditions.ReasonBucketReady
 		bucket.Condition.Message = "Bucket Ready"
 	}
 
-	principal := resolvers.CloudPrincipalResolver{
-		KubeClient: r.Client,
-		Logger:     logger,
-	}
-
-	principal.Resolve(ctx, types.NamespacedName{
-		Namespace: bucketAccess.Spec.PrincipalRef.Namespace,
-		Name:      bucketAccess.Spec.PrincipalRef.Name,
-	})
+	principal, principalStatus := prepareCloudPrincipal(ctx, r.Client, bucketAccess.Spec.PrincipalRef)
 	principal.Condition.ObservedGeneration = bucketAccess.Generation
-	principal.Condition.Type = conditions.TypeCloudPrincipalReady
 
-	if !principal.IsOk() {
+	switch principalStatus {
+	case CloudPrincipalBeingDeleted:
+		if err := r.Delete(ctx, &bucketAccess.BucketAccess); err != nil &&
+			!apierrors.IsNotFound(err) {
+			return ReconcileError(ctx, err, "delete BucketAccess")
+		}
+
+		return Reconciled()
+
+	case CloudPrincipalNotOk:
 		copyConditionState(&bucketAccess.Condition, principal.Condition)
 		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
 			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
@@ -155,17 +149,12 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			principal.Error,
 			"unable to fetch Principal",
 		)
-	}
 
-	notReadyCondition, ok = principal.IsReady()
-
-	if !ok {
-		logger.Info("Principal is not Ready")
-		copyConditionState(&principal.Condition, *notReadyCondition)
+	case CloudPrincipalNotReady:
 		bucketAccess.Condition.Status = metav1.ConditionFalse
 		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessDependencyNotReady
 		bucketAccess.Condition.Message = "CloudPrincipal is not Ready"
-	} else {
+	case CloudPrincipalOk:
 		principal.Condition.Status = metav1.ConditionTrue
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalReady
 		principal.Condition.Message = "CloudPrincipal Ready"
@@ -198,6 +187,24 @@ func (r *BucketAccessReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		return Reconciled()
 	}
+
+	return r.reconcileBucketAccess(
+		ctx,
+		req,
+		&bucket,
+		&bucketAccess,
+		&principal,
+	)
+}
+
+func (r *BucketAccessReconciler) reconcileBucketAccess(
+	ctx context.Context,
+	req ctrl.Request,
+	bucket *resolvers.BucketResolver,
+	bucketAccess *resolvers.BucketAccessResolver,
+	principal *resolvers.CloudPrincipalResolver,
+) (reconcile.Result, error) {
+	logger := log.FromContext(ctx)
 
 	providerFactory := r.ProviderFactory
 	if providerFactory == nil {
@@ -316,10 +323,8 @@ func (r *BucketAccessReconciler) reconcileBucketAccessFinalizer(
 	req ctrl.Request,
 	bucketAccess *resolvers.BucketAccessResolver,
 ) (ctrl.Result, error, bool) {
-	logger := log.FromContext(ctx)
-
-	if !bucketAccess.DeletionTimestamp.IsZero() {
-		result, err := r.deleteBucketAccess(ctx, logger, req, bucketAccess)
+	if bucketAccess.IsBeingDeleted() {
+		result, err := r.deleteBucketAccess(ctx, req, bucketAccess)
 		return result, err, true
 	}
 
@@ -337,61 +342,68 @@ func (r *BucketAccessReconciler) reconcileBucketAccessFinalizer(
 
 func (r *BucketAccessReconciler) deleteBucketAccess(
 	ctx context.Context,
-	logger logr.Logger,
 	req ctrl.Request,
 	access *resolvers.BucketAccessResolver,
 ) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	if !controllerutil.ContainsFinalizer(&access.BucketAccess, bucketAccessFinalizer) {
 		logger.Info("BucketAccess is being deleted, but finalizer is not set; skipping deletion handling")
 		return Reconciled()
 	}
 
-	if access.Status.Applied != nil {
-		logger.Info("deleting BucketAccess")
-		providerFactory := r.ProviderFactory
-		if providerFactory == nil {
-			providerFactory = registry.NewProvider
-		}
-		providerRef := vedro.ProviderConfigReference{
-			Name: access.Status.ObservedProvider,
-		}
-
-		providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
-
-		provider := providerSetup.Provider
-
-		if provider != nil {
-			defer func() {
-				if err := provider.Cleanup(ctx); err != nil {
-					logger.Error(err, "provider cleanup failed")
-				}
-			}()
-		}
-
-		if issue != nil {
-			return ReconcileError(
-				ctx,
-				issue.Error,
-				"unable to prepare provider for BucketAccess deletion",
-			)
-		}
-
-		err := provider.Access().DeleteBucketAccess(ctx, access.BucketAccess)
-		if err != nil {
-			access.Condition.Status = metav1.ConditionFalse
-			access.Condition.Reason = conditions.ReasonBucketAccessDeleteError
-			access.Condition.Message = err.Error()
-
-			patchErr := r.patchStatus(ctx, req, access.Generation, func(p *vedro.BucketAccess) {
-				meta.SetStatusCondition(&p.Status.Conditions, access.Condition)
-			})
-			if patchErr != nil {
-				return ReconcileError(ctx, patchErr, "patch error")
-			}
-			return ReconcileError(ctx, err, "unable to delete external BucketAccess")
-		}
-
+	if access.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+		logger.Info("not revoking permissions because deletionPolicy is Retain")
 	}
+
+	if access.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
+		if access.Status.Applied != nil {
+			logger.Info("deleting BucketAccess")
+			providerFactory := r.ProviderFactory
+			if providerFactory == nil {
+				providerFactory = registry.NewProvider
+			}
+			providerRef := vedro.ProviderConfigReference{
+				Name: access.Status.ObservedProvider,
+			}
+
+			providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
+
+			provider := providerSetup.Provider
+
+			if provider != nil {
+				defer func() {
+					if err := provider.Cleanup(ctx); err != nil {
+						logger.Error(err, "provider cleanup failed")
+					}
+				}()
+			}
+
+			if issue != nil {
+				return ReconcileError(
+					ctx,
+					issue.Error,
+					"unable to prepare provider for BucketAccess deletion",
+				)
+			}
+
+			err := provider.Access().DeleteBucketAccess(ctx, access.BucketAccess)
+			if err != nil {
+				access.Condition.Status = metav1.ConditionFalse
+				access.Condition.Reason = conditions.ReasonBucketAccessDeleteError
+				access.Condition.Message = err.Error()
+
+				patchErr := r.patchStatus(ctx, req, access.Generation, func(p *vedro.BucketAccess) {
+					meta.SetStatusCondition(&p.Status.Conditions, access.Condition)
+				})
+				if patchErr != nil {
+					return ReconcileError(ctx, patchErr, "patch error")
+				}
+				return ReconcileError(ctx, err, "unable to delete external BucketAccess")
+			}
+		}
+	}
+
 	controllerutil.RemoveFinalizer(&access.BucketAccess, bucketAccessFinalizer)
 	if err := r.Update(ctx, &access.BucketAccess); err != nil {
 		return ReconcileError(ctx, err, "remove finalizer error")

@@ -67,6 +67,22 @@ func prepareProvider(
 		return providerSetup, &issue
 	}
 
+	_, ok := providerConfig.IsReady()
+
+	if !ok && !providerConfig.IsBeingDeleted() {
+		msg := "ProviderConfig is not Ready"
+		logger.Info(msg)
+		providerSetup.Config.Condition.Status = metav1.ConditionFalse
+		providerSetup.Config.Condition.Reason = conditions.ReasonProviderConfigNotReady
+		providerSetup.Config.Condition.Message = msg
+		issue := ProviderSetupIssue{
+			Kind:  ProviderConfigInvalid,
+			Error: errors.New(msg),
+		}
+		return providerSetup, &issue
+
+	}
+
 	provider, err := factory(ctx, providerConfig.ProviderConfig, kubeClient)
 	if err != nil {
 		providerSetup.Config.Condition.Status = metav1.ConditionFalse
@@ -80,19 +96,6 @@ func prepareProvider(
 	}
 
 	providerSetup.Provider = provider
-
-	validationResultCfg := provider.ValidateProviderConfigSpec(providerConfig.ProviderConfig)
-	if !validationResultCfg.Valid {
-		logger.Info("ProviderConfig.spec is invalid", "reason", validationResultCfg.Message)
-		providerSetup.Config.Condition.Status = metav1.ConditionFalse
-		providerSetup.Config.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
-		providerSetup.Config.Condition.Message = validationResultCfg.Message
-		issue := ProviderSetupIssue{
-			Kind:  ProviderConfigInvalid,
-			Error: errors.New("ProviderConfig has invalid spec"),
-		}
-		return providerSetup, &issue
-	}
 
 	// providerConfig is valid and provider is configured by now;
 	// set its final condition.

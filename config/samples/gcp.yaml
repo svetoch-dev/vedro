@@ -27,7 +27,7 @@ spec:
     name: providerconfig-sample-gcp
   location: europe-west1
 
-  deletionPolicy: Retain
+  deletionPolicy: Delete
   publicAccessPrevention: false
   storageClass: Standard
 

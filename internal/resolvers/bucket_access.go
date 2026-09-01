@@ -26,8 +26,19 @@ func (o *BucketAccessResolver) IsOk() bool {
 	return o.Error == nil
 }
 
+func (o *BucketAccessResolver) IsBeingDeleted() bool {
+	return !o.DeletionTimestamp.IsZero()
+}
+
 func (o *BucketAccessResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
+}
+
+// BucketAccess has no dependents
+func (o *BucketAccessResolver) IsReferenced(
+	ctx context.Context,
+) (bool, error) {
+	return false, nil
 }
 
 func (o *BucketAccessResolver) Resolve(

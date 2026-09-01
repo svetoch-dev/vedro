@@ -83,6 +83,16 @@ spec:
                 x-kubernetes-validations:
                 - message: bucketRef is immutable
                   rule: self == oldSelf
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy controls what happens to the bucketaccess
+                  when this Kubernetes object is deleted. If Retain is used
+                  when BucketAccess object is deleted permissions are not revoked
+                enum:
+                - Delete
+                - Retain
+                type: string
               principalRef:
                 description: PrincipalRef references the CloudPrincipal to which access
                   is granted.

@@ -16,7 +16,6 @@ import (
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/conditions"
-	"github.com/svetoch-dev/vedro/internal/validation"
 )
 
 var _ = Describe("BucketAccessReconciler", func() {
@@ -258,6 +257,291 @@ var _ = Describe("BucketAccessReconciler", func() {
 		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(access))
 	})
 
+	It("cascades BucketAccess deletion when its Bucket is deleted", func() {
+		createProviderConfig(ctx)
+		bucket := createBucket(ctx, "bucket")
+		createCloudPrincipal(ctx, "principal")
+		access := createAppliedBucketAccess(ctx, "cascade-from-bucket")
+		addBucketAccessFinalizer(ctx, access)
+		controllerutilAddFinalizer(ctx, bucket)
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		bucketReconciler := &BucketReconciler{
+			Client:          k8sClient,
+			Scheme:          k8sClient.Scheme(),
+			ProviderFactory: reconciler.ProviderFactory,
+		}
+		result, err := bucketReconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.RequeueAfter).NotTo(BeZero())
+
+		result, err = reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		terminatingAccess := getBucketAccess(ctx, client.ObjectKeyFromObject(access))
+		Expect(terminatingAccess.DeletionTimestamp.IsZero()).To(BeFalse())
+		Expect(bucketAccess.deleteCalls).To(BeZero())
+
+		result, err = reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(bucketAccess.deleteCalls).To(Equal(1))
+		Expect(provider.cleanupCalled).To(BeTrue())
+		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(access))
+
+		result, err = bucketReconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(bucket), &vedro.Bucket{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("cascades BucketAccess deletion when its CloudPrincipal is deleted", func() {
+		createProviderConfig(ctx)
+		createBucket(ctx, "bucket")
+		principal := createCloudPrincipal(ctx, "principal")
+		access := createAppliedBucketAccess(ctx, "cascade-from-principal")
+		addBucketAccessFinalizer(ctx, access)
+		addPrincipalFinalizer(ctx, principal)
+		Expect(k8sClient.Delete(ctx, principal)).To(Succeed())
+
+		principalReconciler := &CloudPrincipalReconciler{
+			Client:          k8sClient,
+			Scheme:          k8sClient.Scheme(),
+			ProviderFactory: reconciler.ProviderFactory,
+		}
+		result, err := reconcileCloudPrincipal(ctx, principalReconciler, principal)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.RequeueAfter).NotTo(BeZero())
+
+		result, err = reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		terminatingAccess := getBucketAccess(ctx, client.ObjectKeyFromObject(access))
+		Expect(terminatingAccess.DeletionTimestamp.IsZero()).To(BeFalse())
+		Expect(bucketAccess.deleteCalls).To(BeZero())
+
+		result, err = reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(bucketAccess.deleteCalls).To(Equal(1))
+		Expect(provider.cleanupCalled).To(BeTrue())
+		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(access))
+
+		result, err = reconcileCloudPrincipal(ctx, principalReconciler, principal)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		expectCloudPrincipalNotFound(ctx, client.ObjectKeyFromObject(principal))
+	})
+
+	It("keeps the parent and BucketAccess finalizers when cascaded access deletion fails", func() {
+		createProviderConfig(ctx)
+		bucket := createBucket(ctx, "bucket")
+		createCloudPrincipal(ctx, "principal")
+		access := createAppliedBucketAccess(ctx, "cascade-delete-error")
+		addBucketAccessFinalizer(ctx, access)
+		controllerutilAddFinalizer(ctx, bucket)
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		_, err := reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+
+		bucketAccess.deleteErr = errors.New("delete access failed")
+		_, err = reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).To(MatchError("delete access failed"))
+		fetchedAccess := getBucketAccess(ctx, client.ObjectKeyFromObject(access))
+		Expect(fetchedAccess.Finalizers).To(ContainElement(bucketAccessFinalizer))
+
+		bucketReconciler := &BucketReconciler{
+			Client:          k8sClient,
+			Scheme:          k8sClient.Scheme(),
+			ProviderFactory: reconciler.ProviderFactory,
+		}
+		result, err := bucketReconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.RequeueAfter).NotTo(BeZero())
+		fetchedBucket := getBucket(ctx, client.ObjectKeyFromObject(bucket))
+		Expect(fetchedBucket.Finalizers).To(ContainElement(bucketFinalizer))
+	})
+
+	It("waits for every referenced BucketAccess before deleting a Bucket", func() {
+		createProviderConfig(ctx)
+		bucket := createBucket(ctx, "bucket")
+		createCloudPrincipal(ctx, "principal")
+		firstAccess := createAppliedBucketAccess(ctx, "cascade-multiple-first")
+		secondAccess := createAppliedBucketAccess(ctx, "cascade-multiple-second")
+		addBucketAccessFinalizer(ctx, firstAccess)
+		addBucketAccessFinalizer(ctx, secondAccess)
+		controllerutilAddFinalizer(ctx, bucket)
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		_, err := reconcileBucketAccess(ctx, reconciler, firstAccess)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = reconcileBucketAccess(ctx, reconciler, firstAccess)
+		Expect(err).NotTo(HaveOccurred())
+		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(firstAccess))
+
+		bucketReconciler := &BucketReconciler{
+			Client:          k8sClient,
+			Scheme:          k8sClient.Scheme(),
+			ProviderFactory: reconciler.ProviderFactory,
+		}
+		result, err := bucketReconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.RequeueAfter).NotTo(BeZero())
+		Expect(getBucketAccess(ctx, client.ObjectKeyFromObject(secondAccess))).NotTo(BeNil())
+
+		_, err = reconcileBucketAccess(ctx, reconciler, secondAccess)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = reconcileBucketAccess(ctx, reconciler, secondAccess)
+		Expect(err).NotTo(HaveOccurred())
+		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(secondAccess))
+		Expect(bucketAccess.deleteCalls).To(Equal(2))
+
+		result, err = bucketReconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(bucket), &vedro.Bucket{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("retains external access while cascading a Retain BucketAccess", func() {
+		bucket := createBucket(ctx, "bucket")
+		createCloudPrincipal(ctx, "principal")
+		access := createAppliedBucketAccess(ctx, "cascade-retain")
+		fetchedAccess := getBucketAccess(ctx, client.ObjectKeyFromObject(access))
+		fetchedAccess.Spec.DeletionPolicy = vedro.DeletionPolicyRetain
+		Expect(k8sClient.Update(ctx, fetchedAccess)).To(Succeed())
+		addBucketAccessFinalizer(ctx, access)
+		controllerutilAddFinalizer(ctx, bucket)
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		_, err := reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(access))
+		Expect(bucketAccess.deleteCalls).To(BeZero())
+		Expect(provider.cleanupCalled).To(BeFalse())
+
+		bucketReconciler := &BucketReconciler{
+			Client:          k8sClient,
+			Scheme:          k8sClient.Scheme(),
+			ProviderFactory: reconciler.ProviderFactory,
+		}
+		result, err := bucketReconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(bucket), &vedro.Bucket{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("does not let an unrelated BucketAccess block Bucket deletion", func() {
+		bucket := createBucket(ctx, "bucket")
+		access := createBucketAccess(ctx, "unrelated-access", "other-bucket")
+		controllerutilAddFinalizer(ctx, bucket)
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		bucketReconciler := &BucketReconciler{
+			Client:          k8sClient,
+			Scheme:          k8sClient.Scheme(),
+			ProviderFactory: reconciler.ProviderFactory,
+		}
+		result, err := bucketReconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(bucket), &vedro.Bucket{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		Expect(getBucketAccess(ctx, client.ObjectKeyFromObject(access)).DeletionTimestamp.IsZero()).To(BeTrue())
+	})
+
+	It("cascades an unapplied BucketAccess without initializing a provider", func() {
+		bucket := createBucket(ctx, "bucket")
+		createCloudPrincipal(ctx, "principal")
+		access := createBucketAccess(ctx, "cascade-unapplied", "bucket")
+		addBucketAccessFinalizer(ctx, access)
+		controllerutilAddFinalizer(ctx, bucket)
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		_, err := reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(access))
+		Expect(bucketAccess.deleteCalls).To(BeZero())
+		Expect(provider.cleanupCalled).To(BeFalse())
+
+		bucketReconciler := &BucketReconciler{
+			Client:          k8sClient,
+			Scheme:          k8sClient.Scheme(),
+			ProviderFactory: reconciler.ProviderFactory,
+		}
+		result, err := bucketReconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+	})
+
+	It("maps dependency watches only to their referenced BucketAccess objects", func() {
+		bucket := createBucket(ctx, "watched-bucket")
+		createBucket(ctx, "other-bucket")
+		principal := createCloudPrincipal(ctx, "principal")
+		createCloudPrincipal(ctx, "other-principal")
+		both := createBucketAccess(ctx, "watch-both", "watched-bucket")
+		bucketOnly := createBucketAccess(ctx, "watch-bucket-only", "watched-bucket")
+		principalOnly := createBucketAccess(ctx, "watch-principal-only", "other-bucket")
+		fetched := getBucketAccess(ctx, client.ObjectKeyFromObject(bucketOnly))
+		fetched.Spec.PrincipalRef.Name = "other-principal"
+		Expect(k8sClient.Update(ctx, fetched)).To(Succeed())
+
+		bucketRequests := reconciler.findBucketAccessOfBucket(ctx, bucket)
+		Expect(bucketRequests).To(ConsistOf(
+			reconcile.Request{NamespacedName: client.ObjectKeyFromObject(both)},
+			reconcile.Request{NamespacedName: client.ObjectKeyFromObject(bucketOnly)},
+		))
+
+		principalRequests := reconciler.findBucketAccessOfPrincipal(ctx, principal)
+		Expect(principalRequests).To(ConsistOf(
+			reconcile.Request{NamespacedName: client.ObjectKeyFromObject(both)},
+			reconcile.Request{NamespacedName: client.ObjectKeyFromObject(principalOnly)},
+		))
+	})
+
+	It("deletes applied access while its ProviderConfig is terminating and not ready", func() {
+		createProviderConfig(ctx)
+		providerConfig := getProviderConfig(ctx, types.NamespacedName{Name: "test-provider"})
+		markProviderConfigNotReady(ctx, providerConfig)
+		addProviderConfigFinalizer(ctx, providerConfig)
+		Expect(k8sClient.Delete(ctx, providerConfig)).To(Succeed())
+		access := createAppliedBucketAccess(ctx, "delete-with-terminating-provider")
+		addBucketAccessFinalizer(ctx, access)
+		Expect(k8sClient.Delete(ctx, access)).To(Succeed())
+
+		result, err := reconcileBucketAccess(ctx, reconciler, access)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(bucketAccess.deleteCalls).To(Equal(1))
+		Expect(provider.cleanupCalled).To(BeTrue())
+		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(access))
+	})
+
 	It("removes the finalizer without calling the provider when access was not applied", func() {
 		access := createBucketAccess(ctx, "delete-unapplied", "bucket")
 		addBucketAccessFinalizer(ctx, access)
@@ -294,28 +578,22 @@ var _ = Describe("BucketAccessReconciler", func() {
 		)
 	})
 
-	It("cleans up an initialized provider when its config is invalid during deletion", func() {
+	It("It returns an error without initializing a provider when its ProviderConfig is not ready during deletion", func() {
 		createProviderConfig(ctx)
 		access := createAppliedBucketAccess(ctx, "delete-invalid-provider")
 		addBucketAccessFinalizer(ctx, access)
-		invalidProvider := &providerConfigValidationProvider{
-			fakeProvider: provider,
-			result:       validation.Invalid("invalid provider config"),
-		}
-		reconciler.ProviderFactory = func(
-			context.Context,
-			vedro.ProviderConfig,
-			client.Client,
-		) (cloud.Provider, error) {
-			return invalidProvider, nil
-		}
+		providerConfig := getProviderConfig(ctx, types.NamespacedName{
+			Name: "test-provider",
+		})
+		markProviderConfigNotReady(ctx, providerConfig)
+
 		Expect(k8sClient.Delete(ctx, access)).To(Succeed())
 
 		_, err := reconcileBucketAccess(ctx, reconciler, access)
 
-		Expect(err).To(MatchError("ProviderConfig has invalid spec"))
+		Expect(err).To(MatchError("ProviderConfig is not Ready"))
 		Expect(bucketAccess.deleteCalls).To(BeZero())
-		Expect(provider.cleanupCalled).To(BeTrue())
+		Expect(provider.cleanupCalled).To(BeFalse())
 		fetched := getBucketAccess(ctx, client.ObjectKeyFromObject(access))
 		Expect(fetched.Finalizers).To(ContainElement(bucketAccessFinalizer))
 	})
@@ -378,7 +656,8 @@ func createBucketAccess(
 				Name:      "principal",
 				Namespace: "default",
 			},
-			Access: vedro.Access{Level: vedro.ObjectReader},
+			DeletionPolicy: vedro.DeletionPolicyDelete,
+			Access:         vedro.Access{Level: vedro.ObjectReader},
 		},
 	}
 

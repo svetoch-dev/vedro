@@ -42,7 +42,6 @@ func ReconcileAfter(
 	log.FromContext(ctx).Info(msg, keysAndValues...)
 
 	return reconcile.Result{
-		Requeue:      true,
 		RequeueAfter: duration,
 	}, nil
 }

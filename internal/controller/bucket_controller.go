@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/go-logr/logr"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
@@ -226,10 +226,8 @@ func (r *BucketReconciler) reconcileBucketFinalizer(
 	req ctrl.Request,
 	bucket *resolvers.BucketResolver,
 ) (ctrl.Result, error, bool) {
-	logger := log.FromContext(ctx)
-
-	if !bucket.DeletionTimestamp.IsZero() {
-		result, err := r.deleteBucket(ctx, logger, req, bucket)
+	if bucket.IsBeingDeleted() {
+		result, err := r.deleteBucket(ctx, req, bucket)
 		return result, err, true
 	}
 
@@ -246,10 +244,11 @@ func (r *BucketReconciler) reconcileBucketFinalizer(
 
 func (r *BucketReconciler) deleteBucket(
 	ctx context.Context,
-	logger logr.Logger,
 	req ctrl.Request,
 	bucket *resolvers.BucketResolver,
 ) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	if !controllerutil.ContainsFinalizer(&bucket.Bucket, bucketFinalizer) {
 		logger.Info("Bucket is being deleted, but finalizer is not set; skipping deletion handling")
 		return Reconciled()
@@ -257,6 +256,16 @@ func (r *BucketReconciler) deleteBucket(
 
 	if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
 		logger.Info("skipping Bucket deletion because deletionPolicy is Retain")
+	}
+
+	referenced, err := bucket.IsReferenced(ctx)
+
+	if err != nil {
+		return ReconcileError(ctx, err, "Unable to list BucketAccess objects")
+	}
+
+	if referenced {
+		return ReconcileAfter(ctx, time.Second*10, "Bucket is referenced by BucketAccess objects waiting for them to be deleted. Requeuing after 10s")
 	}
 
 	if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {

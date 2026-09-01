@@ -66,6 +66,15 @@ type BucketAccessSpec struct {
 	//
 	PrincipalRef PrincipalReference `json:"principalRef"`
 
+	// DeletionPolicy controls what happens to the bucketaccess
+	// when this Kubernetes object is deleted. If Retain is used
+	// when BucketAccess object is deleted permissions are not revoked
+	//
+	// +kubebuilder:validation:Enum=Delete;Retain
+	// +kubebuilder:default:=Delete
+	// +optional
+	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
+
 	Access Access `json:"access"`
 }
 

@@ -17,7 +17,10 @@ func NewPrincipalCR(
 			Name: name,
 		},
 		Spec: vedro.CloudPrincipalSpec{
-			ProviderRef: vedro.ProviderConfigReference{Name: "some-provider"},
+			ProviderRef:      vedro.ProviderConfigReference{Name: "some-provider"},
+			Kind:             "ServiceAccount",
+			ManagementPolicy: vedro.PrincipalManagementPolicyManaged,
+			Managed:          &vedro.ManagedPrincipalSpec{},
 		},
 	}
 	for _, m := range mods {

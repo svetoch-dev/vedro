@@ -233,7 +233,7 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 
 	It("deletes the external principal and removes the finalizer for Delete policy", func() {
 		principal := createCloudPrincipal(ctx, "delete-policy", func(p *vedro.CloudPrincipal) {
-			p.Spec.DeletionPolicy = vedro.DeletionPolicyDelete
+			p.Spec.Managed.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfig(ctx)
 		addPrincipalFinalizer(ctx, principal)
@@ -250,7 +250,7 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 
 	It("uses the observed ProviderConfig when deleting a CloudPrincipal", func() {
 		principal := createCloudPrincipal(ctx, "observed-provider", func(p *vedro.CloudPrincipal) {
-			p.Spec.DeletionPolicy = vedro.DeletionPolicyDelete
+			p.Spec.Managed.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfigNamed(ctx, "observed-provider")
 		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
@@ -279,7 +279,7 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 
 	It("records delete errors and requeues the CloudPrincipal", func() {
 		principal := createCloudPrincipal(ctx, "delete-error", func(p *vedro.CloudPrincipal) {
-			p.Spec.DeletionPolicy = vedro.DeletionPolicyDelete
+			p.Spec.Managed.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfig(ctx)
 		provider.principal.deleteErr = errors.New("delete failed")
@@ -348,8 +348,13 @@ func createCloudPrincipal(
 			Namespace: "default",
 		},
 		Spec: vedro.CloudPrincipalSpec{
-			ProviderRef:    vedro.ProviderConfigReference{Name: "test-provider"},
-			DeletionPolicy: vedro.DeletionPolicyRetain,
+			ProviderRef:      vedro.ProviderConfigReference{Name: "test-provider"},
+			Kind:             vedro.PrincipalKindServiceAccount,
+			ManagementPolicy: vedro.PrincipalManagementPolicyManaged,
+			Managed: &vedro.ManagedPrincipalSpec{
+				Name:           name,
+				DeletionPolicy: vedro.DeletionPolicyRetain,
+			},
 		},
 	}
 

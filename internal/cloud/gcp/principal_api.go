@@ -27,7 +27,11 @@ func saEmailAndFullName(name, projectId string) (string, string) {
 	return email, fullName
 }
 
-func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, name string) (*cloud.PrincipalAttrs, error) {
+func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
+
+	if principal.Policy == vedro.PrincipalManagementPolicyReference {
+
+	}
 	email, fullName := saEmailAndFullName(name, p.projectID)
 
 	account, err := p.client.GetServiceAccount(ctx, &adminpb.GetServiceAccountRequest{
@@ -47,31 +51,44 @@ func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, name string) (*cloud
 	}, nil
 }
 
-func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, name string) (*cloud.PrincipalAttrs, error) {
+func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
+
+	if principal.Policy != vedro.PrincipalManagementPolicyManaged ||
+		principal.Kind != vedro.PrincipalKindServiceAccount {
+		return nil, fmt.Errorf("Principal can only be a managed ServiceAccount")
+	}
+
 	account, err := p.client.CreateServiceAccount(
 		ctx,
 		&adminpb.CreateServiceAccountRequest{
 			Name:      fmt.Sprintf("projects/%s", p.projectID),
-			AccountId: name,
+			AccountId: principal.Name,
 		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"create service account %q in project %q: %w",
-			name,
+			principal.Name,
 			p.projectID,
 			err,
 		)
 	}
 
 	return &cloud.PrincipalAttrs{
-		Name: name,
-		Id:   account.Email,
+		Name:   name,
+		Id:     account.Email,
+		Kind:   principal.Kind,
+		Policy: principal.Policy,
 	}, nil
 }
 
-func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, name string) error {
-	email, fullName := saEmailAndFullName(name, p.projectID)
+func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, principal cloud.PrincipalSetup) error {
+	if principal.Policy != vedro.PrincipalManagementPolicyManaged ||
+		principal.Kind != vedro.PrincipalKindServiceAccount {
+		return nil, fmt.Errorf("Principal can only be a managed ServiceAccount")
+	}
+
+	email, fullName := saEmailAndFullName(principal.Name, p.projectID)
 	err := p.client.DeleteServiceAccount(
 		ctx,
 		&adminpb.DeleteServiceAccountRequest{

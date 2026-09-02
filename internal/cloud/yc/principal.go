@@ -19,15 +19,17 @@ type Principal struct {
 }
 
 func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) validation.ValidationResult {
-	spec := principal.Spec
 	status := principal.Status
 
 	name := helpers.PrincipalNameFromCR(principal)
 
 	v := validation.ValidateNameImmutability(
-		spec.Name,
+		name,
 		status.ExternalName,
-		principal.Name,
+		// We use name as obj name
+		// because Spec.Reference.Name and Spec.Managed.Name
+		// are mandatory
+		name,
 	)
 
 	if !v.Valid {
@@ -48,9 +50,15 @@ func (p *Principal) EnsurePrincipal(
 	principal vedro.CloudPrincipal,
 ) (*cloud.PrincipalAttrs, error) {
 	principalName := helpers.PrincipalNameFromCR(principal)
-	attrs, err := p.api.GetPrincipal(ctx, principalName)
+	principalSetup := cloud.PrincipalSetup{
+		Kind:   principal.Spec.Kind,
+		Name:   principalName,
+		Policy: principal.Spec.ManagementPolicy,
+	}
+
+	attrs, err := p.api.GetPrincipal(ctx, principalSetup)
 	if errors.Is(err, cloud.ErrPrincipalNotFound) {
-		attrs, err := p.api.CreatePrincipal(ctx, principalName)
+		attrs, err := p.api.CreatePrincipal(ctx, principalSetup)
 		if err != nil {
 			return nil, fmt.Errorf("create principal %q: %w", principalName, err)
 		}
@@ -68,5 +76,10 @@ func (p *Principal) DeletePrincipal(
 	ctx context.Context,
 	principal vedro.CloudPrincipal,
 ) error {
-	return p.api.DeletePrincipal(ctx, helpers.PrincipalNameForDelete(principal))
+	principalSetup := cloud.PrincipalSetup{
+		Kind:   principal.Spec.Kind,
+		Name:   helpers.PrincipalNameForDelete(principal),
+		Policy: principal.Spec.ManagementPolicy,
+	}
+	return p.api.DeletePrincipal(ctx, principalSetup)
 }

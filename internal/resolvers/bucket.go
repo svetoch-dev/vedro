@@ -34,6 +34,14 @@ func (o *BucketResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
 }
 
+func (o *BucketResolver) ShouldBeRetained() bool {
+	return o.Spec.DeletionPolicy == vedro.DeletionPolicyRetain
+}
+
+func (o *BucketResolver) ShouldBeDeleted() bool {
+	return o.Spec.DeletionPolicy == vedro.DeletionPolicyDelete
+}
+
 func (o *BucketResolver) IsReferenced(
 	ctx context.Context,
 ) (bool, error) {

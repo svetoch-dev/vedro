@@ -215,7 +215,7 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 		return Reconciled()
 	}
 
-	if principal.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+	if principal.ShouldBeRetained() {
 		logger.Info("skipping CloudPrincipal deletion because deletionPolicy is Retain")
 	}
 
@@ -229,8 +229,7 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 		return ReconcileAfter(ctx, time.Second*10, "CloudPrincipal is referenced by BucketAccess objects waiting for them to be deleted. Requeuing after 10s")
 	}
 
-	if principal.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
-
+	if principal.ShouldBeDeleted() {
 		logger.Info("deleting CloudPrincipal")
 		providerFactory := r.ProviderFactory
 		if providerFactory == nil {

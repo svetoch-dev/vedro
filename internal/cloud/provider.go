@@ -69,8 +69,16 @@ type BucketAttrs struct {
 type BucketAccessAttrs vedro.BucketAccessProperties
 
 type PrincipalAttrs struct {
-	Name string
-	Id   string
+	Name   string
+	Kind   vedro.PrincipalKind
+	Policy vedro.PrincipalManagementPolicy
+	Id     string
+}
+
+type PrincipalSetup struct {
+	Kind   vedro.PrincipalKind
+	Name   string
+	Policy vedro.PrincipalManagementPolicy
 }
 
 type Change[T any] struct {
@@ -141,9 +149,9 @@ type BucketAPI interface {
 }
 
 type PrincipalAPI interface {
-	GetPrincipal(ctx context.Context, name string) (*PrincipalAttrs, error)
-	CreatePrincipal(ctx context.Context, name string) (*PrincipalAttrs, error)
-	DeletePrincipal(ctx context.Context, name string) error
+	GetPrincipal(ctx context.Context, principal PrincipalSetup) (*PrincipalAttrs, error)
+	CreatePrincipal(ctx context.Context, principal PrincipalSetup) (*PrincipalAttrs, error)
+	DeletePrincipal(ctx context.Context, principal PrincipalSetup) error
 	Close(ctx context.Context) error
 }
 

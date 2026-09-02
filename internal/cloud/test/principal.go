@@ -127,42 +127,24 @@ func PrincipalValidationTests(cfg Config) bool {
 			principal = cfg.NewPrincipal(fake)
 		})
 
-		It("returns valid for a correct principal spec", func() {
-			prncpl := newPrincipalCR()
-
-			result := principal.ValidatePrincipalSpec(prncpl)
-			Expect(result.Valid).To(BeTrue())
-		})
-
-		It("returns valid when spec.name is used", func() {
+		It("returns valid when spec.managed.name is used", func() {
 			prncpl := newPrincipalCR(func(b *vedro.CloudPrincipal) {
-				b.Spec.Name = "actual-principal-name"
+				b.Spec.Managed.Name = "actual-principal-name"
 			})
 
 			result := principal.ValidatePrincipalSpec(prncpl)
 			Expect(result.Valid).To(BeTrue())
 		})
 
-		It("returns an error when spec.name is changed after creation", func() {
+		It("returns an error when spec.managed.name is changed after creation", func() {
 			prncpl := newPrincipalCR(func(b *vedro.CloudPrincipal) {
-				b.Spec.Name = "new-name"
+				b.Spec.Managed.Name = "new-name"
 				b.Status.ExternalName = "old-name"
 			})
 
 			result := principal.ValidatePrincipalSpec(prncpl)
 			Expect(result.Valid).To(BeFalse())
-			Expect(result.Message).To(ContainSubstring("spec.name cannot be changed"))
-		})
-
-		It("returns an error when metadata.name is used after spec.name was used", func() {
-			prncpl := newPrincipalCR(func(b *vedro.CloudPrincipal) {
-				b.Spec.Name = ""
-				b.Status.ExternalName = "old-spec-name"
-			})
-
-			result := principal.ValidatePrincipalSpec(prncpl)
-			Expect(result.Valid).To(BeFalse())
-			Expect(result.Message).To(ContainSubstring("metadata.name cannot be used"))
+			Expect(result.Message).To(ContainSubstring("name cannot be changed"))
 		})
 
 	})

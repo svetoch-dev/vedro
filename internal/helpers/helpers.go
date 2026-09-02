@@ -21,10 +21,18 @@ func BucketNameFromCR(bckt vedro.Bucket) string {
 }
 
 func PrincipalNameFromCR(prncpl vedro.CloudPrincipal) string {
-	cloudPrincipalName := prncpl.Name
+	cloudPrincipalName := ""
 
-	if prncpl.Spec.Name != "" {
-		cloudPrincipalName = prncpl.Spec.Name
+	if prncpl.Spec.ManagementPolicy == vedro.PrincipalManagementPolicyManaged &&
+		prncpl.Spec.Managed != nil &&
+		prncpl.Spec.Managed.Name != "" {
+		cloudPrincipalName = prncpl.Spec.Managed.Name
+	}
+
+	if prncpl.Spec.ManagementPolicy == vedro.PrincipalManagementPolicyReference &&
+		prncpl.Spec.Reference != nil &&
+		prncpl.Spec.Reference.Name != "" {
+		cloudPrincipalName = prncpl.Spec.Reference.Name
 	}
 
 	return cloudPrincipalName

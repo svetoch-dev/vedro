@@ -20,17 +20,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type CloudPrincipalSpec struct {
-	// Name is the real cloud provider bucket name.
+type PrincipalKind string
+
+const (
+	PrincipalKindServiceAccount PrincipalKind = "ServiceAccount"
+	PrincipalKindRole           PrincipalKind = "Role"
+	PrincipalKindUser           PrincipalKind = "User"
+	PrincipalKindGroup          PrincipalKind = "Group"
+)
+
+type PrincipalManagementPolicy string
+
+const (
+	PrincipalManagementPolicyManaged   PrincipalManagementPolicy = "Managed"
+	PrincipalManagementPolicyReference PrincipalManagementPolicy = "Reference"
+)
+
+type ManagedPrincipalSpec struct {
+	// Name is the cloud provider principal name.
+	// Name format depends on what Kind of principal it is
 	//
 	// +kubebuilder:validation:MinLength=1
-	// +optional
 	Name string `json:"name,omitempty"`
-
-	// ProviderRef references the ProviderConfig used to manage this bucket.
-	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="providerRef is immutable"
-	ProviderRef ProviderConfigReference `json:"providerRef"`
 
 	// DeletionPolicy controls what happens to the external CloudPrincipal
 	// when this Kubernetes object is deleted.
@@ -39,6 +50,35 @@ type CloudPrincipalSpec struct {
 	// +kubebuilder:default:=Delete
 	// +optional
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
+}
+
+type ReferencedPrincipalSpec struct {
+	// Name is the cloud provider principal name.
+	// Name format depends on what Kind of principal it is
+	//
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+}
+
+// +kubebuilder:validation:XValidation:rule="self.managementPolicy != 'Managed' || (has(self.managed) && !has(self.reference))",message="managed must be set and reference must not be set when managementPolicy is Managed"
+// +kubebuilder:validation:XValidation:rule="self.managementPolicy != 'Reference' || (has(self.reference) && !has(self.managed))",message="reference must be set and managed must not be set when managementPolicy is Reference"
+type CloudPrincipalSpec struct {
+
+	// ProviderRef references the ProviderConfig used to manage this bucket.
+	//
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="providerRef is immutable"
+	ProviderRef ProviderConfigReference `json:"providerRef"`
+
+	//
+
+	// +kubebuilder:validation:Enum=ServiceAccount;User;Group;Role
+	Kind PrincipalKind `json:"kind"`
+
+	// +kubebuilder:validation:Enum=Managed;Reference
+	ManagementPolicy PrincipalManagementPolicy `json:"managementPolicy"`
+
+	Managed   *ManagedPrincipalSpec    `json:"managed,omitempty"`
+	Reference *ReferencedPrincipalSpec `json:"reference,omitempty"`
 }
 
 // ProviderConfigStatus defines the observed provider configuration state.

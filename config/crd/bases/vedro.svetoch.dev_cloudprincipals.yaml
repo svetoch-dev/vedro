@@ -50,18 +50,35 @@ spec:
             type: object
           spec:
             properties:
-              deletionPolicy:
-                default: Delete
-                description: |-
-                  DeletionPolicy controls what happens to the external CloudPrincipal
-                  when this Kubernetes object is deleted.
+              kind:
                 enum:
-                - Delete
-                - Retain
+                - ServiceAccount
+                - User
+                - Group
+                - Role
                 type: string
-              name:
-                description: Name is the real cloud provider bucket name.
-                minLength: 1
+              managed:
+                properties:
+                  deletionPolicy:
+                    default: Delete
+                    description: |-
+                      DeletionPolicy controls what happens to the external CloudPrincipal
+                      when this Kubernetes object is deleted.
+                    enum:
+                    - Delete
+                    - Retain
+                    type: string
+                  name:
+                    description: |-
+                      Name is the cloud provider principal name.
+                      Name format depends on what Kind of principal it is
+                    minLength: 1
+                    type: string
+                type: object
+              managementPolicy:
+                enum:
+                - Managed
+                - Reference
                 type: string
               providerRef:
                 description: ProviderRef references the ProviderConfig used to manage
@@ -77,9 +94,30 @@ spec:
                 x-kubernetes-validations:
                 - message: providerRef is immutable
                   rule: self == oldSelf
+              reference:
+                properties:
+                  name:
+                    description: |-
+                      Name is the cloud provider principal name.
+                      Name format depends on what Kind of principal it is
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
             required:
+            - kind
+            - managementPolicy
             - providerRef
             type: object
+            x-kubernetes-validations:
+            - message: managed must be set and reference must not be set when managementPolicy
+                is Managed
+              rule: self.managementPolicy != 'Managed' || (has(self.managed) && !has(self.reference))
+            - message: reference must be set and managed must not be set when managementPolicy
+                is Reference
+              rule: self.managementPolicy != 'Reference' || (has(self.reference) &&
+                !has(self.managed))
           status:
             description: ProviderConfigStatus defines the observed provider configuration
               state.

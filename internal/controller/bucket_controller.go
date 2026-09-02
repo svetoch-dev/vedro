@@ -254,7 +254,7 @@ func (r *BucketReconciler) deleteBucket(
 		return Reconciled()
 	}
 
-	if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+	if bucket.ShouldBeRetained() {
 		logger.Info("skipping Bucket deletion because deletionPolicy is Retain")
 	}
 
@@ -268,7 +268,7 @@ func (r *BucketReconciler) deleteBucket(
 		return ReconcileAfter(ctx, time.Second*10, "Bucket is referenced by BucketAccess objects waiting for them to be deleted. Requeuing after 10s")
 	}
 
-	if bucket.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
+	if bucket.ShouldBeDeleted() {
 		logger.Info("deleting bucket and all of its objects")
 		providerFactory := r.ProviderFactory
 		if providerFactory == nil {
@@ -318,6 +318,7 @@ func (r *BucketReconciler) deleteBucket(
 		}
 
 	}
+
 	controllerutil.RemoveFinalizer(&bucket.Bucket, bucketFinalizer)
 	if err := r.Update(ctx, &bucket.Bucket); err != nil {
 		return ReconcileError(ctx, err, "remove finalizer error")

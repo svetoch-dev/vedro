@@ -45,7 +45,7 @@ func ValidateNameImmutability(
 	if specName != "" &&
 		externalName != "" &&
 		externalName != specName {
-		return Invalid("spec.name cannot be changed after creation")
+		return Invalid("name cannot be changed after creation")
 	}
 
 	if specName == "" &&

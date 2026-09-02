@@ -55,19 +55,39 @@ func TestPrincipalNameFromCR(t *testing.T) {
 		expected  string
 	}{
 		{
-			name: "returns metadata.name when spec.name is empty",
+			name: "returns spec.managed.name when spec.reference.name is empty",
 			principal: vedro.CloudPrincipal{
-				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-name",
+				},
+				Spec: vedro.CloudPrincipalSpec{
+					ProviderRef:      vedro.ProviderConfigReference{Name: "some-provider"},
+					Kind:             "ServiceAccount",
+					ManagementPolicy: vedro.PrincipalManagementPolicyManaged,
+					Managed: &vedro.ManagedPrincipalSpec{
+						Name:           "sa-name",
+						DeletionPolicy: vedro.DeletionPolicyDelete,
+					},
+				},
 			},
-			expected: "cr-name",
+			expected: "sa-name",
 		},
 		{
-			name: "returns spec.name when set",
+			name: "returns spec.reference.name when spec.reference.name is empty",
 			principal: vedro.CloudPrincipal{
-				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
-				Spec:       vedro.CloudPrincipalSpec{Name: "actual-principal"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-name",
+				},
+				Spec: vedro.CloudPrincipalSpec{
+					ProviderRef:      vedro.ProviderConfigReference{Name: "some-provider"},
+					Kind:             "User",
+					ManagementPolicy: vedro.PrincipalManagementPolicyReference,
+					Reference: &vedro.ReferencedPrincipalSpec{
+						Name: "username",
+					},
+				},
 			},
-			expected: "actual-principal",
+			expected: "username",
 		},
 	}
 
@@ -123,19 +143,39 @@ func TestPrincipalNameForDelete(t *testing.T) {
 		expected  string
 	}{
 		{
-			name: "uses the regular name before a successful reconcile",
+			name: "uses the managed.name before a successful reconcile",
 			principal: vedro.CloudPrincipal{
-				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
-				Spec:       vedro.CloudPrincipalSpec{Name: "spec-name"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-name",
+				},
+				Spec: vedro.CloudPrincipalSpec{
+					ProviderRef:      vedro.ProviderConfigReference{Name: "some-provider"},
+					Kind:             "ServiceAccount",
+					ManagementPolicy: vedro.PrincipalManagementPolicyManaged,
+					Managed: &vedro.ManagedPrincipalSpec{
+						Name:           "sa-name",
+						DeletionPolicy: vedro.DeletionPolicyDelete,
+					},
+				},
 			},
-			expected: "spec-name",
+			expected: "sa-name",
 		},
 		{
 			name: "uses external name after a successful reconcile",
 			principal: vedro.CloudPrincipal{
-				ObjectMeta: metav1.ObjectMeta{Name: "cr-name"},
-				Spec:       vedro.CloudPrincipalSpec{Name: "spec-name"},
-				Status:     vedro.CloudPrincipalStatus{ExternalName: "external-name"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-name",
+				},
+				Spec: vedro.CloudPrincipalSpec{
+					ProviderRef:      vedro.ProviderConfigReference{Name: "some-provider"},
+					Kind:             "ServiceAccount",
+					ManagementPolicy: vedro.PrincipalManagementPolicyManaged,
+					Managed: &vedro.ManagedPrincipalSpec{
+						Name:           "sa-name",
+						DeletionPolicy: vedro.DeletionPolicyDelete,
+					},
+				},
+				Status: vedro.CloudPrincipalStatus{ExternalName: "external-name"},
 			},
 			expected: "external-name",
 		},

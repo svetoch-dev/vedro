@@ -28,11 +28,6 @@ func saEmailAndFullName(name, projectId string) (string, string) {
 	return email, fullName
 }
 
-func (p *gcpPrincipalAPI) ValidForManagement(principal cloud.PrincipalSetup) bool {
-	return principal.Policy == vedro.PrincipalManagementPolicyManaged &&
-		principal.Kind == vedro.PrincipalKindServiceAccount
-}
-
 func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
 
 	if principal.Policy == vedro.PrincipalManagementPolicyReference {
@@ -78,11 +73,6 @@ func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Prin
 }
 
 func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
-
-	if !p.ValidForManagement(principal) {
-		return nil, fmt.Errorf("Principal can only be a managed ServiceAccount")
-	}
-
 	account, err := p.client.CreateServiceAccount(
 		ctx,
 		&adminpb.CreateServiceAccountRequest{
@@ -108,10 +98,6 @@ func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, principal cloud.P
 }
 
 func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, principal cloud.PrincipalSetup) error {
-	if !p.ValidForManagement(principal) {
-		return fmt.Errorf("Principal can only be a managed ServiceAccount")
-	}
-
 	email, fullName := saEmailAndFullName(principal.Name, p.projectID)
 	err := p.client.DeleteServiceAccount(
 		ctx,

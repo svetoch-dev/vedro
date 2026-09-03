@@ -12,34 +12,100 @@ import (
 	"github.com/svetoch-dev/vedro/internal/validation"
 )
 
-var ycPrincipalNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,61}[a-z0-9]$`)
+var ycServiceAccountNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,61}[a-z0-9]$`)
+var ycPrincipalIDPattern = regexp.MustCompile(`^aje[a-z0-9]+$`)
 
 type Principal struct {
 	api cloud.PrincipalAPI
 }
 
+func validateYcServiceAccount(principal vedro.CloudPrincipal) validation.ValidationResult {
+	kind := principal.Spec.Kind
+	policy := principal.Spec.ManagementPolicy
+
+	principalName := helpers.PrincipalNameFromCR(principal)
+
+	if kind != vedro.PrincipalKindServiceAccount {
+		return validation.Valid()
+	}
+
+	if policy == vedro.PrincipalManagementPolicyManaged && !ycServiceAccountNamePattern.MatchString(principalName) {
+		return validation.Invalid(
+			"Managed serviceAccount name must be 3-63 characters, contain only lowercase letters, numbers, and dashes, start with a letter, and end with a letter or number. Example: some-sa",
+		)
+	}
+
+	if policy == vedro.PrincipalManagementPolicyReference {
+		if !ycPrincipalIDPattern.MatchString(principalName) {
+			return validation.Invalid(
+				"Referenced serviceAccount names must be valid yc ids. Example: aje9sb6ffd2u12345678",
+			)
+		}
+	}
+
+	return validation.Valid()
+}
+
+func validateYcUserAndGroup(principal vedro.CloudPrincipal) validation.ValidationResult {
+	kind := principal.Spec.Kind
+	principalName := helpers.PrincipalNameFromCR(principal)
+
+	if kind != vedro.PrincipalKindGroup && kind != vedro.PrincipalKindUser {
+		return validation.Valid()
+	}
+
+	if !ycPrincipalIDPattern.MatchString(principalName) {
+		return validation.Invalid(
+			fmt.Sprintf("Referenced %s names must be valid yc ids. Example: aje9sb6ffd2u12345678", kind),
+		)
+	}
+	return validation.Valid()
+}
+
+func validateYcManagementPolicy(principal vedro.CloudPrincipal) validation.ValidationResult {
+	kind := principal.Spec.Kind
+	policy := principal.Spec.ManagementPolicy
+
+	if policy == vedro.PrincipalManagementPolicyManaged &&
+		kind != vedro.PrincipalKindServiceAccount {
+		return validation.Invalid(fmt.Sprintf("%s cant be managed", kind))
+	}
+
+	return validation.Valid()
+}
+
 func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) validation.ValidationResult {
 	status := principal.Status
-
-	name := helpers.PrincipalNameFromCR(principal)
+	principalName := helpers.PrincipalNameFromCR(principal)
 
 	v := validation.ValidateNameImmutability(
-		name,
+		principalName,
 		status.ExternalName,
-		// We use name as obj name
+		// We use principalName as obj name
 		// because Spec.Reference.Name and Spec.Managed.Name
 		// are mandatory
-		name,
+		principalName,
 	)
+	if !v.Valid {
+		return v
+	}
+
+	v = validateYcManagementPolicy(principal)
 
 	if !v.Valid {
 		return v
 	}
 
-	if !ycPrincipalNamePattern.MatchString(name) {
-		return validation.Invalid(
-			"principal name must be 3-63 characters, contain only lowercase letters, numbers, and dashes, start with a letter, and end with a letter or number",
-		)
+	v = validateYcServiceAccount(principal)
+
+	if !v.Valid {
+		return v
+	}
+
+	v = validateYcUserAndGroup(principal)
+
+	if !v.Valid {
+		return v
 	}
 
 	return validation.Valid()

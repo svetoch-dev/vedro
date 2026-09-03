@@ -19,35 +19,94 @@ type Principal struct {
 	api cloud.PrincipalAPI
 }
 
+func validateGcpServiceAccount(principal vedro.CloudPrincipal) validation.ValidationResult {
+	kind := principal.Spec.Kind
+	policy := principal.Spec.ManagementPolicy
+
+	principalName := helpers.PrincipalNameFromCR(principal)
+
+	if kind != vedro.PrincipalKindServiceAccount {
+		return validation.Valid()
+	}
+
+	if policy == vedro.PrincipalManagementPolicyManaged && !gcpServiceAccountNamePattern.MatchString(principalName) {
+		return validation.Invalid(
+			"Manged serviceAccount name must be 6-30 characters, contain only lowercase letters, numbers, and dashes, start with a letter, and end with a letter or number. Example: some-sa",
+		)
+	}
+
+	if policy == vedro.PrincipalManagementPolicyReference {
+		if !emailPattern.MatchString(principalName) {
+			return validation.Invalid(
+				"Referenced serviceAccount names must be valid email addresses without the GCP IAM prefix. Example: some-sa@some-project.iam.gserviceaccount.com",
+			)
+		}
+	}
+
+	return validation.Valid()
+}
+
+func validateGcpUserAndGroup(principal vedro.CloudPrincipal) validation.ValidationResult {
+	kind := principal.Spec.Kind
+	principalName := helpers.PrincipalNameFromCR(principal)
+
+	if kind != vedro.PrincipalKindGroup && kind != vedro.PrincipalKindUser {
+		return validation.Valid()
+	}
+
+	if !emailPattern.MatchString(principalName) {
+		return validation.Invalid(
+			fmt.Sprintf("%s names must be valid email addresses without the GCP IAM prefix. Example: user@example.com", kind),
+		)
+	}
+
+	return validation.Valid()
+}
+
+func validateGcpManagementPolicy(principal vedro.CloudPrincipal) validation.ValidationResult {
+	kind := principal.Spec.Kind
+	policy := principal.Spec.ManagementPolicy
+
+	if policy == vedro.PrincipalManagementPolicyManaged &&
+		kind != vedro.PrincipalKindServiceAccount {
+		return validation.Invalid(fmt.Sprintf("%s cant be managed", kind))
+	}
+
+	return validation.Valid()
+}
+
 func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) validation.ValidationResult {
 	status := principal.Status
-	kind := principal.Spec.Kind
-
-	name := helpers.PrincipalNameFromCR(principal)
+	principalName := helpers.PrincipalNameFromCR(principal)
 
 	v := validation.ValidateNameImmutability(
-		name,
+		principalName,
 		status.ExternalName,
-		// We use name as obj name
+		// We use principalName as obj name
 		// because Spec.Reference.Name and Spec.Managed.Name
 		// are mandatory
-		name,
+		principalName,
 	)
 	if !v.Valid {
 		return v
 	}
 
-	if kind == vedro.PrincipalKindServiceAccount && !gcpServiceAccountNamePattern.MatchString(name) {
-		return validation.Invalid(
-			"service account name must be 6-30 characters, contain only lowercase letters, numbers, and dashes, start with a letter, and end with a letter or number",
-		)
+	v = validateGcpManagementPolicy(principal)
+
+	if !v.Valid {
+		return v
 	}
 
-	if (kind == vedro.PrincipalKindUser || kind == vedro.PrincipalKindGroup) &&
-		!emailPattern.MatchString(name) {
-		return validation.Invalid(
-			fmt.Sprintf("%s names must be valid email addresses without the GCP IAM prefix (for example, user@example.com)", kind),
-		)
+	v = validateGcpServiceAccount(principal)
+
+	if !v.Valid {
+		return v
+	}
+
+	v = validateGcpUserAndGroup(principal)
+
+	if !v.Valid {
+		return v
 	}
 
 	return validation.Valid()

@@ -437,7 +437,7 @@ func (g *gcsAPI) HasAccess(
 ) (bool, error) {
 	iam := g.client.Bucket(access.BucketName).IAM()
 
-	principalId := fmt.Sprintf("serviceAccount:%s", access.PrincipalId)
+	principalId := access.PrincipalId
 
 	policy, err := iam.Policy(ctx)
 	if err != nil {
@@ -468,7 +468,7 @@ func (g *gcsAPI) GrantAccess(
 ) error {
 	log.FromContext(ctx).Info("Granting access")
 	iam := g.client.Bucket(access.BucketName).IAM()
-	principalId := fmt.Sprintf("serviceAccount:%s", access.PrincipalId)
+	principalId := access.PrincipalId
 
 	policy, err := iam.Policy(ctx)
 	if err != nil {
@@ -499,7 +499,7 @@ func (g *gcsAPI) RevokeAccess(
 ) error {
 	log.FromContext(ctx).Info("Revoking access")
 	iam := g.client.Bucket(access.BucketName).IAM()
-	principalId := fmt.Sprintf("serviceAccount:%s", access.PrincipalId)
+	principalId := access.PrincipalId
 
 	policy, err := iam.Policy(ctx)
 	if err != nil {

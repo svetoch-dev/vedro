@@ -40,7 +40,7 @@ var _ = Describe("Principal.ValidateYcPrincipalSpec", func() {
 
 			Expect(result.Valid).To(Equal(valid))
 			if !valid {
-				Expect(result.Message).To(ContainSubstring("principal name must be 3-63 characters"))
+				Expect(result.Message).To(ContainSubstring("name must be 3-63 characters"))
 			}
 		},
 		Entry("managed name", "service-account", true),

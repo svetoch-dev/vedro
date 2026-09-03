@@ -6,6 +6,7 @@ import (
 
 	admin "cloud.google.com/go/iam/admin/apiv1"
 	"cloud.google.com/go/iam/admin/apiv1/adminpb"
+	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -27,12 +28,35 @@ func saEmailAndFullName(name, projectId string) (string, string) {
 	return email, fullName
 }
 
+func (p *gcpPrincipalAPI) ValidForManagement(principal cloud.PrincipalSetup) bool {
+	return principal.Policy == vedro.PrincipalManagementPolicyManaged &&
+		principal.Kind == vedro.PrincipalKindServiceAccount
+}
+
 func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
 
 	if principal.Policy == vedro.PrincipalManagementPolicyReference {
+		id := ""
+		switch principal.Kind {
+		case vedro.PrincipalKindGroup:
+			id = fmt.Sprintf("group:%s", principal.Name)
+		case vedro.PrincipalKindServiceAccount:
+			id = fmt.Sprintf("serviceAccount:%s", principal.Name)
+		case vedro.PrincipalKindUser:
+			id = fmt.Sprintf("user:%s", principal.Name)
+
+		}
+
+		return &cloud.PrincipalAttrs{
+			Name:   principal.Name,
+			Kind:   principal.Kind,
+			Policy: principal.Policy,
+			Id:     id,
+		}, nil
 
 	}
-	email, fullName := saEmailAndFullName(name, p.projectID)
+
+	email, fullName := saEmailAndFullName(principal.Name, p.projectID)
 
 	account, err := p.client.GetServiceAccount(ctx, &adminpb.GetServiceAccountRequest{
 		Name: fullName,
@@ -46,15 +70,16 @@ func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Prin
 	}
 
 	return &cloud.PrincipalAttrs{
-		Name: name,
-		Id:   account.Email,
+		Name:   principal.Name,
+		Id:     fmt.Sprintf("serviceAccount:%s", account.Email),
+		Kind:   principal.Kind,
+		Policy: principal.Policy,
 	}, nil
 }
 
 func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
 
-	if principal.Policy != vedro.PrincipalManagementPolicyManaged ||
-		principal.Kind != vedro.PrincipalKindServiceAccount {
+	if !p.ValidForManagement(principal) {
 		return nil, fmt.Errorf("Principal can only be a managed ServiceAccount")
 	}
 
@@ -75,17 +100,16 @@ func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, principal cloud.P
 	}
 
 	return &cloud.PrincipalAttrs{
-		Name:   name,
-		Id:     account.Email,
+		Name:   principal.Name,
+		Id:     fmt.Sprintf("serviceAccount:%s", account.Email),
 		Kind:   principal.Kind,
 		Policy: principal.Policy,
 	}, nil
 }
 
 func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, principal cloud.PrincipalSetup) error {
-	if principal.Policy != vedro.PrincipalManagementPolicyManaged ||
-		principal.Kind != vedro.PrincipalKindServiceAccount {
-		return nil, fmt.Errorf("Principal can only be a managed ServiceAccount")
+	if !p.ValidForManagement(principal) {
+		return fmt.Errorf("Principal can only be a managed ServiceAccount")
 	}
 
 	email, fullName := saEmailAndFullName(principal.Name, p.projectID)

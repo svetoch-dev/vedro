@@ -54,6 +54,12 @@ func validateYcUserAndGroup(principal vedro.CloudPrincipal) validation.Validatio
 		return validation.Valid()
 	}
 
+	if kind == vedro.PrincipalKindGroup {
+		return validation.Invalid(
+			"Group kind is not yet supported for yc by this operator",
+		)
+	}
+
 	if !ycPrincipalIDPattern.MatchString(principalName) {
 		return validation.Invalid(
 			fmt.Sprintf("Referenced %s names must be valid yc ids. Example: aje9sb6ffd2u12345678", kind),

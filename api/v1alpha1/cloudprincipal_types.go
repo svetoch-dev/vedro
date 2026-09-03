@@ -41,7 +41,7 @@ type ManagedPrincipalSpec struct {
 	// Name format depends on what Kind of principal it is
 	//
 	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// DeletionPolicy controls what happens to the external CloudPrincipal
 	// when this Kubernetes object is deleted.

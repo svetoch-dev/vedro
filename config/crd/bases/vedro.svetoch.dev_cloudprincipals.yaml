@@ -74,6 +74,8 @@ spec:
                       Name format depends on what Kind of principal it is
                     minLength: 1
                     type: string
+                required:
+                - name
                 type: object
               managementPolicy:
                 enum:

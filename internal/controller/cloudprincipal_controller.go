@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"time"
 
@@ -131,7 +130,6 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	caps := provider.Capabilities().Principal
 
 	unsupported := capabilities.ValidatePrincipalCapabilities(caps, principal.Spec)
-	logger.Info(fmt.Sprintln(unsupported))
 
 	if len(unsupported) > 0 {
 		logger.Info("CloudPrincipal Unsupported features found")

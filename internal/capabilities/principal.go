@@ -21,7 +21,7 @@ func ValidatePrincipalCapabilities(
 
 	}
 	if spec.ManagementPolicy == vedro.PrincipalManagementPolicyReference {
-		supported, ok := caps.ManagedKinds[spec.Kind]
+		supported, ok := caps.ReferencedKinds[spec.Kind]
 		if !ok || !supported {
 			unsupported = append(unsupported, unsupportedFeatures[fmt.Sprintf("Referenced%s", spec.Kind)])
 		}

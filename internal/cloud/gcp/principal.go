@@ -31,14 +31,14 @@ func validateGcpServiceAccount(principal vedro.CloudPrincipal) validation.Valida
 
 	if policy == vedro.PrincipalManagementPolicyManaged && !gcpServiceAccountNamePattern.MatchString(principalName) {
 		return validation.Invalid(
-			"Manged serviceAccount name must be 6-30 characters, contain only lowercase letters, numbers, and dashes, start with a letter, and end with a letter or number. Example: some-sa",
+			"Managed serviceAccount name must be 6-30 characters, contain only lowercase letters, numbers, and dashes, start with a letter, and end with a letter or number. Example: some-sa",
 		)
 	}
 
 	if policy == vedro.PrincipalManagementPolicyReference {
 		if !emailPattern.MatchString(principalName) {
 			return validation.Invalid(
-				"Referenced serviceAccount names must be valid email addresses without the GCP IAM prefix. Example: some-sa@some-project.iam.gserviceaccount.com",
+				"Referenced serviceAccount names must be valid email addresses without the serviceAccount: prefix. Example: some-sa@some-project.iam.gserviceaccount.com",
 			)
 		}
 	}

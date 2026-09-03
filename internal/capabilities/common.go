@@ -94,22 +94,22 @@ var (
 			Reason:  vedro.PrincipalUnsupportedManagedRole,
 		},
 		"ReferencedServiceAccount": {
-			Field:   "kind;managementPolicy=Referenced",
+			Field:   "kind;managementPolicy=Reference",
 			Message: "Referenced ServiceAccounts are unsupported by this provider",
 			Reason:  vedro.PrincipalUnsupportedReferencedSA,
 		},
 		"ReferencedUser": {
-			Field:   "kind;managementPolicy=Referenced",
+			Field:   "kind;managementPolicy=Reference",
 			Message: "Referenced Users are unsupported by this provider",
 			Reason:  vedro.PrincipalUnsupportedReferencedUser,
 		},
 		"ReferencedGroup": {
-			Field:   "kind;managementPolicy=Referenced",
+			Field:   "kind;managementPolicy=Reference",
 			Message: "Referenced Groups are unsupported by this provider",
 			Reason:  vedro.PrincipalUnsupportedReferencedGroup,
 		},
 		"ReferencedRole": {
-			Field:   "kind;managementPolicy=Referenced",
+			Field:   "kind;managementPolicy=Reference",
 			Message: "Referenced Roles are unsupported by this provider",
 			Reason:  vedro.PrincipalUnsupportedReferencedRole,
 		},

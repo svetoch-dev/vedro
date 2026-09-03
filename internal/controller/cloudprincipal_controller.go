@@ -18,9 +18,11 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
+	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -126,6 +128,27 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
+	caps := provider.Capabilities().Principal
+
+	unsupported := capabilities.ValidatePrincipalCapabilities(caps, principal.Spec)
+	logger.Info(fmt.Sprintln(unsupported))
+
+	if len(unsupported) > 0 {
+		logger.Info("CloudPrincipal Unsupported features found")
+		principal.Condition.Status = metav1.ConditionFalse
+		principal.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
+		principal.Condition.Message = "unsupported features found"
+		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+			p.Status.UnsupportedFeatures = unsupported
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+
+		return Reconciled()
+	}
+
 	// check that spec is valid
 	validationResult := provider.Principal().ValidatePrincipalSpec(principal.CloudPrincipal)
 
@@ -167,6 +190,8 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 		p.Status.ExternalName = result.Name
 		p.Status.ExternalId = result.Id
+		p.Status.Kind = result.Kind
+		p.Status.ManagementPolicy = result.Policy
 		p.Status.ObservedProvider = principal.Spec.ProviderRef.Name
 		meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
 		meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)

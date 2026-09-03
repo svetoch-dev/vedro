@@ -63,18 +63,6 @@ func validateGcpUserAndGroup(principal vedro.CloudPrincipal) validation.Validati
 	return validation.Valid()
 }
 
-func validateGcpManagementPolicy(principal vedro.CloudPrincipal) validation.ValidationResult {
-	kind := principal.Spec.Kind
-	policy := principal.Spec.ManagementPolicy
-
-	if policy == vedro.PrincipalManagementPolicyManaged &&
-		kind != vedro.PrincipalKindServiceAccount {
-		return validation.Invalid(fmt.Sprintf("%s cant be managed", kind))
-	}
-
-	return validation.Valid()
-}
-
 func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) validation.ValidationResult {
 	status := principal.Status
 	principalName := helpers.PrincipalNameFromCR(principal)
@@ -87,12 +75,6 @@ func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) valida
 		// are mandatory
 		principalName,
 	)
-	if !v.Valid {
-		return v
-	}
-
-	v = validateGcpManagementPolicy(principal)
-
 	if !v.Valid {
 		return v
 	}

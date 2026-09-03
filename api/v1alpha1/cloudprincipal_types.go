@@ -20,6 +20,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	PrincipalUnsupportedManagedSA       UnsupportedFeatureReason = "PrincipalUnsupportedManagedSA"
+	PrincipalUnsupportedManagedUser     UnsupportedFeatureReason = "PrincipalUnsupportedManagedUser"
+	PrincipalUnsupportedManagedRole     UnsupportedFeatureReason = "PrincipalUnsupportedManagedRole"
+	PrincipalUnsupportedManagedGroup    UnsupportedFeatureReason = "PrincipalUnsupportedManagedGroup"
+	PrincipalUnsupportedReferencedSA    UnsupportedFeatureReason = "PrincipalUnsupportedReferencedSA"
+	PrincipalUnsupportedReferencedUser  UnsupportedFeatureReason = "PrincipalUnsupportedReferencedUser"
+	PrincipalUnsupportedReferencedRole  UnsupportedFeatureReason = "PrincipalUnsupportedReferencedRole"
+	PrincipalUnsupportedReferencedGroup UnsupportedFeatureReason = "PrincipalUnsupportedReferencedGroup"
+)
+
 type PrincipalKind string
 
 const (
@@ -69,8 +80,6 @@ type CloudPrincipalSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="providerRef is immutable"
 	ProviderRef ProviderConfigReference `json:"providerRef"`
 
-	//
-
 	// +kubebuilder:validation:Enum=ServiceAccount;User;Group;Role
 	Kind PrincipalKind `json:"kind"`
 
@@ -97,6 +106,10 @@ type CloudPrincipalStatus struct {
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// List of unsupported features set on CloudPrincipal resource
+	//
+	// +optional
+	UnsupportedFeatures []UnsupportedFeature `json:"unsupported,omitempty"`
 
 	// ExternalId is the provider-side principal id.
 	//
@@ -106,6 +119,12 @@ type CloudPrincipalStatus struct {
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// +optional
+	Kind PrincipalKind `json:"kind,omitempty"`
+
+	// +optional
+	ManagementPolicy PrincipalManagementPolicy `json:"managementPolicy,omitempty"`
 }
 
 // +kubebuilder:object:root=true

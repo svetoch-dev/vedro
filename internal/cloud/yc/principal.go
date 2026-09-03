@@ -46,18 +46,12 @@ func validateYcServiceAccount(principal vedro.CloudPrincipal) validation.Validat
 	return validation.Valid()
 }
 
-func validateYcUserAndGroup(principal vedro.CloudPrincipal) validation.ValidationResult {
+func validateYcUser(principal vedro.CloudPrincipal) validation.ValidationResult {
 	kind := principal.Spec.Kind
 	principalName := helpers.PrincipalNameFromCR(principal)
 
-	if kind != vedro.PrincipalKindGroup && kind != vedro.PrincipalKindUser {
+	if kind != vedro.PrincipalKindUser {
 		return validation.Valid()
-	}
-
-	if kind == vedro.PrincipalKindGroup {
-		return validation.Invalid(
-			"Group kind is not yet supported for yc by this operator",
-		)
 	}
 
 	if !ycPrincipalIDPattern.MatchString(principalName) {
@@ -65,18 +59,6 @@ func validateYcUserAndGroup(principal vedro.CloudPrincipal) validation.Validatio
 			fmt.Sprintf("Referenced %s names must be valid yc ids. Example: aje9sb6ffd2u12345678", kind),
 		)
 	}
-	return validation.Valid()
-}
-
-func validateYcManagementPolicy(principal vedro.CloudPrincipal) validation.ValidationResult {
-	kind := principal.Spec.Kind
-	policy := principal.Spec.ManagementPolicy
-
-	if policy == vedro.PrincipalManagementPolicyManaged &&
-		kind != vedro.PrincipalKindServiceAccount {
-		return validation.Invalid(fmt.Sprintf("%s cant be managed", kind))
-	}
-
 	return validation.Valid()
 }
 
@@ -96,19 +78,13 @@ func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) valida
 		return v
 	}
 
-	v = validateYcManagementPolicy(principal)
-
-	if !v.Valid {
-		return v
-	}
-
 	v = validateYcServiceAccount(principal)
 
 	if !v.Valid {
 		return v
 	}
 
-	v = validateYcUserAndGroup(principal)
+	v = validateYcUser(principal)
 
 	if !v.Valid {
 		return v

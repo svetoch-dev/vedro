@@ -26,6 +26,12 @@ type Provider interface {
 type Capabilities struct {
 	Bucket       BucketCapabilities
 	BucketAccess BucketAccessCapabilities
+	Principal    PrincipalCapabilities
+}
+
+type PrincipalCapabilities struct {
+	ManagedKinds    map[vedro.PrincipalKind]bool
+	ReferencedKinds map[vedro.PrincipalKind]bool
 }
 
 type BucketCapabilities struct {

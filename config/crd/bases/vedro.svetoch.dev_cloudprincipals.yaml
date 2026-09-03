@@ -188,6 +188,10 @@ spec:
               externalName:
                 description: ExternalName is the provider-side principal name.
                 type: string
+              kind:
+                type: string
+              managementPolicy:
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the latest metadata.generation
                   observed by the controller.
@@ -196,6 +200,22 @@ spec:
               observedProvider:
                 description: Provider used for this CloudPrincipal
                 type: string
+              unsupported:
+                description: List of unsupported features set on CloudPrincipal resource
+                items:
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                  required:
+                  - field
+                  - message
+                  - reason
+                  type: object
+                type: array
             type: object
         type: object
     served: true

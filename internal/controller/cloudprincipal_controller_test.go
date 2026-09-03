@@ -43,6 +43,16 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 
 	BeforeEach(func() {
 		provider = &fakeProvider{
+			capabilities: cloud.Capabilities{
+				Principal: cloud.PrincipalCapabilities{
+					ManagedKinds: map[vedro.PrincipalKind]bool{
+						vedro.PrincipalKindServiceAccount: true,
+					},
+					ReferencedKinds: map[vedro.PrincipalKind]bool{
+						vedro.PrincipalKindServiceAccount: true,
+					},
+				},
+			},
 			principal: &fakePrincipalProvider{
 				validateResult: validation.Valid(),
 				ensureResult: &cloud.PrincipalAttrs{

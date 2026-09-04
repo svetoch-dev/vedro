@@ -87,6 +87,18 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 		Expect(result).To(Equal(reconcile.Result{}))
 	})
 
+	It("rejects management policy changes", func() {
+		principal := createCloudPrincipal(ctx, "immutable-management-policy")
+		principal.Spec.ManagementPolicy = vedro.PrincipalManagementPolicyReference
+		principal.Spec.Managed = nil
+		principal.Spec.Reference = &vedro.ReferencedPrincipalSpec{Name: "referenced-principal"}
+
+		err := k8sClient.Update(ctx, principal)
+
+		Expect(apierrors.IsInvalid(err)).To(BeTrue())
+		Expect(err).To(MatchError(ContainSubstring("managementPolicy is immutable")))
+	})
+
 	It("adds the finalizer and marks ProviderConfig missing", func() {
 		principal := createCloudPrincipal(ctx, "missing-provider", func(p *vedro.CloudPrincipal) {
 			p.Spec.ProviderRef.Name = "missing-provider"

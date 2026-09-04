@@ -170,6 +170,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		bucket.Condition.Reason = conditions.ReasonBucketInvalidSpec
 		bucket.Condition.Message = validationResult.Message
 		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+			b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
 		if patchErr != nil {
@@ -186,6 +187,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		bucket.Condition.Reason = conditions.ReasonBucketEnsureError
 		bucket.Condition.Message = err.Error()
 		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+			b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
 			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
 		})
 		if patchErr != nil {

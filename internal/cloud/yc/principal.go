@@ -110,7 +110,8 @@ func (p *Principal) EnsurePrincipal(
 	}
 
 	attrs, err := p.api.GetPrincipal(ctx, principalSetup)
-	if errors.Is(err, cloud.ErrPrincipalNotFound) {
+	if principalSetup.Policy == vedro.PrincipalManagementPolicyManaged &&
+		errors.Is(err, cloud.ErrPrincipalNotFound) {
 		attrs, err := p.api.CreatePrincipal(ctx, principalSetup)
 		if err != nil {
 			return nil, fmt.Errorf("create principal %q: %w", principalName, err)

@@ -178,7 +178,12 @@ func (y *ycPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Princ
 					yccloud.Id,
 				)
 			}
+
 			user, err := y.findUser(ctx, yccloud.OrganizationId, principal.Name)
+			if err != nil {
+				return nil, err
+			}
+
 			id = fmt.Sprintf("userAccount:%s", user.SubjectClaims.Sub)
 		}
 

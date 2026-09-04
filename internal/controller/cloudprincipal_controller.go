@@ -157,6 +157,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalInvalidSpec
 		principal.Condition.Message = validationResult.Message
 		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+			p.Status.UnsupportedFeatures = principal.Status.UnsupportedFeatures
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		})
 		if patchErr != nil {
@@ -173,6 +174,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalEnsureError
 		principal.Condition.Message = err.Error()
 		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+			p.Status.UnsupportedFeatures = principal.Status.UnsupportedFeatures
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		})
 		if patchErr != nil {

@@ -13,7 +13,10 @@ import (
 )
 
 var ycServiceAccountNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,61}[a-z0-9]$`)
-var ycPrincipalIDPattern = regexp.MustCompile(`^aje[a-z0-9]+$`)
+var emailPattern = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+var ycServiceAccountRefPattern = regexp.MustCompile(
+	`^[a-z](?:[-a-z0-9]{1,61}[a-z0-9]):[a-z](?:[-a-z0-9]{1,61}[a-z0-9])$`,
+)
 
 type Principal struct {
 	api cloud.PrincipalAPI
@@ -29,18 +32,18 @@ func validateYcServiceAccount(principal vedro.CloudPrincipal) validation.Validat
 		return validation.Valid()
 	}
 
-	if policy == vedro.PrincipalManagementPolicyManaged && !ycServiceAccountNamePattern.MatchString(principalName) {
+	if policy == vedro.PrincipalManagementPolicyManaged &&
+		!ycServiceAccountNamePattern.MatchString(principalName) {
 		return validation.Invalid(
 			"Managed serviceAccount name must be 3-63 characters, contain only lowercase letters, numbers, and dashes, start with a letter, and end with a letter or number. Example: some-sa",
 		)
 	}
 
-	if policy == vedro.PrincipalManagementPolicyReference {
-		if !ycPrincipalIDPattern.MatchString(principalName) {
-			return validation.Invalid(
-				"Referenced serviceAccount names must be valid yc ids. Example: aje9sb6ffd2u12345678",
-			)
-		}
+	if policy == vedro.PrincipalManagementPolicyReference &&
+		!ycServiceAccountRefPattern.MatchString(principalName) {
+		return validation.Invalid(
+			"referenced serviceAccount must match <folder-name>:<service-account-name>: Example prod:some-sa",
+		)
 	}
 
 	return validation.Valid()
@@ -54,9 +57,9 @@ func validateYcUser(principal vedro.CloudPrincipal) validation.ValidationResult 
 		return validation.Valid()
 	}
 
-	if !ycPrincipalIDPattern.MatchString(principalName) {
+	if !emailPattern.MatchString(principalName) {
 		return validation.Invalid(
-			fmt.Sprintf("Referenced %s names must be valid yc ids. Example: aje9sb6ffd2u12345678", kind),
+			fmt.Sprintf("Referenced %s names must be valid emails. Example: user@example.com", kind),
 		)
 	}
 	return validation.Valid()

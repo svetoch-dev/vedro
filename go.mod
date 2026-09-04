@@ -14,9 +14,11 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.27.4
 	github.com/onsi/gomega v1.40.0
-	github.com/yandex-cloud/go-genproto v0.92.0
+	github.com/yandex-cloud/go-genproto v0.118.0
+	github.com/yandex-cloud/go-sdk/services/organizationmanager v0.0.95
+	github.com/yandex-cloud/go-sdk/services/resourcemanager v0.0.95
 	github.com/yandex-cloud/go-sdk/services/storage v0.0.74
-	github.com/yandex-cloud/go-sdk/v2 v2.130.0
+	github.com/yandex-cloud/go-sdk/v2 v2.169.0
 	google.golang.org/api v0.274.0
 	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af

@@ -57,6 +57,10 @@ metadata:
 spec:
   providerRef:
     name: providerconfig-sample-yc
+  kind: User
+  reference:
+    name: ajedqhg0nvl2081gik1m
+  managementPolicy: Reference
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: BucketAccess

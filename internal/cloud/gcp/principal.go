@@ -67,19 +67,21 @@ func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) valida
 	status := principal.Status
 	principalName := helpers.PrincipalNameFromCR(principal)
 
-	v := validation.ValidateNameImmutability(
-		principalName,
-		status.ExternalName,
-		// We use principalName as obj name
-		// because Spec.Reference.Name and Spec.Managed.Name
-		// are mandatory
-		principalName,
-	)
-	if !v.Valid {
-		return v
+	if principal.Spec.ManagementPolicy == vedro.PrincipalManagementPolicyManaged {
+		v := validation.ValidateNameImmutability(
+			principalName,
+			status.ExternalName,
+			// We use principalName as obj name
+			// because Spec.Reference.Name and Spec.Managed.Name
+			// are mandatory
+			principalName,
+		)
+		if !v.Valid {
+			return v
+		}
 	}
 
-	v = validateGcpServiceAccount(principal)
+	v := validateGcpServiceAccount(principal)
 
 	if !v.Valid {
 		return v

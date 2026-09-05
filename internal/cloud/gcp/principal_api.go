@@ -39,7 +39,8 @@ func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Prin
 			id = fmt.Sprintf("serviceAccount:%s", principal.Name)
 		case vedro.PrincipalKindUser:
 			id = fmt.Sprintf("user:%s", principal.Name)
-
+		default:
+			return nil, fmt.Errorf("unknown principal kind %s", principal.Kind)
 		}
 
 		return &cloud.PrincipalAttrs{

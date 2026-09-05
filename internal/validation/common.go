@@ -1,5 +1,9 @@
 package validation
 
+import "regexp"
+
+var EmailPattern = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+
 type ValidationResult struct {
 	Valid   bool
 	Message string

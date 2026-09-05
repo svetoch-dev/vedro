@@ -13,7 +13,6 @@ import (
 )
 
 var ycServiceAccountNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,61}[a-z0-9]$`)
-var emailPattern = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
 var ycServiceAccountRefPattern = regexp.MustCompile(
 	`^[a-z](?:[-a-z0-9]{1,61}[a-z0-9]):[a-z](?:[-a-z0-9]{1,61}[a-z0-9])$`,
 )
@@ -57,7 +56,7 @@ func validateYcUser(principal vedro.CloudPrincipal) validation.ValidationResult 
 		return validation.Valid()
 	}
 
-	if !emailPattern.MatchString(principalName) {
+	if !validation.EmailPattern.MatchString(principalName) {
 		return validation.Invalid(
 			fmt.Sprintf("Referenced %s names must be valid emails. Example: user@example.com", kind),
 		)

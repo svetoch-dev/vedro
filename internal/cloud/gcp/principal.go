@@ -13,7 +13,6 @@ import (
 )
 
 var gcpServiceAccountNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
-var emailPattern = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
 
 type Principal struct {
 	api cloud.PrincipalAPI
@@ -36,7 +35,7 @@ func validateGcpServiceAccount(principal vedro.CloudPrincipal) validation.Valida
 	}
 
 	if policy == vedro.PrincipalManagementPolicyReference {
-		if !emailPattern.MatchString(principalName) {
+		if !validation.EmailPattern.MatchString(principalName) {
 			return validation.Invalid(
 				"Referenced serviceAccount names must be valid email addresses without the serviceAccount: prefix. Example: some-sa@some-project.iam.gserviceaccount.com",
 			)
@@ -54,7 +53,7 @@ func validateGcpUserAndGroup(principal vedro.CloudPrincipal) validation.Validati
 		return validation.Valid()
 	}
 
-	if !emailPattern.MatchString(principalName) {
+	if !validation.EmailPattern.MatchString(principalName) {
 		return validation.Invalid(
 			fmt.Sprintf("%s names must be valid email addresses without the GCP IAM prefix. Example: user@example.com", kind),
 		)

@@ -136,11 +136,7 @@ func (y *ycPrincipalAPI) findUser(
 		pageToken = resp.NextPageToken
 	}
 
-	return nil, fmt.Errorf(
-		"user with email %q not found in organization %q",
-		email,
-		orgID,
-	)
+	return nil, cloud.ErrPrincipalNotFound
 }
 
 func (y *ycPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
@@ -185,6 +181,8 @@ func (y *ycPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Princ
 			}
 
 			id = fmt.Sprintf("userAccount:%s", user.SubjectClaims.Sub)
+		default:
+			return nil, fmt.Errorf("unknown principal kind %s", principal.Kind)
 		}
 
 		return &cloud.PrincipalAttrs{

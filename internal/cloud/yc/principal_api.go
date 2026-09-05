@@ -148,8 +148,8 @@ func (y *ycPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Princ
 			if err != nil {
 				return nil, err
 			}
-			//In this case we pass principal.Name as <folder_name>:<service_account_name>
-			//so we can use helpers.ParseIAMMemberString because the string is the same
+			// In this case we pass principal.Name as <folder_name>:<service_account_name>
+			// so we can use helpers.ParseIAMMemberString because the string is the same
 			principalFolderName, principalName := helpers.ParseIAMMemberString(principal.Name)
 			folder, err := y.findFolder(ctx, yccloud.Id, principalFolderName)
 			if err != nil {

@@ -1,5 +1,9 @@
 package validation
 
+import "regexp"
+
+var EmailPattern = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+
 type ValidationResult struct {
 	Valid   bool
 	Message string
@@ -45,7 +49,7 @@ func ValidateNameImmutability(
 	if specName != "" &&
 		externalName != "" &&
 		externalName != specName {
-		return Invalid("spec.name cannot be changed after creation")
+		return Invalid("name cannot be changed after creation")
 	}
 
 	if specName == "" &&

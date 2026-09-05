@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
@@ -20,11 +21,37 @@ func BucketNameFromCR(bckt vedro.Bucket) string {
 	return bucketName
 }
 
-func PrincipalNameFromCR(prncpl vedro.CloudPrincipal) string {
-	cloudPrincipalName := prncpl.Name
+// Parse string in format <principal_type>:<principal_name>.
+// Returns <principal_type>, <principal_name>
+// Examples:
+//  1. "user:some_user@example.com"
+//     returns "user", "some_user@example.com"
+//  2. "serviceAccount:a121dawd1faagty"
+//     returns "serviceAccount", "a121dawd1faagty"
+//  3. "a121dawd1faagty"
+//     returns "", "a121dawd1faagty"
+func ParseIAMMemberString(input string) (string, string) {
+	parts := strings.SplitN(input, ":", 2)
+	if len(parts) != 2 {
+		return "", parts[0]
+	}
 
-	if prncpl.Spec.Name != "" {
-		cloudPrincipalName = prncpl.Spec.Name
+	return parts[0], parts[1]
+}
+
+func PrincipalNameFromCR(prncpl vedro.CloudPrincipal) string {
+	cloudPrincipalName := ""
+
+	if prncpl.Spec.ManagementPolicy == vedro.PrincipalManagementPolicyManaged &&
+		prncpl.Spec.Managed != nil &&
+		prncpl.Spec.Managed.Name != "" {
+		cloudPrincipalName = prncpl.Spec.Managed.Name
+	}
+
+	if prncpl.Spec.ManagementPolicy == vedro.PrincipalManagementPolicyReference &&
+		prncpl.Spec.Reference != nil &&
+		prncpl.Spec.Reference.Name != "" {
+		cloudPrincipalName = prncpl.Spec.Reference.Name
 	}
 
 	return cloudPrincipalName

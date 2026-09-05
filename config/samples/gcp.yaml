@@ -57,6 +57,10 @@ metadata:
 spec:
   providerRef:
     name: providerconfig-sample-gcp
+  kind: ServiceAccount
+  managed:
+    name: principal-sample-gcp
+  managementPolicy: Managed
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: BucketAccess

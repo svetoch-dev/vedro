@@ -14,6 +14,8 @@ type ResourceResolver interface {
 	IsBeingDeleted() bool
 	IsReferenced(ctx context.Context) (bool, error)
 	IsReady() (*metav1.Condition, bool)
+	ShouldBeRetained() bool
+	ShouldBeDeleted() bool
 }
 
 func isReady(gen int64, conditions []metav1.Condition) (*metav1.Condition, bool) {

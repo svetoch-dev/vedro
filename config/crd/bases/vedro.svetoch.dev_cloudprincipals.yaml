@@ -29,7 +29,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ProviderConfig is the Schema for the providerconfigs API.
+        description: CloudPrincipal is the Schema for the cloudprincipals API.
         properties:
           apiVersion:
             description: |-
@@ -49,23 +49,53 @@ spec:
           metadata:
             type: object
           spec:
+            description: Spec defines the desired state of the CloudPrincipal.
             properties:
-              deletionPolicy:
-                default: Delete
-                description: |-
-                  DeletionPolicy controls what happens to the external CloudPrincipal
-                  when this Kubernetes object is deleted.
+              kind:
+                description: Kind identifies the type of cloud principal.
                 enum:
-                - Delete
-                - Retain
+                - ServiceAccount
+                - User
+                - Group
+                - Role
                 type: string
-              name:
-                description: Name is the real cloud provider bucket name.
-                minLength: 1
+              managed:
+                description: |-
+                  Managed configures a principal managed by this resource.
+                  It must be set only when ManagementPolicy is Managed.
+                properties:
+                  deletionPolicy:
+                    default: Delete
+                    description: |-
+                      DeletionPolicy controls what happens to the external CloudPrincipal
+                      when this Kubernetes object is deleted.
+                    enum:
+                    - Delete
+                    - Retain
+                    type: string
+                  name:
+                    description: |-
+                      Name is the cloud provider principal name.
+                      Name format depends on what Kind of principal it is
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              managementPolicy:
+                description: |-
+                  ManagementPolicy controls whether the external principal is managed by this
+                  resource or references an existing principal.
+                enum:
+                - Managed
+                - Reference
                 type: string
+                x-kubernetes-validations:
+                - message: managementPolicy is immutable
+                  rule: self == oldSelf
               providerRef:
                 description: ProviderRef references the ProviderConfig used to manage
-                  this bucket.
+                  this principal.
                 properties:
                   name:
                     description: Name is the name of the ProviderConfig.
@@ -77,16 +107,39 @@ spec:
                 x-kubernetes-validations:
                 - message: providerRef is immutable
                   rule: self == oldSelf
+              reference:
+                description: |-
+                  Reference identifies an existing principal that is not managed by this resource.
+                  It must be set only when ManagementPolicy is Reference.
+                properties:
+                  name:
+                    description: |-
+                      Name is the cloud provider principal name.
+                      Name format depends on what Kind of principal it is
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
             required:
+            - kind
+            - managementPolicy
             - providerRef
             type: object
+            x-kubernetes-validations:
+            - message: managed must be set and reference must not be set when managementPolicy
+                is Managed
+              rule: self.managementPolicy != 'Managed' || (has(self.managed) && !has(self.reference))
+            - message: reference must be set and managed must not be set when managementPolicy
+                is Reference
+              rule: self.managementPolicy != 'Reference' || (has(self.reference) &&
+                !has(self.managed))
           status:
-            description: ProviderConfigStatus defines the observed provider configuration
-              state.
+            description: Status defines the observed state of the CloudPrincipal.
             properties:
               conditions:
                 description: Conditions represent the latest available observations
-                  of the ProviderConfig state.
+                  of the CloudPrincipal state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -143,10 +196,17 @@ spec:
                   type: object
                 type: array
               externalId:
-                description: ExternalId is the provider-side principal id.
+                description: ExternalId is the provider-side immutable principal identifier.
                 type: string
               externalName:
                 description: ExternalName is the provider-side principal name.
+                type: string
+              kind:
+                description: Kind is the kind reported for the external principal.
+                type: string
+              managementPolicy:
+                description: ManagementPolicy is the policy used to reconcile the
+                  external principal.
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the latest metadata.generation
@@ -154,8 +214,26 @@ spec:
                 format: int64
                 type: integer
               observedProvider:
-                description: Provider used for this CloudPrincipal
+                description: ObservedProvider is the ProviderConfig used for the last
+                  successful reconciliation.
                 type: string
+              unsupported:
+                description: UnsupportedFeatures lists requested features that the
+                  selected provider does not support.
+                items:
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                  required:
+                  - field
+                  - message
+                  - reason
+                  type: object
+                type: array
             type: object
         type: object
     served: true

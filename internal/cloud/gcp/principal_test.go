@@ -5,7 +5,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
@@ -25,55 +24,113 @@ var _ = cloudtest.PrincipalValidationTests(cloudtest.Config{
 })
 
 var _ = Describe("Principal.ValidateGCPPrincipalSpec", func() {
-	newPrincipal := func(metadataName, specName, externalName string) vedro.CloudPrincipal {
-		return vedro.CloudPrincipal{
-			ObjectMeta: metav1.ObjectMeta{Name: metadataName},
-			Spec:       vedro.CloudPrincipalSpec{Name: specName},
-			Status:     vedro.CloudPrincipalStatus{ExternalName: externalName},
-		}
+	newPrincipal := func(managedName, externalName string) vedro.CloudPrincipal {
+		return cloudtest.NewPrincipalCR(
+			"service-account",
+			func(cp *vedro.CloudPrincipal) {
+				cp.Spec.Managed.Name = managedName
+				cp.Status = vedro.CloudPrincipalStatus{ExternalName: externalName}
+			},
+		)
 	}
 
 	DescribeTable("validates GCP service account names",
-		func(metadataName, specName string, valid bool) {
-			result := (&Principal{}).ValidatePrincipalSpec(newPrincipal(metadataName, specName, ""))
+		func(managedName string, valid bool) {
+			result := (&Principal{}).ValidatePrincipalSpec(newPrincipal(managedName, ""))
 
 			Expect(result.Valid).To(Equal(valid))
 			if !valid {
-				Expect(result.Message).To(ContainSubstring("principal name must be 6-30 characters"))
+				Expect(result.Message).To(ContainSubstring("name must be 6-30 characters"))
 			}
 		},
-		Entry("metadata name", "service-account", "", true),
-		Entry("spec name override", "invalid.metadata.name", "service-account", true),
-		Entry("minimum length", "abcdef", "", true),
-		Entry("maximum length", "", "a"+strings.Repeat("b", 29), true),
-		Entry("empty name", "", "", false),
-		Entry("too short", "abcde", "", false),
-		Entry("too long", "", "a"+strings.Repeat("b", 30), false),
-		Entry("starts with a number", "1service", "", false),
-		Entry("starts with a dash", "-service", "", false),
-		Entry("ends with a dash", "service-", "", false),
-		Entry("contains uppercase letters", "Service", "", false),
-		Entry("contains an underscore", "service_account", "", false),
-		Entry("contains a dot", "service.account", "", false),
+		Entry("no managed name", "", false),
+		Entry("managed name", "service-account", true),
+		Entry("minimum length", "abcdef", true),
+		Entry("maximum length", "a"+strings.Repeat("b", 29), true),
+		Entry("too short", "abcde", false),
+		Entry("too long", "a"+strings.Repeat("b", 30), false),
+		Entry("starts with a number", "1service", false),
+		Entry("starts with a dash", "-service", false),
+		Entry("ends with a dash", "service-", false),
+		Entry("contains uppercase letters", "Service", false),
+		Entry("contains an underscore", "service_account", false),
+		Entry("contains a dot", "service.account", false),
 	)
 
-	It("rejects a changed spec name after creation", func() {
-		result := (&Principal{}).ValidatePrincipalSpec(
-			newPrincipal("principal", "new-principal", "old-principal"),
+	newPrincipalWithKind := func(
+		kind vedro.PrincipalKind,
+		policy vedro.PrincipalManagementPolicy,
+		name string,
+		externalName string,
+	) vedro.CloudPrincipal {
+		return cloudtest.NewPrincipalCR(
+			"service-account",
+			func(cp *vedro.CloudPrincipal) {
+				cp.Spec.Kind = kind
+				cp.Spec.ManagementPolicy = policy
+				if policy == vedro.PrincipalManagementPolicyManaged {
+					cp.Spec.Managed = &vedro.ManagedPrincipalSpec{Name: name}
+				} else {
+					cp.Spec.Managed = nil
+					cp.Spec.Reference = &vedro.ReferencedPrincipalSpec{Name: name}
+				}
+				cp.Status = vedro.CloudPrincipalStatus{ExternalName: externalName}
+			},
 		)
+	}
 
-		Expect(result.Valid).To(BeFalse())
-		Expect(result.Message).To(Equal("spec.name cannot be changed after creation"))
-	})
+	DescribeTable("validates referenced GCP service account names",
+		func(name string, valid bool) {
+			result := (&Principal{}).ValidatePrincipalSpec(newPrincipalWithKind(
+				vedro.PrincipalKindServiceAccount,
+				vedro.PrincipalManagementPolicyReference,
+				name,
+				"",
+			))
 
-	It("rejects switching from spec.name to metadata.name after creation", func() {
-		result := (&Principal{}).ValidatePrincipalSpec(
-			newPrincipal("metadata-principal", "", "spec-principal"),
-		)
+			Expect(result.Valid).To(Equal(valid))
+			if !valid {
+				Expect(result.Message).To(ContainSubstring(
+					"must be valid email addresses without the serviceAccount: prefix",
+				))
+			}
+		},
+		Entry("email", "some-sa@some-project.iam.gserviceaccount.com", true),
+		Entry("minimal email", "sa@b.c", true),
+		Entry("empty name", "", false),
+		Entry("no at sign", "some-sa", false),
+		Entry("no domain", "some-sa@", false),
+		Entry("no tld", "some-sa@project", false),
+		Entry("contains spaces", "some sa@project.iam.gserviceaccount.com", false),
+	)
 
-		Expect(result.Valid).To(BeFalse())
-		Expect(result.Message).To(Equal(
-			"metadata.name cannot be used as the name source if spec.name was used and CR is created",
+	DescribeTable("validates GCP user and group names",
+		func(kind vedro.PrincipalKind, policy vedro.PrincipalManagementPolicy, name string, valid bool) {
+			result := (&Principal{}).ValidatePrincipalSpec(newPrincipalWithKind(kind, policy, name, ""))
+
+			Expect(result.Valid).To(Equal(valid))
+			if !valid {
+				Expect(result.Message).To(ContainSubstring(
+					"must be valid email addresses without the GCP IAM prefix",
+				))
+			}
+		},
+		Entry("referenced user email", vedro.PrincipalKindUser, vedro.PrincipalManagementPolicyReference, "user@example.com", true),
+		Entry("referenced group email", vedro.PrincipalKindGroup, vedro.PrincipalManagementPolicyReference, "group@example.com", true),
+		Entry("referenced user not an email", vedro.PrincipalKindUser, vedro.PrincipalManagementPolicyReference, "user", false),
+		Entry("referenced group not an email", vedro.PrincipalKindGroup, vedro.PrincipalManagementPolicyReference, "group", false),
+		Entry("managed user email", vedro.PrincipalKindUser, vedro.PrincipalManagementPolicyManaged, "user@example.com", true),
+		Entry("managed user not an email", vedro.PrincipalKindUser, vedro.PrincipalManagementPolicyManaged, "user", false),
+	)
+
+	It("does not check name immutability for referenced principals", func() {
+		result := (&Principal{}).ValidatePrincipalSpec(newPrincipalWithKind(
+			vedro.PrincipalKindServiceAccount,
+			vedro.PrincipalManagementPolicyReference,
+			"new-ref@some-project.iam.gserviceaccount.com",
+			"old-name",
 		))
+
+		Expect(result.Valid).To(BeTrue())
 	})
 })

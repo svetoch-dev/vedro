@@ -433,6 +433,7 @@ func (y *ycsAPI) HasAccess(
 	})
 
 	roleId, ok := accessLevelMapping[access.GrantedAccess]
+	principalType, principalId := helpers.ParseIAMMemberString(access.PrincipalId)
 
 	if !ok {
 		return false, fmt.Errorf("Access level does not map to any yc role")
@@ -446,8 +447,8 @@ func (y *ycsAPI) HasAccess(
 			continue
 		}
 
-		if subject.GetType() == "serviceAccount" &&
-			subject.GetId() == access.PrincipalId &&
+		if subject.GetType() == principalType &&
+			subject.GetId() == principalId &&
 			binding.GetRoleId() == roleId {
 			return true, nil
 		}
@@ -478,6 +479,8 @@ func (y *ycsAPI) accessControl(
 		return fmt.Errorf("Access level does not map to any yc role")
 	}
 
+	principalType, principalId := helpers.ParseIAMMemberString(access.PrincipalId)
+
 	op, err := storagesdk.NewBucketClient(y.sdk).UpdateAccessBindings(
 		ctx,
 		&ycaccess.UpdateAccessBindingsRequest{
@@ -488,8 +491,8 @@ func (y *ycsAPI) accessControl(
 					AccessBinding: &ycaccess.AccessBinding{
 						RoleId: roleId,
 						Subject: &ycaccess.Subject{
-							Id:   access.PrincipalId,
-							Type: "serviceAccount",
+							Id:   principalId,
+							Type: principalType,
 						},
 					},
 				},

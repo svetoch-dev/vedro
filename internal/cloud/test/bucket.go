@@ -524,7 +524,7 @@ func BucketValidationTests(cfg Config) bool {
 
 			result := bucket.ValidateBucketSpec(bckt, cfg.ProviderConfigType)
 			Expect(result.Valid).To(BeFalse())
-			Expect(result.Message).To(ContainSubstring("spec.name cannot be changed"))
+			Expect(result.Message).To(ContainSubstring("name cannot be changed"))
 		})
 
 		It("returns an error when metadata.name is used after spec.name was used", func() {

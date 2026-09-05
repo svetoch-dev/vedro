@@ -56,4 +56,81 @@ var _ = Describe("Principal.ValidateGCPPrincipalSpec", func() {
 		Entry("contains an underscore", "service_account", false),
 		Entry("contains a dot", "service.account", false),
 	)
+
+	newPrincipalWithKind := func(
+		kind vedro.PrincipalKind,
+		policy vedro.PrincipalManagementPolicy,
+		name string,
+		externalName string,
+	) vedro.CloudPrincipal {
+		return cloudtest.NewPrincipalCR(
+			"service-account",
+			func(cp *vedro.CloudPrincipal) {
+				cp.Spec.Kind = kind
+				cp.Spec.ManagementPolicy = policy
+				if policy == vedro.PrincipalManagementPolicyManaged {
+					cp.Spec.Managed = &vedro.ManagedPrincipalSpec{Name: name}
+				} else {
+					cp.Spec.Managed = nil
+					cp.Spec.Reference = &vedro.ReferencedPrincipalSpec{Name: name}
+				}
+				cp.Status = vedro.CloudPrincipalStatus{ExternalName: externalName}
+			},
+		)
+	}
+
+	DescribeTable("validates referenced GCP service account names",
+		func(name string, valid bool) {
+			result := (&Principal{}).ValidatePrincipalSpec(newPrincipalWithKind(
+				vedro.PrincipalKindServiceAccount,
+				vedro.PrincipalManagementPolicyReference,
+				name,
+				"",
+			))
+
+			Expect(result.Valid).To(Equal(valid))
+			if !valid {
+				Expect(result.Message).To(ContainSubstring(
+					"must be valid email addresses without the serviceAccount: prefix",
+				))
+			}
+		},
+		Entry("email", "some-sa@some-project.iam.gserviceaccount.com", true),
+		Entry("minimal email", "sa@b.c", true),
+		Entry("empty name", "", false),
+		Entry("no at sign", "some-sa", false),
+		Entry("no domain", "some-sa@", false),
+		Entry("no tld", "some-sa@project", false),
+		Entry("contains spaces", "some sa@project.iam.gserviceaccount.com", false),
+	)
+
+	DescribeTable("validates GCP user and group names",
+		func(kind vedro.PrincipalKind, policy vedro.PrincipalManagementPolicy, name string, valid bool) {
+			result := (&Principal{}).ValidatePrincipalSpec(newPrincipalWithKind(kind, policy, name, ""))
+
+			Expect(result.Valid).To(Equal(valid))
+			if !valid {
+				Expect(result.Message).To(ContainSubstring(
+					"must be valid email addresses without the GCP IAM prefix",
+				))
+			}
+		},
+		Entry("referenced user email", vedro.PrincipalKindUser, vedro.PrincipalManagementPolicyReference, "user@example.com", true),
+		Entry("referenced group email", vedro.PrincipalKindGroup, vedro.PrincipalManagementPolicyReference, "group@example.com", true),
+		Entry("referenced user not an email", vedro.PrincipalKindUser, vedro.PrincipalManagementPolicyReference, "user", false),
+		Entry("referenced group not an email", vedro.PrincipalKindGroup, vedro.PrincipalManagementPolicyReference, "group", false),
+		Entry("managed user email", vedro.PrincipalKindUser, vedro.PrincipalManagementPolicyManaged, "user@example.com", true),
+		Entry("managed user not an email", vedro.PrincipalKindUser, vedro.PrincipalManagementPolicyManaged, "user", false),
+	)
+
+	It("does not check name immutability for referenced principals", func() {
+		result := (&Principal{}).ValidatePrincipalSpec(newPrincipalWithKind(
+			vedro.PrincipalKindServiceAccount,
+			vedro.PrincipalManagementPolicyReference,
+			"new-ref@some-project.iam.gserviceaccount.com",
+			"old-name",
+		))
+
+		Expect(result.Valid).To(BeTrue())
+	})
 })

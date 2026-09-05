@@ -322,6 +322,180 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 		Expect(condition.Reason).To(Equal(conditions.ReasonCloudPrincipalDeleteError))
 		Expect(condition.Message).To(Equal("delete failed"))
 	})
+
+	It("rejects a CloudPrincipal with both managed and reference set", func() {
+		principal := &vedro.CloudPrincipal{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "vedro.svetoch.dev/v1alpha1",
+				Kind:       "CloudPrincipal",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "managed-and-reference",
+				Namespace: "default",
+			},
+			Spec: vedro.CloudPrincipalSpec{
+				ProviderRef:      vedro.ProviderConfigReference{Name: "test-provider"},
+				Kind:             vedro.PrincipalKindServiceAccount,
+				ManagementPolicy: vedro.PrincipalManagementPolicyManaged,
+				Managed:          &vedro.ManagedPrincipalSpec{Name: "managed-principal"},
+				Reference:        &vedro.ReferencedPrincipalSpec{Name: "referenced-principal"},
+			},
+		}
+
+		err := k8sClient.Create(ctx, principal)
+
+		Expect(apierrors.IsInvalid(err)).To(BeTrue())
+		Expect(err).To(MatchError(ContainSubstring(
+			"managed must be set and reference must not be set",
+		)))
+	})
+
+	It("rejects a Reference principal without a reference set", func() {
+		principal := &vedro.CloudPrincipal{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "vedro.svetoch.dev/v1alpha1",
+				Kind:       "CloudPrincipal",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "reference-without-reference",
+				Namespace: "default",
+			},
+			Spec: vedro.CloudPrincipalSpec{
+				ProviderRef:      vedro.ProviderConfigReference{Name: "test-provider"},
+				Kind:             vedro.PrincipalKindServiceAccount,
+				ManagementPolicy: vedro.PrincipalManagementPolicyReference,
+			},
+		}
+
+		err := k8sClient.Create(ctx, principal)
+
+		Expect(apierrors.IsInvalid(err)).To(BeTrue())
+		Expect(err).To(MatchError(ContainSubstring(
+			"reference must be set and managed must not be set",
+		)))
+	})
+
+	It("rejects a Managed principal without a managed set", func() {
+		principal := &vedro.CloudPrincipal{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "vedro.svetoch.dev/v1alpha1",
+				Kind:       "CloudPrincipal",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "managed-without-managed",
+				Namespace: "default",
+			},
+			Spec: vedro.CloudPrincipalSpec{
+				ProviderRef:      vedro.ProviderConfigReference{Name: "test-provider"},
+				Kind:             vedro.PrincipalKindServiceAccount,
+				ManagementPolicy: vedro.PrincipalManagementPolicyManaged,
+			},
+		}
+
+		err := k8sClient.Create(ctx, principal)
+
+		Expect(apierrors.IsInvalid(err)).To(BeTrue())
+		Expect(err).To(MatchError(ContainSubstring(
+			"managed must be set and reference must not be set",
+		)))
+	})
+
+	It("records unsupported features without ensuring the external principal", func() {
+		principal := createCloudPrincipal(ctx, "unsupported-features", func(p *vedro.CloudPrincipal) {
+			p.Spec.Kind = vedro.PrincipalKindUser
+		})
+		createProviderConfig(ctx)
+
+		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+
+		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+		Expect(fetched.Status.UnsupportedFeatures).To(HaveLen(1))
+		Expect(fetched.Status.UnsupportedFeatures[0].Reason).To(Equal(
+			vedro.PrincipalUnsupportedManagedUser,
+		))
+
+		condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(condition).NotTo(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal(conditions.ReasonCloudPrincipalUnsupportedFeatures))
+		Expect(provider.principal.ensureCalls).To(Equal(0))
+		Expect(provider.cleanupCalled).To(BeTrue())
+	})
+
+	It("clears unsupported features when the provider gains support", func() {
+		principal := createCloudPrincipal(ctx, "unsupported-then-supported", func(p *vedro.CloudPrincipal) {
+			p.Spec.Kind = vedro.PrincipalKindUser
+		})
+		createProviderConfig(ctx)
+
+		_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+		Expect(err).NotTo(HaveOccurred())
+
+		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+		Expect(fetched.Status.UnsupportedFeatures).To(HaveLen(1))
+
+		provider.capabilities.Principal.ManagedKinds[vedro.PrincipalKindUser] = true
+		_, err = reconcileCloudPrincipal(ctx, reconciler, principal)
+		Expect(err).NotTo(HaveOccurred())
+
+		fetched = getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+		Expect(fetched.Status.UnsupportedFeatures).To(BeEmpty())
+		condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(condition).NotTo(BeNil())
+		Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(provider.principal.ensureCalls).To(Equal(1))
+	})
+
+	It("reconciles referenced principals", func() {
+		principal := createCloudPrincipal(ctx, "referenced-principal", func(p *vedro.CloudPrincipal) {
+			p.Spec.ManagementPolicy = vedro.PrincipalManagementPolicyReference
+			p.Spec.Managed = nil
+			p.Spec.Reference = &vedro.ReferencedPrincipalSpec{Name: "referenced-principal"}
+			provider.principal.ensureResult = &cloud.PrincipalAttrs{
+				Name:   "referenced-principal",
+				Id:     "serviceAccount:principal-id",
+				Kind:   vedro.PrincipalKindServiceAccount,
+				Policy: vedro.PrincipalManagementPolicyReference,
+			}
+		})
+		createProviderConfig(ctx)
+
+		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+
+		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+		Expect(fetched.Status.ExternalName).To(Equal("referenced-principal"))
+		Expect(fetched.Status.ExternalId).To(Equal("serviceAccount:principal-id"))
+		Expect(fetched.Status.Kind).To(Equal(vedro.PrincipalKindServiceAccount))
+		Expect(fetched.Status.ManagementPolicy).To(Equal(vedro.PrincipalManagementPolicyReference))
+
+		readyCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(provider.principal.ensureCalls).To(Equal(1))
+	})
+
+	It("removes the finalizer without deleting the external principal for Reference policy", func() {
+		principal := createCloudPrincipal(ctx, "reference-deletion", func(p *vedro.CloudPrincipal) {
+			p.Spec.ManagementPolicy = vedro.PrincipalManagementPolicyReference
+			p.Spec.Managed = nil
+			p.Spec.Reference = &vedro.ReferencedPrincipalSpec{Name: "referenced-principal"}
+		})
+		addPrincipalFinalizer(ctx, principal)
+		Expect(k8sClient.Delete(ctx, principal)).To(Succeed())
+
+		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(provider.principal.deleteCalls).To(Equal(0))
+		expectCloudPrincipalNotFound(ctx, client.ObjectKeyFromObject(principal))
+	})
 })
 
 type fakePrincipalProvider struct {

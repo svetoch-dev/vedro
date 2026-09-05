@@ -15,6 +15,43 @@ import (
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 )
 
+func TestParseIAMMemberString(t *testing.T) {
+	tests := []struct {
+		name               string
+		input              string
+		expectedMemberType string
+		expectedMemberName string
+	}{
+		{
+			name:               "right string",
+			input:              "user:user@example.com",
+			expectedMemberName: "user@example.com",
+			expectedMemberType: "user",
+		},
+		{
+			name:               "wrong string",
+			input:              "user@example.com",
+			expectedMemberName: "user@example.com",
+			expectedMemberType: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPt, gotPn := ParseIAMMemberString(tt.input)
+			if gotPt != tt.expectedMemberType || gotPn != tt.expectedMemberName {
+				t.Errorf(
+					"ParseIAMMemberString() = %q, %q. Want %q, %q",
+					gotPt,
+					gotPn,
+					tt.expectedMemberType,
+					tt.expectedMemberName,
+				)
+			}
+		})
+	}
+}
+
 func TestBucketNameFromCR(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -55,7 +92,7 @@ func TestPrincipalNameFromCR(t *testing.T) {
 		expected  string
 	}{
 		{
-			name: "returns spec.managed.name when spec.reference.name is empty",
+			name: "returns spec.managed.name when set",
 			principal: vedro.CloudPrincipal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "some-name",
@@ -73,7 +110,7 @@ func TestPrincipalNameFromCR(t *testing.T) {
 			expected: "sa-name",
 		},
 		{
-			name: "returns spec.reference.name when spec.reference.name is empty",
+			name: "returns spec.reference.name when set",
 			principal: vedro.CloudPrincipal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "some-name",

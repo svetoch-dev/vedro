@@ -52,13 +52,6 @@ const (
 	DeletionPolicyRetain DeletionPolicy = "Retain"
 )
 
-type UnsupportedFeaturePolicy string
-
-const (
-	UnsupportedFeaturePolicyFail UnsupportedFeaturePolicy = "Fail"
-	UnsupportedFeaturePolicyWarn UnsupportedFeaturePolicy = "Warn"
-)
-
 type UnsupportedFeatureReason string
 
 type UnsupportedFeature struct {

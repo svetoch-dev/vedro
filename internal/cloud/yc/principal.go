@@ -68,6 +68,10 @@ func (p *Principal) ValidatePrincipalSpec(principal vedro.CloudPrincipal) valida
 	status := principal.Status
 	principalName := helpers.PrincipalNameFromCR(principal)
 
+	if principal.Spec.Kind == vedro.PrincipalKindAllUsers {
+		return validation.ValidatePrincipalAllUsers(principal)
+	}
+
 	if principal.Spec.ManagementPolicy == vedro.PrincipalManagementPolicyManaged {
 		v := validation.ValidateNameImmutability(
 			principalName,

@@ -181,15 +181,6 @@ spec:
                 - Cold
                 - Ice
                 type: string
-              unsupportedFeaturePolicy:
-                default: Fail
-                description: |-
-                  UnsupportedFeaturePolicy controls what the controller does when
-                  the selected provider does not support a requested feature.
-                enum:
-                - Fail
-                - Warn
-                type: string
               versioning:
                 description: Versioning configures object versioning.
                 properties:

@@ -93,6 +93,11 @@ var (
 			Message: "Managed Roles are unsupported by this provider",
 			Reason:  vedro.PrincipalUnsupportedManagedRole,
 		},
+		"ManagedAllUsers": {
+			Field:   "kind;managementPolicy=Managed",
+			Message: "Managed AllUsers is unsupported",
+			Reason:  vedro.PrincipalUnsupportedManagedAllUsers,
+		},
 		"ReferencedServiceAccount": {
 			Field:   "kind;managementPolicy=Reference",
 			Message: "Referenced ServiceAccounts are unsupported by this provider",
@@ -112,6 +117,11 @@ var (
 			Field:   "kind;managementPolicy=Reference",
 			Message: "Referenced Roles are unsupported by this provider",
 			Reason:  vedro.PrincipalUnsupportedReferencedRole,
+		},
+		"ReferencedAllUsers": {
+			Field:   "kind;managementPolicy=Reference",
+			Message: "Referenced AllUsers is unsupported by this provider",
+			Reason:  vedro.PrincipalUnsupportedReferencedAllUsers,
 		},
 	}
 )

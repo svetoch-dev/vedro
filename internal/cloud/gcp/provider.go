@@ -158,6 +158,7 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 				vedro.PrincipalKindServiceAccount: true,
 				vedro.PrincipalKindGroup:          true,
 				vedro.PrincipalKindUser:           true,
+				vedro.PrincipalKindAllUsers:       true,
 			},
 		},
 	}

@@ -174,10 +174,9 @@ var _ = Describe("BucketReconciler", func() {
 		Expect(provider.bucket.ensureCalls).To(Equal(0))
 	})
 
-	It("fails fast when unsupported features are requested with Fail policy", func() {
+	It("fails fast when unsupported features are requested", func() {
 		bucket := createBucket(ctx, "unsupported-fail", func(spec *vedro.BucketSpec) {
 			spec.Versioning = &vedro.BucketVersioning{Enabled: true}
-			spec.UnsupportedFeaturePolicy = vedro.UnsupportedFeaturePolicyFail
 		})
 		createProviderConfig(ctx)
 		provider.capabilities.Bucket.Versioning = false
@@ -190,33 +189,11 @@ var _ = Describe("BucketReconciler", func() {
 		Expect(result).To(Equal(reconcile.Result{}))
 
 		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
-		Expect(fetched.Status.UnsupportedFeatures).NotTo(BeEmpty())
 		condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
 		Expect(condition).NotTo(BeNil())
 		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
 		Expect(condition.Reason).To(Equal(conditions.ReasonBucketUnsupportedFeatures))
 		Expect(provider.bucket.ensureCalls).To(Equal(0))
-	})
-
-	It("warns about unsupported features and continues reconciling with Warn policy", func() {
-		bucket := createBucket(ctx, "unsupported-warn", func(spec *vedro.BucketSpec) {
-			spec.Versioning = &vedro.BucketVersioning{Enabled: true}
-			spec.UnsupportedFeaturePolicy = vedro.UnsupportedFeaturePolicyWarn
-		})
-		createProviderConfig(ctx)
-		provider.capabilities.Bucket.Versioning = false
-
-		result, err := reconciler.Reconcile(ctx, reconcile.Request{
-			NamespacedName: client.ObjectKeyFromObject(bucket),
-		})
-
-		Expect(err).NotTo(HaveOccurred())
-		Expect(result).To(Equal(reconcile.Result{}))
-
-		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
-		Expect(fetched.Status.UnsupportedFeatures).NotTo(BeEmpty())
-		Expect(fetched.Status.ExternalName).To(Equal("external-bucket"))
-		Expect(provider.bucket.ensureCalls).To(Equal(1))
 	})
 
 	It("sets successful Bucket status after ensuring the external bucket", func() {
@@ -468,10 +445,9 @@ func createBucket(
 			ProviderRef: vedro.ProviderConfigReference{
 				Name: "test-provider",
 			},
-			Location:                 "europe-west1",
-			StorageClass:             vedro.BucketStorageClassStandard,
-			DeletionPolicy:           vedro.DeletionPolicyRetain,
-			UnsupportedFeaturePolicy: vedro.UnsupportedFeaturePolicyFail,
+			Location:       "europe-west1",
+			StorageClass:   vedro.BucketStorageClassStandard,
+			DeletionPolicy: vedro.DeletionPolicyRetain,
 		},
 	}
 

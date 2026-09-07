@@ -371,8 +371,31 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 
 		Expect(apierrors.IsInvalid(err)).To(BeTrue())
 		Expect(err).To(MatchError(ContainSubstring(
-			"reference must be set and managed must not be set",
+			"reference must be set unless kind is AllUsers, and managed must not be set",
 		)))
+	})
+
+	It("allows an AllUsers Reference principal without a reference set", func() {
+		principal := &vedro.CloudPrincipal{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "vedro.svetoch.dev/v1alpha1",
+				Kind:       "CloudPrincipal",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "all-users-without-reference",
+				Namespace: "default",
+			},
+			Spec: vedro.CloudPrincipalSpec{
+				ProviderRef:      vedro.ProviderConfigReference{Name: "test-provider"},
+				Kind:             vedro.PrincipalKindAllUsers,
+				ManagementPolicy: vedro.PrincipalManagementPolicyReference,
+			},
+		}
+
+		Expect(k8sClient.Create(ctx, principal)).To(Succeed())
+		DeferCleanup(func() {
+			cleanupCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+		})
 	})
 
 	It("rejects a Managed principal without a managed set", func() {

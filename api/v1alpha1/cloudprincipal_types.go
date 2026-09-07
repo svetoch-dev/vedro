@@ -21,14 +21,16 @@ import (
 )
 
 const (
-	PrincipalUnsupportedManagedSA       UnsupportedFeatureReason = "PrincipalUnsupportedManagedSA"
-	PrincipalUnsupportedManagedUser     UnsupportedFeatureReason = "PrincipalUnsupportedManagedUser"
-	PrincipalUnsupportedManagedRole     UnsupportedFeatureReason = "PrincipalUnsupportedManagedRole"
-	PrincipalUnsupportedManagedGroup    UnsupportedFeatureReason = "PrincipalUnsupportedManagedGroup"
-	PrincipalUnsupportedReferencedSA    UnsupportedFeatureReason = "PrincipalUnsupportedReferencedSA"
-	PrincipalUnsupportedReferencedUser  UnsupportedFeatureReason = "PrincipalUnsupportedReferencedUser"
-	PrincipalUnsupportedReferencedRole  UnsupportedFeatureReason = "PrincipalUnsupportedReferencedRole"
-	PrincipalUnsupportedReferencedGroup UnsupportedFeatureReason = "PrincipalUnsupportedReferencedGroup"
+	PrincipalUnsupportedManagedSA          UnsupportedFeatureReason = "PrincipalUnsupportedManagedSA"
+	PrincipalUnsupportedManagedUser        UnsupportedFeatureReason = "PrincipalUnsupportedManagedUser"
+	PrincipalUnsupportedManagedRole        UnsupportedFeatureReason = "PrincipalUnsupportedManagedRole"
+	PrincipalUnsupportedManagedAllUsers    UnsupportedFeatureReason = "PrincipalUnsupportedManagedAllUsers"
+	PrincipalUnsupportedManagedGroup       UnsupportedFeatureReason = "PrincipalUnsupportedManagedGroup"
+	PrincipalUnsupportedReferencedSA       UnsupportedFeatureReason = "PrincipalUnsupportedReferencedSA"
+	PrincipalUnsupportedReferencedUser     UnsupportedFeatureReason = "PrincipalUnsupportedReferencedUser"
+	PrincipalUnsupportedReferencedRole     UnsupportedFeatureReason = "PrincipalUnsupportedReferencedRole"
+	PrincipalUnsupportedReferencedGroup    UnsupportedFeatureReason = "PrincipalUnsupportedReferencedGroup"
+	PrincipalUnsupportedReferencedAllUsers UnsupportedFeatureReason = "PrincipalUnsupportedReferencedAllUsers"
 )
 
 type PrincipalKind string
@@ -38,6 +40,7 @@ const (
 	PrincipalKindRole           PrincipalKind = "Role"
 	PrincipalKindUser           PrincipalKind = "User"
 	PrincipalKindGroup          PrincipalKind = "Group"
+	PrincipalKindAllUsers       PrincipalKind = "AllUsers"
 )
 
 type PrincipalManagementPolicy string
@@ -72,7 +75,7 @@ type ReferencedPrincipalSpec struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="self.managementPolicy != 'Managed' || (has(self.managed) && !has(self.reference))",message="managed must be set and reference must not be set when managementPolicy is Managed"
-// +kubebuilder:validation:XValidation:rule="self.managementPolicy != 'Reference' || (has(self.reference) && !has(self.managed))",message="reference must be set and managed must not be set when managementPolicy is Reference"
+// +kubebuilder:validation:XValidation:rule="self.managementPolicy != 'Reference' || ((self.kind == 'AllUsers' || has(self.reference)) && !has(self.managed))",message="reference must be set unless kind is AllUsers, and managed must not be set when managementPolicy is Reference"
 type CloudPrincipalSpec struct {
 
 	// ProviderRef references the ProviderConfig used to manage this principal.
@@ -82,7 +85,7 @@ type CloudPrincipalSpec struct {
 
 	// Kind identifies the type of cloud principal.
 	//
-	// +kubebuilder:validation:Enum=ServiceAccount;User;Group;Role
+	// +kubebuilder:validation:Enum=ServiceAccount;User;Group;Role;AllUsers
 	Kind PrincipalKind `json:"kind"`
 
 	// ManagementPolicy controls whether the external principal is managed by this

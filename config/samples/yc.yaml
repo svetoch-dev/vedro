@@ -43,8 +43,6 @@ spec:
   labels:
     app: payments
     env: dev
-
-  unsupportedFeaturePolicy: Fail
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: CloudPrincipal
@@ -57,11 +55,8 @@ metadata:
 spec:
   providerRef:
     name: providerconfig-sample-yc
-  kind: ServiceAccount
-  managed:
-    name: principal-sample-yc
-    deletionPolicy: Delete
-  managementPolicy: Managed
+  kind: AllUsers
+  managementPolicy: Reference
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: BucketAccess
@@ -79,4 +74,4 @@ spec:
     name: bucket-sample-yc
     namespace: vedro-system
   access:
-    level: BucketAdmin
+    level: ObjectReader

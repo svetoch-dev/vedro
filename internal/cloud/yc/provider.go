@@ -155,6 +155,7 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 			ReferencedKinds: map[vedro.PrincipalKind]bool{
 				vedro.PrincipalKindServiceAccount: true,
 				vedro.PrincipalKindUser:           true,
+				vedro.PrincipalKindAllUsers:       true,
 			},
 		},
 	}

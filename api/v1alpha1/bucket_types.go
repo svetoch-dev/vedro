@@ -174,14 +174,6 @@ type BucketSpec struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// UnsupportedFeaturePolicy controls what the controller does when
-	// the selected provider does not support a requested feature.
-	//
-	// +kubebuilder:validation:Enum=Fail;Warn
-	// +kubebuilder:default:=Fail
-	// +optional
-	UnsupportedFeaturePolicy UnsupportedFeaturePolicy `json:"unsupportedFeaturePolicy,omitempty"`
-
 	// CloudSpecificConfig contains provider-specific bucket settings that do not
 	// have a cloud-agnostic equivalent in BucketSpec.
 	//

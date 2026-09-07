@@ -134,31 +134,18 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if len(unsupported) > 0 {
 		logger.Info("Bucket Unsupported features found")
-
-		if bucket.Spec.UnsupportedFeaturePolicy == vedro.UnsupportedFeaturePolicyFail {
-			logger.Info("UnsupportedFeaturePolicy set to Fail. stopping reconciliation")
-			bucket.Condition.Status = metav1.ConditionFalse
-			bucket.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
-			bucket.Condition.Message = "unsupported features found"
-			patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-				b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
-				meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
-			})
-			if patchErr != nil {
-				return ReconcileError(ctx, patchErr, "patch error")
-			}
-
-			return Reconciled()
-		}
-		if bucket.Spec.UnsupportedFeaturePolicy == vedro.UnsupportedFeaturePolicyWarn {
-			patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-				b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
-			})
-			if patchErr != nil {
-				return ReconcileError(ctx, patchErr, "patch error")
-			}
+		bucket.Condition.Status = metav1.ConditionFalse
+		bucket.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
+		bucket.Condition.Message = "unsupported features found"
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+			b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
 		}
 
+		return Reconciled()
 	}
 
 	// check that spec is valid

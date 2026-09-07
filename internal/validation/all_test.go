@@ -234,7 +234,7 @@ func TestValidateNameImmutability(t *testing.T) {
 			specName:     "new-name",
 			externalName: "old-name",
 			valid:        false,
-			message:      "spec.name cannot be changed after creation",
+			message:      "name cannot be changed after creation",
 		},
 		{
 			name:         "metadata.name used after spec.name was used",

@@ -150,6 +150,16 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 			ObjectAdmin:  true,
 			BucketAdmin:  true,
 		},
+		Principal: cloud.PrincipalCapabilities{
+			ManagedKinds: map[vedro.PrincipalKind]bool{
+				vedro.PrincipalKindServiceAccount: true,
+			},
+			ReferencedKinds: map[vedro.PrincipalKind]bool{
+				vedro.PrincipalKindServiceAccount: true,
+				vedro.PrincipalKindGroup:          true,
+				vedro.PrincipalKindUser:           true,
+			},
+		},
 	}
 }
 

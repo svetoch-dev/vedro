@@ -73,5 +73,45 @@ var (
 			Message: "ObjectReader acces is unsupported by this provider",
 			Reason:  vedro.BucketAccessUnsupportedObjectReader,
 		},
+		"ManagedServiceAccount": {
+			Field:   "kind;managementPolicy=Managed",
+			Message: "Managed ServiceAccounts are unsupported by this provider",
+			Reason:  vedro.PrincipalUnsupportedManagedSA,
+		},
+		"ManagedUser": {
+			Field:   "kind;managementPolicy=Managed",
+			Message: "Managed Users are unsupported by this provider",
+			Reason:  vedro.PrincipalUnsupportedManagedUser,
+		},
+		"ManagedGroup": {
+			Field:   "kind;managementPolicy=Managed",
+			Message: "Managed Groups are unsupported by this provider",
+			Reason:  vedro.PrincipalUnsupportedManagedGroup,
+		},
+		"ManagedRole": {
+			Field:   "kind;managementPolicy=Managed",
+			Message: "Managed Roles are unsupported by this provider",
+			Reason:  vedro.PrincipalUnsupportedManagedRole,
+		},
+		"ReferencedServiceAccount": {
+			Field:   "kind;managementPolicy=Reference",
+			Message: "Referenced ServiceAccounts are unsupported by this provider",
+			Reason:  vedro.PrincipalUnsupportedReferencedSA,
+		},
+		"ReferencedUser": {
+			Field:   "kind;managementPolicy=Reference",
+			Message: "Referenced Users are unsupported by this provider",
+			Reason:  vedro.PrincipalUnsupportedReferencedUser,
+		},
+		"ReferencedGroup": {
+			Field:   "kind;managementPolicy=Reference",
+			Message: "Referenced Groups are unsupported by this provider",
+			Reason:  vedro.PrincipalUnsupportedReferencedGroup,
+		},
+		"ReferencedRole": {
+			Field:   "kind;managementPolicy=Reference",
+			Message: "Referenced Roles are unsupported by this provider",
+			Reason:  vedro.PrincipalUnsupportedReferencedRole,
+		},
 	}
 )

@@ -34,6 +34,14 @@ func (o *BucketAccessResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
 }
 
+func (o *BucketAccessResolver) ShouldBeRetained() bool {
+	return o.Spec.DeletionPolicy == vedro.DeletionPolicyRetain
+}
+
+func (o *BucketAccessResolver) ShouldBeDeleted() bool {
+	return o.Spec.DeletionPolicy == vedro.DeletionPolicyDelete
+}
+
 // BucketAccess has no dependents
 func (o *BucketAccessResolver) IsReferenced(
 	ctx context.Context,

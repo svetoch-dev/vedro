@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -126,6 +127,27 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
+	caps := provider.Capabilities().Principal
+
+	unsupported := capabilities.ValidatePrincipalCapabilities(caps, principal.Spec)
+	principal.Status.UnsupportedFeatures = unsupported
+
+	if len(unsupported) > 0 {
+		logger.Info("CloudPrincipal Unsupported features found")
+		principal.Condition.Status = metav1.ConditionFalse
+		principal.Condition.Reason = conditions.ReasonCloudPrincipalUnsupportedFeatures
+		principal.Condition.Message = "unsupported features found"
+		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+			p.Status.UnsupportedFeatures = principal.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+
+		return Reconciled()
+	}
+
 	// check that spec is valid
 	validationResult := provider.Principal().ValidatePrincipalSpec(principal.CloudPrincipal)
 
@@ -135,6 +157,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalInvalidSpec
 		principal.Condition.Message = validationResult.Message
 		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+			p.Status.UnsupportedFeatures = principal.Status.UnsupportedFeatures
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		})
 		if patchErr != nil {
@@ -151,6 +174,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalEnsureError
 		principal.Condition.Message = err.Error()
 		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+			p.Status.UnsupportedFeatures = principal.Status.UnsupportedFeatures
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 		})
 		if patchErr != nil {
@@ -167,7 +191,10 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 		p.Status.ExternalName = result.Name
 		p.Status.ExternalId = result.Id
+		p.Status.Kind = result.Kind
+		p.Status.ManagementPolicy = result.Policy
 		p.Status.ObservedProvider = principal.Spec.ProviderRef.Name
+		p.Status.UnsupportedFeatures = principal.Status.UnsupportedFeatures
 		meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
 		meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
 	})
@@ -215,7 +242,7 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 		return Reconciled()
 	}
 
-	if principal.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+	if principal.ShouldBeRetained() {
 		logger.Info("skipping CloudPrincipal deletion because deletionPolicy is Retain")
 	}
 
@@ -229,8 +256,7 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 		return ReconcileAfter(ctx, time.Second*10, "CloudPrincipal is referenced by BucketAccess objects waiting for them to be deleted. Requeuing after 10s")
 	}
 
-	if principal.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
-
+	if principal.ShouldBeDeleted() {
 		logger.Info("deleting CloudPrincipal")
 		providerFactory := r.ProviderFactory
 		if providerFactory == nil {

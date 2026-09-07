@@ -34,6 +34,14 @@ func (o *CloudPrincipalResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
 }
 
+func (o *CloudPrincipalResolver) ShouldBeRetained() bool {
+	return o.Spec.Managed != nil && o.Spec.Managed.DeletionPolicy == vedro.DeletionPolicyRetain
+}
+
+func (o *CloudPrincipalResolver) ShouldBeDeleted() bool {
+	return o.Spec.Managed != nil && o.Spec.Managed.DeletionPolicy == vedro.DeletionPolicyDelete
+}
+
 func (o *CloudPrincipalResolver) IsReferenced(
 	ctx context.Context,
 ) (bool, error) {

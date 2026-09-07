@@ -352,11 +352,11 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 		return Reconciled()
 	}
 
-	if access.Spec.DeletionPolicy == vedro.DeletionPolicyRetain {
+	if access.ShouldBeRetained() {
 		logger.Info("not revoking permissions because deletionPolicy is Retain")
 	}
 
-	if access.Spec.DeletionPolicy == vedro.DeletionPolicyDelete {
+	if access.ShouldBeDeleted() {
 		if access.Status.Applied != nil {
 			logger.Info("deleting BucketAccess")
 			providerFactory := r.ProviderFactory

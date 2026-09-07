@@ -35,6 +35,14 @@ func (o *ProviderConfigResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
 }
 
+func (o *ProviderConfigResolver) ShouldBeRetained() bool {
+	return false
+}
+
+func (o *ProviderConfigResolver) ShouldBeDeleted() bool {
+	return false
+}
+
 func (o *ProviderConfigResolver) IsReferenced(
 	ctx context.Context,
 ) (bool, error) {

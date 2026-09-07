@@ -57,6 +57,11 @@ metadata:
 spec:
   providerRef:
     name: providerconfig-sample-yc
+  kind: ServiceAccount
+  managed:
+    name: principal-sample-yc
+    deletionPolicy: Delete
+  managementPolicy: Managed
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: BucketAccess

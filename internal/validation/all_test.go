@@ -198,6 +198,115 @@ func TestValidateCloudSpecificConfig(t *testing.T) {
 	}
 }
 
+func TestValidatePrincipalAllUsers(t *testing.T) {
+	tests := []struct {
+		name      string
+		principal vedro.CloudPrincipal
+		valid     bool
+	}{
+		{
+			name: "Valid",
+			principal: vedro.CloudPrincipal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "some-principal",
+					Namespace: "default",
+				},
+				Spec: vedro.CloudPrincipalSpec{
+					ProviderRef: vedro.ProviderConfigReference{
+						Name: "some-provider",
+					},
+					Kind:             vedro.PrincipalKindAllUsers,
+					ManagementPolicy: vedro.PrincipalManagementPolicyReference,
+				},
+			},
+			valid: true,
+		},
+		{
+			name: "Valid Kind is not AllUsers",
+			principal: vedro.CloudPrincipal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "some-principal",
+					Namespace: "default",
+				},
+				Spec: vedro.CloudPrincipalSpec{
+					ProviderRef: vedro.ProviderConfigReference{
+						Name: "some-provider",
+					},
+					Kind:             vedro.PrincipalKindRole,
+					ManagementPolicy: vedro.PrincipalManagementPolicyReference,
+				},
+			},
+			valid: true,
+		},
+		{
+			name: "Invalid if managementPolicy is not Reference",
+			principal: vedro.CloudPrincipal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "some-principal",
+					Namespace: "default",
+				},
+				Spec: vedro.CloudPrincipalSpec{
+					ProviderRef: vedro.ProviderConfigReference{
+						Name: "some-provider",
+					},
+					Kind:             vedro.PrincipalKindAllUsers,
+					ManagementPolicy: vedro.PrincipalManagementPolicyManaged,
+				},
+			},
+			valid: false,
+		},
+		{
+			name: "Invalid if reference is set",
+			principal: vedro.CloudPrincipal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "some-principal",
+					Namespace: "default",
+				},
+				Spec: vedro.CloudPrincipalSpec{
+					ProviderRef: vedro.ProviderConfigReference{
+						Name: "some-provider",
+					},
+					Kind:             vedro.PrincipalKindAllUsers,
+					ManagementPolicy: vedro.PrincipalManagementPolicyReference,
+					Reference: &vedro.ReferencedPrincipalSpec{
+						Name: "some-name",
+					},
+				},
+			},
+			valid: false,
+		},
+		{
+			name: "Invalid if managed is set",
+			principal: vedro.CloudPrincipal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "some-principal",
+					Namespace: "default",
+				},
+				Spec: vedro.CloudPrincipalSpec{
+					ProviderRef: vedro.ProviderConfigReference{
+						Name: "some-provider",
+					},
+					Kind:             vedro.PrincipalKindAllUsers,
+					ManagementPolicy: vedro.PrincipalManagementPolicyReference,
+					Managed: &vedro.ManagedPrincipalSpec{
+						Name: "some-name",
+					},
+				},
+			},
+			valid: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ValidatePrincipalAllUsers(tt.principal)
+			if result.Valid != tt.valid {
+				t.Errorf("Expect Valid=%v, got %v", tt.valid, result.Valid)
+			}
+		})
+	}
+}
+
 func TestValidateNameImmutability(t *testing.T) {
 	tests := []struct {
 		name         string

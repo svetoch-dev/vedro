@@ -202,6 +202,39 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 		Expect(provider.cleanupCalled).To(BeTrue())
 	})
 
+	It("reconciles an AllUsers Reference principal without a reference set", func() {
+		provider.capabilities.Principal.ReferencedKinds[vedro.PrincipalKindAllUsers] = true
+		provider.principal.ensureResult = &cloud.PrincipalAttrs{
+			Id:     "allUsers",
+			Kind:   vedro.PrincipalKindAllUsers,
+			Policy: vedro.PrincipalManagementPolicyReference,
+		}
+		principal := createCloudPrincipal(ctx, "all-users-reconcile", func(p *vedro.CloudPrincipal) {
+			p.Spec.Kind = vedro.PrincipalKindAllUsers
+			p.Spec.ManagementPolicy = vedro.PrincipalManagementPolicyReference
+			p.Spec.Managed = nil
+		})
+		createProviderConfig(ctx)
+
+		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(provider.principal.ensureCalls).To(Equal(1))
+
+		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+		Expect(fetched.Status.ExternalId).To(Equal("allUsers"))
+		Expect(fetched.Status.Kind).To(Equal(vedro.PrincipalKindAllUsers))
+		Expect(fetched.Status.ManagementPolicy).To(Equal(
+			vedro.PrincipalManagementPolicyReference,
+		))
+
+		readyCondition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(readyCondition.Reason).To(Equal(conditions.ReasonCloudPrincipalReconciled))
+	})
+
 	It("records ensure errors", func() {
 		principal := createCloudPrincipal(ctx, "ensure-error")
 		createProviderConfig(ctx)

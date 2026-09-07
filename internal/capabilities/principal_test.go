@@ -126,4 +126,41 @@ var _ = Describe("ValidatePrincipalCapabilities", func() {
 		Expect(unsupported).To(Equal(want))
 	})
 
+	DescribeTable("reports unsupported AllUsers combinations",
+		func(
+			policy vedro.PrincipalManagementPolicy,
+			want vedro.UnsupportedFeature,
+		) {
+			principal := vedro.CloudPrincipalSpec{
+				ProviderRef: vedro.ProviderConfigReference{
+					Name: "some-provider",
+				},
+				Kind:             vedro.PrincipalKindAllUsers,
+				ManagementPolicy: policy,
+			}
+
+			unsupported := ValidatePrincipalCapabilities(cloud.PrincipalCapabilities{}, principal)
+
+			Expect(unsupported).To(Equal([]vedro.UnsupportedFeature{want}))
+		},
+		Entry(
+			"managed",
+			vedro.PrincipalManagementPolicyManaged,
+			vedro.UnsupportedFeature{
+				Field:   "kind;managementPolicy=Managed",
+				Message: "Managed AllUsers is unsupported",
+				Reason:  vedro.PrincipalUnsupportedManagedAllUsers,
+			},
+		),
+		Entry(
+			"referenced",
+			vedro.PrincipalManagementPolicyReference,
+			vedro.UnsupportedFeature{
+				Field:   "kind;managementPolicy=Reference",
+				Message: "Referenced AllUsers is unsupported by this provider",
+				Reason:  vedro.PrincipalUnsupportedReferencedAllUsers,
+			},
+		),
+	)
+
 })

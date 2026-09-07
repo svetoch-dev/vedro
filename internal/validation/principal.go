@@ -13,8 +13,16 @@ func ValidatePrincipalAllUsers(principal vedro.CloudPrincipal) ValidationResult 
 		return Valid()
 	}
 
+	if principal.Spec.ManagementPolicy == vedro.PrincipalManagementPolicyManaged {
+		return Invalid("managementPolicy can not be Managed when Kind is AllUsers")
+	}
+
 	if principal.Spec.Reference != nil {
 		return Invalid("Reference can not be set when Kind is AllUsers")
+	}
+
+	if principal.Spec.Managed != nil {
+		return Invalid("Managed can not be set when Kind is AllUsers")
 	}
 
 	return Valid()

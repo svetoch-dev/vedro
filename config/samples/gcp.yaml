@@ -13,6 +13,19 @@ spec:
   credentialsSecretRef:
     name: gcp-creds
     namespace: vedro-system
+  usagePolicy:
+    allowedNamespaces:
+      names:
+        - vedro-system
+    bucketPolicy:
+      allowedNamePatterns:
+        - '^.*sample.*$'
+    principalPolicy:
+      allowedNamePatterns:
+        - '^.*sample.*$'
+      allowedReferencePatterns:
+        - '^.*sample.*$'
+
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: Bucket
@@ -55,10 +68,11 @@ metadata:
 spec:
   providerRef:
     name: providerconfig-sample-gcp
-  kind: AllUsers
-  reference:
+  kind: ServiceAccount
+  managementPolicy: Managed
+  managed:
     name: principal-sample-gcp
-  managementPolicy: Reference
+    deletionPolicy: Delete
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: BucketAccess

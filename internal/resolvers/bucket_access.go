@@ -30,6 +30,10 @@ func (o *BucketAccessResolver) IsBeingDeleted() bool {
 	return !o.DeletionTimestamp.IsZero()
 }
 
+func (o *BucketAccessResolver) IsProvisioned() bool {
+	return o.Status.Applied != nil
+}
+
 func (o *BucketAccessResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
 }

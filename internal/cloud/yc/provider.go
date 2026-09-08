@@ -191,5 +191,11 @@ func (p *Provider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validati
 		return v
 	}
 
+	v = validation.ValidateUsagePolicy(cfg.Spec.UsagePolicy)
+
+	if !v.Valid {
+		return v
+	}
+
 	return validation.Valid()
 }

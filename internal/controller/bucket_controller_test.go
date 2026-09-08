@@ -293,10 +293,16 @@ var _ = Describe("BucketReconciler", func() {
 			spec.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfig(ctx)
-		controllerutilAddFinalizer(ctx, bucket)
-		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
 
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		result, err = reconciler.Reconcile(ctx, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(bucket),
 		})
 
@@ -311,13 +317,15 @@ var _ = Describe("BucketReconciler", func() {
 
 	It("uses the observed ProviderConfig when deleting a bucket", func() {
 		bucket := createBucket(ctx, "observed-provider", func(spec *vedro.BucketSpec) {
+			spec.ProviderRef.Name = "observed-provider"
 			spec.DeletionPolicy = vedro.DeletionPolicyDelete
+
 		})
 		createProviderConfigNamed(ctx, "observed-provider")
-		fetched := getBucket(ctx, client.ObjectKeyFromObject(bucket))
-		fetched.Status.ObservedProvider = "observed-provider"
-		Expect(k8sClient.Status().Update(ctx, fetched)).To(Succeed())
-		controllerutilAddFinalizer(ctx, bucket)
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+		Expect(err).NotTo(HaveOccurred())
 
 		var configuredProvider string
 		reconciler.ProviderFactory = func(
@@ -330,7 +338,7 @@ var _ = Describe("BucketReconciler", func() {
 		}
 		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
 
-		_, err := reconciler.Reconcile(ctx, reconcile.Request{
+		_, err = reconciler.Reconcile(ctx, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(bucket),
 		})
 
@@ -344,11 +352,15 @@ var _ = Describe("BucketReconciler", func() {
 			spec.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfig(ctx)
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(bucket),
+		})
+		Expect(err).NotTo(HaveOccurred())
+
 		provider.bucket.deleteErr = errors.New("delete failed")
-		controllerutilAddFinalizer(ctx, bucket)
 		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
 
-		_, err := reconciler.Reconcile(ctx, reconcile.Request{
+		_, err = reconciler.Reconcile(ctx, reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(bucket),
 		})
 

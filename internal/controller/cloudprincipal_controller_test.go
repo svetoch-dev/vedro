@@ -56,8 +56,10 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 			principal: &fakePrincipalProvider{
 				validateResult: validation.Valid(),
 				ensureResult: &cloud.PrincipalAttrs{
-					Name: "external-principal",
-					Id:   "principal-id",
+					Name:   "external-principal",
+					Kind:   vedro.PrincipalKindServiceAccount,
+					Policy: vedro.PrincipalManagementPolicyManaged,
+					Id:     "principal-id",
 				},
 			},
 		}
@@ -292,10 +294,14 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 			p.Spec.Managed.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfig(ctx)
-		addPrincipalFinalizer(ctx, principal)
+		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+
 		Expect(k8sClient.Delete(ctx, principal)).To(Succeed())
 
-		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+		result, err = reconcileCloudPrincipal(ctx, reconciler, principal)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(result).To(Equal(reconcile.Result{}))
@@ -306,13 +312,13 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 
 	It("uses the observed ProviderConfig when deleting a CloudPrincipal", func() {
 		principal := createCloudPrincipal(ctx, "observed-provider", func(p *vedro.CloudPrincipal) {
+			p.Spec.ProviderRef.Name = "observed-provider"
 			p.Spec.Managed.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfigNamed(ctx, "observed-provider")
-		fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
-		fetched.Status.ObservedProvider = "observed-provider"
-		Expect(k8sClient.Status().Update(ctx, fetched)).To(Succeed())
-		addPrincipalFinalizer(ctx, principal)
+		_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+
+		Expect(err).NotTo(HaveOccurred())
 
 		var configuredProvider string
 		reconciler.ProviderFactory = func(
@@ -325,7 +331,7 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 		}
 		Expect(k8sClient.Delete(ctx, principal)).To(Succeed())
 
-		_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+		_, err = reconcileCloudPrincipal(ctx, reconciler, principal)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(configuredProvider).To(Equal("observed-provider"))
@@ -338,11 +344,14 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 			p.Spec.Managed.DeletionPolicy = vedro.DeletionPolicyDelete
 		})
 		createProviderConfig(ctx)
-		provider.principal.deleteErr = errors.New("delete failed")
-		addPrincipalFinalizer(ctx, principal)
+		_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+		Expect(err).NotTo(HaveOccurred())
+
 		Expect(k8sClient.Delete(ctx, principal)).To(Succeed())
 
-		_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+		provider.principal.deleteErr = errors.New("delete failed")
+
+		_, err = reconcileCloudPrincipal(ctx, reconciler, principal)
 
 		Expect(err).To(MatchError("delete failed"))
 		Expect(provider.principal.deleteCalls).To(Equal(1))

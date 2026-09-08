@@ -45,7 +45,7 @@ func isNamespaceAllowed(namespace string, allowedNamespaces vedro.AllowedNamespa
 func isNameAllowed(name string, patterns []string) Decision {
 	for _, p := range patterns {
 		regex := regexp.MustCompile(p)
-		if regex.MatchString(p) {
+		if regex.MatchString(name) {
 			return Allowed()
 		}
 	}
@@ -61,7 +61,12 @@ func CheckBucket(spec vedro.UsagePolicySpec, bucket vedro.Bucket) Decision {
 		return d
 	}
 
-	bucketName := helpers.BucketNameFromCR(bucket)
+	var bucketName string
+	if bucket.DeletionTimestamp.IsZero() {
+		bucketName = helpers.BucketNameFromCR(bucket)
+	} else {
+		bucketName = helpers.BucketNameForDelete(bucket)
+	}
 
 	d = isNameAllowed(bucketName, spec.BucketPolicy.AllowedNamePatterns)
 
@@ -79,13 +84,21 @@ func CheckPrincipal(spec vedro.UsagePolicySpec, principal vedro.CloudPrincipal) 
 		return d
 	}
 
-	if !slices.Contains(spec.PrincipalPolicy.AllowedKinds, principal.Spec.Kind) {
+	var principalName string
+	var kind vedro.PrincipalKind
+	if principal.DeletionTimestamp.IsZero() {
+		principalName = helpers.PrincipalNameFromCR(principal)
+		kind = principal.Spec.Kind
+	} else {
+		principalName = helpers.PrincipalNameForDelete(principal)
+		kind = principal.Status.Kind
+	}
+
+	if !slices.Contains(spec.PrincipalPolicy.AllowedKinds, kind) {
 		return Restricted(
 			fmt.Sprintf("Kind %s is not allowed by ProviderConfig usagePolicy", principal.Spec.Kind),
 		)
 	}
-
-	principalName := helpers.PrincipalNameFromCR(principal)
 
 	if principal.Spec.ManagementPolicy == vedro.PrincipalManagementPolicyManaged {
 		if !spec.PrincipalPolicy.AllowManaged {
@@ -104,7 +117,7 @@ func CheckPrincipal(spec vedro.UsagePolicySpec, principal vedro.CloudPrincipal) 
 			return Restricted("Referenced CloudPrincipals are not allowed by ProviderConfig usagePolicy")
 		}
 
-		if principal.Spec.Kind != vedro.PrincipalKindAllUsers {
+		if kind != vedro.PrincipalKindAllUsers {
 			d = isNameAllowed(principalName, spec.PrincipalPolicy.AllowedReferencePatterns)
 
 			if !d.Allowed {

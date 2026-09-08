@@ -30,6 +30,11 @@ func (o *CloudPrincipalResolver) IsBeingDeleted() bool {
 	return !o.DeletionTimestamp.IsZero()
 }
 
+func (o *CloudPrincipalResolver) IsProvisioned() bool {
+	return o.Status.ManagementPolicy == vedro.PrincipalManagementPolicyManaged &&
+		o.Status.ExternalId != ""
+}
+
 func (o *CloudPrincipalResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
 }

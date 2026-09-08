@@ -295,6 +295,7 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 		providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
 
 		provider := providerSetup.Provider
+		providerConfig := providerSetup.Config
 
 		if provider != nil {
 			defer func() {
@@ -312,19 +313,44 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 			)
 		}
 
-		err := provider.Principal().DeletePrincipal(ctx, principal.CloudPrincipal)
-		if err != nil {
-			principal.Condition.Status = metav1.ConditionFalse
-			principal.Condition.Reason = conditions.ReasonCloudPrincipalDeleteError
-			principal.Condition.Message = err.Error()
+		// check usagePolicy
+		decision := usagepolicy.CheckPrincipal(
+			providerConfig.Spec.UsagePolicy,
+			principal.CloudPrincipal,
+		)
 
-			patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
-				meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
-			})
-			if patchErr != nil {
-				return ReconcileError(ctx, patchErr, "patch error")
+		if decision.Allowed {
+			err := provider.Principal().DeletePrincipal(ctx, principal.CloudPrincipal)
+			if err != nil {
+				principal.Condition.Status = metav1.ConditionFalse
+				principal.Condition.Reason = conditions.ReasonCloudPrincipalDeleteError
+				principal.Condition.Message = err.Error()
+
+				patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+					meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+				})
+				if patchErr != nil {
+					return ReconcileError(ctx, patchErr, "patch error")
+				}
+				return ReconcileError(ctx, err, "unable to delete external CloudPrincipal")
 			}
-			return ReconcileError(ctx, err, "unable to delete external CloudPrincipal")
+		} else {
+			logger.Info("skipping CloudPrincipal deletion because its spec is restricted", "message", decision.Message)
+			if principal.IsProvisioned() {
+				message := "Cant remove CloudPrincipal becasue it was already provisioned" +
+					" and spec is restricted by usagePolicy"
+				logger.Info(message)
+				principal.Condition.Status = metav1.ConditionFalse
+				principal.Condition.Reason = conditions.ReasonCloudPrincipalRemoveFinalizerError
+				principal.Condition.Message = message
+				patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+					meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+				})
+				if patchErr != nil {
+					return ReconcileError(ctx, patchErr, "patch error")
+				}
+				return Reconciled()
+			}
 		}
 	}
 

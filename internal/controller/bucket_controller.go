@@ -296,6 +296,7 @@ func (r *BucketReconciler) deleteBucket(
 		providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
 
 		provider := providerSetup.Provider
+		providerConfig := providerSetup.Config
 
 		if provider != nil {
 			defer func() {
@@ -312,20 +313,45 @@ func (r *BucketReconciler) deleteBucket(
 			)
 		}
 
-		err := provider.Bucket().DeleteBucket(ctx, bucket.Bucket)
+		// check usagePolicy
+		decision := usagepolicy.CheckBucket(
+			providerConfig.Spec.UsagePolicy,
+			bucket.Bucket,
+		)
 
-		if err != nil {
-			bucket.Condition.Status = metav1.ConditionFalse
-			bucket.Condition.Reason = conditions.ReasonBucketDeleteError
-			bucket.Condition.Message = err.Error()
+		if decision.Allowed {
+			err := provider.Bucket().DeleteBucket(ctx, bucket.Bucket)
 
-			patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-				meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
-			})
-			if patchErr != nil {
-				return ReconcileError(ctx, patchErr, "patch error")
+			if err != nil {
+				bucket.Condition.Status = metav1.ConditionFalse
+				bucket.Condition.Reason = conditions.ReasonBucketDeleteError
+				bucket.Condition.Message = err.Error()
+
+				patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+					meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+				})
+				if patchErr != nil {
+					return ReconcileError(ctx, patchErr, "patch error")
+				}
+				return ReconcileError(ctx, err, "unable to delete external bucket")
 			}
-			return ReconcileError(ctx, err, "unable to delete external bucket")
+		} else {
+			logger.Info("Skipping bucket deletion because spec is restricted", "message", decision.Message)
+			if bucket.IsProvisioned() {
+				message := "Cant remove bucket because it was already provisioned" +
+					" and spec is restricted by usagePolicy"
+				logger.Info(message)
+				bucket.Condition.Status = metav1.ConditionFalse
+				bucket.Condition.Reason = conditions.ReasonBucketRemoveFinalizerError
+				bucket.Condition.Message = message
+				patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+					meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+				})
+				if patchErr != nil {
+					return ReconcileError(ctx, patchErr, "patch error")
+				}
+				return Reconciled()
+			}
 		}
 
 	}

@@ -11,6 +11,7 @@ import (
 type ResourceResolver interface {
 	Resolve(ctx context.Context, name types.NamespacedName)
 	IsOk() bool
+	IsProvisioned() bool
 	IsBeingDeleted() bool
 	IsReferenced(ctx context.Context) (bool, error)
 	IsReady() (*metav1.Condition, bool)

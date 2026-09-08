@@ -214,6 +214,7 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 			p.Spec.ManagementPolicy = vedro.PrincipalManagementPolicyReference
 			p.Spec.Managed = nil
 		})
+
 		createProviderConfig(ctx)
 
 		result, err := reconcileCloudPrincipal(ctx, reconciler, principal)

@@ -21,6 +21,42 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type AllowedNamePatterns []string
+
+type AllowedNamespacesSpec struct {
+	// +optional
+	Names []string `json:"names,omitempty"`
+
+	// +optional
+	All bool `json:"all,omitempty"`
+}
+
+type BucketPolicySpec struct {
+	AllowedNamePatterns AllowedNamePatterns `json:"allowedNamePatterns"`
+}
+
+type PrincipalPolicySpec struct {
+	AllowedNamePatterns AllowedNamePatterns `json:"allowedNamePatterns"`
+
+	// +kubebuilder:default:={".*"}
+	AllowedReferencePatterns AllowedNamePatterns `json:"allowedReferencePatterns"`
+
+	// +kubebuilder:default:=true
+	AllowManaged bool `json:"allowManaged"`
+
+	// +kubebuilder:default:=true
+	AllowReferences bool `json:"allowReferences"`
+
+	// +kubebuilder:default:={"ServiceAccount", "Role", "User", "Group", "AllUsers"}
+	AllowedKinds []PrincipalKind `json:"allowedKinds"`
+}
+
+type UsagePolicySpec struct {
+	AllowedNamespaces AllowedNamespacesSpec `json:"allowedNamespaces"`
+	BucketPolicy      BucketPolicySpec      `json:"bucketPolicy"`
+	PrincipalPolicy   PrincipalPolicySpec   `json:"principalPolicy"`
+}
+
 // If StaticCredentials is set credentialsSecretRef should also be set
 // +kubebuilder:validation:XValidation:rule="self.method != 'StaticCredentials' || has(self.credentialsSecretRef)",message="credentialsSecretRef is required when method is StaticCredentials"
 // If WorkloadIdentity is set credentialsSecretRef should not be set
@@ -55,6 +91,8 @@ type ProviderConfigSpec struct {
 	//
 	// +optional
 	CredentialsSecretRef *corev1.SecretReference `json:"credentialsSecretRef,omitempty"`
+
+	UsagePolicy UsagePolicySpec `json:"usagePolicy"`
 }
 
 // ProviderConfigStatus defines the observed provider configuration state.

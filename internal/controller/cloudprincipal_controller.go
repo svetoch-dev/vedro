@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/svetoch-dev/vedro/internal/capabilities"
+	"github.com/svetoch-dev/vedro/internal/usagepolicy"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -127,6 +128,27 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
+	// check usagePolicy
+	decision := usagepolicy.CheckPrincipal(
+		providerConfig.Spec.UsagePolicy,
+		principal.CloudPrincipal,
+	)
+
+	if !decision.Allowed {
+		logger.Info("spec is Restricted", "message", decision.Message)
+		principal.Condition.Status = metav1.ConditionFalse
+		principal.Condition.Reason = conditions.ReasonBucketSpecRestricted
+		principal.Condition.Message = decision.Message
+		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
+			p.Status.UnsupportedFeatures = principal.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
 	caps := provider.Capabilities().Principal
 
 	unsupported := capabilities.ValidatePrincipalCapabilities(caps, principal.Spec)
@@ -152,7 +174,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	validationResult := provider.Principal().ValidatePrincipalSpec(principal.CloudPrincipal)
 
 	if !validationResult.Valid {
-		logger.Info("spec is invalid")
+		logger.Info("spec is invalid", "message", validationResult.Message)
 		principal.Condition.Status = metav1.ConditionFalse
 		principal.Condition.Reason = conditions.ReasonCloudPrincipalInvalidSpec
 		principal.Condition.Message = validationResult.Message

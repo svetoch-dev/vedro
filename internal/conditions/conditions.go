@@ -30,6 +30,7 @@ const (
 	ReasonBucketGetFailed           = "BucketGetFailed"
 	ReasonBucketUnsupportedFeatures = "BucketUnsupportedFeatures"
 	ReasonBucketInvalidSpec         = "BucketInvalidSpec"
+	ReasonBucketSpecRestricted      = "BucketSpecRestricted"
 	ReasonBucketEnsureError         = "BucketEnsureError"
 	ReasonBucketReconciled          = "Reconciled"
 	ReasonBucketDeleteError         = "BucketDeleteError"

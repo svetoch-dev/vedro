@@ -222,6 +222,26 @@ func createUnreadyProviderConfigNamed(ctx context.Context, name string) *vedro.P
 			ProjectId: "test-project",
 			Region:    "europe-west1",
 			Method:    vedro.AuthMethodWorkloadIdentity,
+			UsagePolicy: vedro.UsagePolicySpec{
+				AllowedNamespaces: vedro.AllowedNamespacesSpec{
+					All: true,
+				},
+				BucketPolicy: vedro.BucketPolicySpec{
+					AllowedNamePatterns: []string{
+						".*",
+					},
+				},
+				PrincipalPolicy: vedro.PrincipalPolicySpec{
+					AllowManaged:    true,
+					AllowReferences: true,
+					AllowedNamePatterns: []string{
+						".*",
+					},
+					AllowedReferencePatterns: []string{
+						".*",
+					},
+				},
+			},
 		},
 	}
 

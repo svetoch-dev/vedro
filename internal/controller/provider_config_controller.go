@@ -101,7 +101,7 @@ func (r *ProviderConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	validationResultCfg := provider.ValidateProviderConfigSpec(providerConfig.ProviderConfig)
 	if !validationResultCfg.Valid {
-		logger.Info("ProviderConfig.spec is invalid", "reason", validationResultCfg.Message)
+		logger.Info("ProviderConfig.spec is invalid", "message", validationResultCfg.Message)
 		providerConfig.Condition.Status = metav1.ConditionFalse
 		providerConfig.Condition.Reason = conditions.ReasonProviderConfigInvalidSpec
 		providerConfig.Condition.Message = validationResultCfg.Message

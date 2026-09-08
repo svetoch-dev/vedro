@@ -101,11 +101,72 @@ spec:
                 x-kubernetes-validations:
                 - message: type is immutable
                   rule: self == oldSelf
+              usagePolicy:
+                properties:
+                  allowedNamespaces:
+                    properties:
+                      all:
+                        type: boolean
+                      names:
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  bucketPolicy:
+                    properties:
+                      allowedNamePatterns:
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - allowedNamePatterns
+                    type: object
+                  principalPolicy:
+                    properties:
+                      allowManaged:
+                        default: true
+                        type: boolean
+                      allowReferences:
+                        default: true
+                        type: boolean
+                      allowedKinds:
+                        default:
+                        - ServiceAccount
+                        - Role
+                        - User
+                        - Group
+                        - AllUsers
+                        items:
+                          type: string
+                        type: array
+                      allowedNamePatterns:
+                        items:
+                          type: string
+                        type: array
+                      allowedReferencePatterns:
+                        default:
+                        - .*
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - allowManaged
+                    - allowReferences
+                    - allowedKinds
+                    - allowedNamePatterns
+                    - allowedReferencePatterns
+                    type: object
+                required:
+                - allowedNamespaces
+                - bucketPolicy
+                - principalPolicy
+                type: object
             required:
             - method
             - projectId
             - region
             - type
+            - usagePolicy
             type: object
             x-kubernetes-validations:
             - message: credentialsSecretRef is required when method is StaticCredentials

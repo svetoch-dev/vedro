@@ -39,6 +39,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/resolvers"
+	"github.com/svetoch-dev/vedro/internal/usagepolicy"
 )
 
 const bucketFinalizer = "vedro.svetoch.dev/bucket-finalizer"
@@ -127,6 +128,27 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
+	// check usagePolicy
+	decision := usagepolicy.CheckBucket(
+		providerConfig.Spec.UsagePolicy,
+		bucket.Bucket,
+	)
+
+	if !decision.Allowed {
+		logger.Info("spec is Restricted", "message", decision.Message)
+		bucket.Condition.Status = metav1.ConditionFalse
+		bucket.Condition.Reason = conditions.ReasonBucketSpecRestricted
+		bucket.Condition.Message = decision.Message
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+			b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
 	// check bucket capabilities
 	caps := provider.Capabilities().Bucket
 	unsupported := capabilities.ValidateBucketCapabilities(caps, bucket.Spec)
@@ -152,7 +174,7 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	validationResult := provider.Bucket().ValidateBucketSpec(bucket.Bucket, providerConfig.Spec.Type)
 
 	if !validationResult.Valid {
-		logger.Info("spec is invalid")
+		logger.Info("spec is invalid", "message", validationResult.Message)
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketInvalidSpec
 		bucket.Condition.Message = validationResult.Message

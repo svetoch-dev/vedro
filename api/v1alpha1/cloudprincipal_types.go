@@ -43,6 +43,19 @@ const (
 	PrincipalKindAllUsers       PrincipalKind = "AllUsers"
 )
 
+func (k PrincipalKind) Valid() bool {
+	switch k {
+	case PrincipalKindServiceAccount,
+		PrincipalKindRole,
+		PrincipalKindUser,
+		PrincipalKindGroup,
+		PrincipalKindAllUsers:
+		return true
+	default:
+		return false
+	}
+}
+
 type PrincipalManagementPolicy string
 
 const (

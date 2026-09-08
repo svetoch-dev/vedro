@@ -173,6 +173,57 @@ var _ = Describe("BucketAccessReconciler", func() {
 		Expect(provider.cleanupCalled).To(BeTrue())
 	})
 
+	It("denies access in a restricted namespace and recovers after policy relaxation", func() {
+		createProviderConfig(ctx)
+		bucket := createBucket(ctx, "bucket")
+		principal := createCloudPrincipal(ctx, "principal")
+		markBucketReady(ctx, bucket)
+		markCloudPrincipalReady(ctx, principal)
+		access := createBucketAccess(ctx, "restricted-access", "bucket")
+		updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) {
+			p.AllowedNamespaces = vedro.AllowedNamespacesSpec{Names: []string{"other"}}
+		})
+		result, err := reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(bucketAccess.ensureCalls).To(BeZero())
+		fetched := getBucketAccess(ctx, client.ObjectKeyFromObject(access))
+		expectAccessCondition(fetched, conditions.TypeReady, metav1.ConditionFalse, conditions.ReasonBucketAccessSpecRestricted)
+		Expect(fetched.Status.Applied).To(BeNil())
+		Expect(meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady).Message).To(ContainSubstring("default"))
+		updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) {
+			p.AllowedNamespaces = vedro.AllowedNamespacesSpec{Names: []string{"default"}}
+		})
+		_, err = reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(bucketAccess.ensureCalls).To(Equal(1))
+		fetched = getBucketAccess(ctx, client.ObjectKeyFromObject(access))
+		expectAccessCondition(fetched, conditions.TypeReady, metav1.ConditionTrue, conditions.ReasonBucketAccessReconciled)
+	})
+
+	It("preserves restricted applied access until deletion is allowed again", func() {
+		createProviderConfig(ctx)
+		access := createAppliedBucketAccess(ctx, "restricted-delete-access")
+		addBucketAccessFinalizer(ctx, access)
+		updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) {
+			p.AllowedNamespaces = vedro.AllowedNamespacesSpec{Names: []string{"other"}}
+		})
+		Expect(k8sClient.Delete(ctx, access)).To(Succeed())
+		result, err := reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(bucketAccess.deleteCalls).To(BeZero())
+		fetched := getBucketAccess(ctx, client.ObjectKeyFromObject(access))
+		Expect(fetched.Finalizers).To(ContainElement(bucketAccessFinalizer))
+		Expect(fetched.Status.Applied).NotTo(BeNil())
+		expectAccessCondition(fetched, conditions.TypeReady, metav1.ConditionFalse, conditions.ReasonBucketAccessRemoveFinalizerError)
+		updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) { p.AllowedNamespaces = vedro.AllowedNamespacesSpec{All: true} })
+		_, err = reconcileBucketAccess(ctx, reconciler, access)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(bucketAccess.deleteCalls).To(Equal(1))
+		expectBucketAccessNotFound(ctx, client.ObjectKeyFromObject(access))
+	})
+
 	It("sets successful status after ensuring access", func() {
 		createProviderConfig(ctx)
 		bucket := createBucket(ctx, "bucket")

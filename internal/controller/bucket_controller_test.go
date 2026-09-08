@@ -88,6 +88,75 @@ var _ = Describe("BucketReconciler", func() {
 		}
 	})
 
+	DescribeTable("enforces usage policy and recovers after it is relaxed",
+		func(restrict func(*vedro.UsagePolicySpec)) {
+			bucket := createBucket(ctx, "policy-bucket")
+			createProviderConfig(ctx)
+			updateUsagePolicy(ctx, restrict)
+			request := reconcile.Request{NamespacedName: client.ObjectKeyFromObject(bucket)}
+			result, err := reconciler.Reconcile(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+			Expect(provider.bucket.ensureCalls).To(BeZero())
+			fetched := getBucket(ctx, request.NamespacedName)
+			condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+			Expect(condition).NotTo(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(condition.Reason).To(Equal(conditions.ReasonBucketSpecRestricted))
+			Expect(condition.Message).NotTo(BeEmpty())
+			Expect(condition.ObservedGeneration).To(Equal(fetched.Generation))
+			updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) {
+				p.AllowedNamespaces = vedro.AllowedNamespacesSpec{All: true}
+				p.BucketPolicy.AllowedNamePatterns = []string{".*"}
+			})
+			_, err = reconciler.Reconcile(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(provider.bucket.ensureCalls).To(Equal(1))
+			fetched = getBucket(ctx, request.NamespacedName)
+			Expect(meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady).Status).To(Equal(metav1.ConditionTrue))
+		},
+		Entry("namespace", func(p *vedro.UsagePolicySpec) {
+			p.AllowedNamespaces = vedro.AllowedNamespacesSpec{Names: []string{"other"}}
+		}),
+		Entry("name", func(p *vedro.UsagePolicySpec) { p.BucketPolicy.AllowedNamePatterns = []string{"^other$"} }),
+	)
+
+	DescribeTable("handles restricted bucket deletion according to recorded provisioning",
+		func(provisioned bool) {
+			bucket := createBucket(ctx, "restricted-delete", func(p *vedro.BucketSpec) { p.DeletionPolicy = vedro.DeletionPolicyDelete })
+			createProviderConfig(ctx)
+			request := reconcile.Request{NamespacedName: client.ObjectKeyFromObject(bucket)}
+			if provisioned {
+				_, err := reconciler.Reconcile(ctx, request)
+				Expect(err).NotTo(HaveOccurred())
+			} else {
+				controllerutilAddFinalizer(ctx, bucket)
+			}
+			// The CR name is allowed, but the actual recorded deletion target is not.
+			updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) { p.BucketPolicy.AllowedNamePatterns = []string{"^restricted-delete$"} })
+			if !provisioned {
+				updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) { p.BucketPolicy.AllowedNamePatterns = []string{"^other$"} })
+			}
+			Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+			_, err := reconciler.Reconcile(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(provider.bucket.deleteCalls).To(BeZero())
+			if !provisioned {
+				Expect(apierrors.IsNotFound(k8sClient.Get(ctx, request.NamespacedName, &vedro.Bucket{}))).To(BeTrue())
+				return
+			}
+			fetched := getBucket(ctx, request.NamespacedName)
+			Expect(fetched.Finalizers).To(ContainElement(bucketFinalizer))
+			Expect(meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady).Reason).To(Equal(conditions.ReasonBucketRemoveFinalizerError))
+			updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) { p.BucketPolicy.AllowedNamePatterns = []string{"^external-bucket$"} })
+			_, err = reconciler.Reconcile(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(provider.bucket.deleteCalls).To(Equal(1))
+			Expect(apierrors.IsNotFound(k8sClient.Get(ctx, request.NamespacedName, &vedro.Bucket{}))).To(BeTrue())
+		},
+		Entry("unprovisioned", false), Entry("provisioned", true),
+	)
+
 	It("ignores missing Buckets", func() {
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{
 			NamespacedName: types.NamespacedName{

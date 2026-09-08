@@ -289,6 +289,85 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 		expectCloudPrincipalNotFound(ctx, client.ObjectKeyFromObject(principal))
 	})
 
+	DescribeTable("rejects managed principals restricted by usage policy",
+		func(restrict func(*vedro.UsagePolicySpec)) {
+			principal := createCloudPrincipal(ctx, "restricted-principal")
+			createProviderConfig(ctx)
+			updateUsagePolicy(ctx, restrict)
+			_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(provider.principal.ensureCalls).To(BeZero())
+			fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+			condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+			Expect(condition).NotTo(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(condition.Reason).To(Equal(conditions.ReasonCloudPrincipalSpecRestricted))
+			Expect(condition.Message).NotTo(BeEmpty())
+			Expect(condition.ObservedGeneration).To(Equal(fetched.Generation))
+		},
+		Entry("namespace", func(p *vedro.UsagePolicySpec) {
+			p.AllowedNamespaces = vedro.AllowedNamespacesSpec{Names: []string{"other"}}
+		}),
+		Entry("name", func(p *vedro.UsagePolicySpec) { p.PrincipalPolicy.AllowedNamePatterns = []string{"^other$"} }),
+		Entry("kind", func(p *vedro.UsagePolicySpec) {
+			p.PrincipalPolicy.AllowedKinds = []vedro.PrincipalKind{vedro.PrincipalKindUser}
+		}),
+		Entry("management disabled", func(p *vedro.UsagePolicySpec) { p.PrincipalPolicy.AllowManaged = false }),
+	)
+
+	DescribeTable("preserves provisioned principals when recorded deletion targets are restricted",
+		func(restrictKind bool) {
+			principal := createCloudPrincipal(ctx, "restricted-delete", func(p *vedro.CloudPrincipal) { p.Spec.Managed.DeletionPolicy = vedro.DeletionPolicyDelete })
+			createProviderConfig(ctx)
+			_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+			Expect(err).NotTo(HaveOccurred())
+			fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+			if restrictKind {
+				fetched.Spec.Kind = vedro.PrincipalKindUser
+			} else {
+				fetched.Spec.Managed.Name = "allowed-name"
+			}
+			Expect(k8sClient.Update(ctx, fetched)).To(Succeed())
+			updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) {
+				if restrictKind {
+					p.PrincipalPolicy.AllowedKinds = []vedro.PrincipalKind{vedro.PrincipalKindUser}
+				} else {
+					p.PrincipalPolicy.AllowedNamePatterns = []string{"^allowed-name$"}
+				}
+			})
+			Expect(k8sClient.Delete(ctx, fetched)).To(Succeed())
+			_, err = reconcileCloudPrincipal(ctx, reconciler, principal)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(provider.principal.deleteCalls).To(BeZero())
+			fetched = getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+			Expect(fetched.Finalizers).To(ContainElement(principalFinalizer))
+			Expect(meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady).Reason).To(Equal(conditions.ReasonCloudPrincipalRemoveFinalizerError))
+			updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) {
+				p.PrincipalPolicy.AllowedKinds = []vedro.PrincipalKind{vedro.PrincipalKindServiceAccount}
+				p.PrincipalPolicy.AllowedNamePatterns = []string{"^external-principal$"}
+			})
+			_, err = reconcileCloudPrincipal(ctx, reconciler, principal)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(provider.principal.deleteCalls).To(Equal(1))
+			expectCloudPrincipalNotFound(ctx, client.ObjectKeyFromObject(principal))
+		},
+		Entry("recorded kind", true), Entry("recorded name", false),
+	)
+
+	It("removes a rejected unprovisioned principal without calling cloud deletion", func() {
+		principal := createCloudPrincipal(ctx, "rejected-delete", func(p *vedro.CloudPrincipal) { p.Spec.Managed.DeletionPolicy = vedro.DeletionPolicyDelete })
+		createProviderConfig(ctx)
+		updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) { p.PrincipalPolicy.AllowManaged = false })
+		_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(provider.principal.ensureCalls).To(BeZero())
+		Expect(k8sClient.Delete(ctx, principal)).To(Succeed())
+		_, err = reconcileCloudPrincipal(ctx, reconciler, principal)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(provider.principal.deleteCalls).To(BeZero())
+		expectCloudPrincipalNotFound(ctx, client.ObjectKeyFromObject(principal))
+	})
+
 	It("deletes the external principal and removes the finalizer for Delete policy", func() {
 		principal := createCloudPrincipal(ctx, "delete-policy", func(p *vedro.CloudPrincipal) {
 			p.Spec.Managed.DeletionPolicy = vedro.DeletionPolicyDelete
@@ -514,6 +593,33 @@ var _ = Describe("CloudPrincipalReconciler", func() {
 		Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 		Expect(provider.principal.ensureCalls).To(Equal(1))
 	})
+
+	DescribeTable("enforces reference policy before resolving the external principal",
+		func(disableReferences bool) {
+			principal := createCloudPrincipal(ctx, "restricted-reference", func(p *vedro.CloudPrincipal) {
+				p.Spec.ManagementPolicy = vedro.PrincipalManagementPolicyReference
+				p.Spec.Managed = nil
+				p.Spec.Reference = &vedro.ReferencedPrincipalSpec{Name: "account@example.com"}
+			})
+			createProviderConfig(ctx)
+			updateUsagePolicy(ctx, func(p *vedro.UsagePolicySpec) {
+				if disableReferences {
+					p.PrincipalPolicy.AllowReferences = false
+				} else {
+					p.PrincipalPolicy.AllowedReferencePatterns = []string{`^[^@]+@other\.com$`}
+				}
+			})
+			_, err := reconcileCloudPrincipal(ctx, reconciler, principal)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(provider.principal.ensureCalls).To(BeZero())
+			fetched := getCloudPrincipal(ctx, client.ObjectKeyFromObject(principal))
+			condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeReady)
+			Expect(condition).NotTo(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(condition.Reason).To(Equal(conditions.ReasonCloudPrincipalSpecRestricted))
+		},
+		Entry("references disabled", true), Entry("reference name denied", false),
+	)
 
 	It("reconciles referenced principals", func() {
 		principal := createCloudPrincipal(ctx, "referenced-principal", func(p *vedro.CloudPrincipal) {

@@ -24,7 +24,8 @@ spec:
       allowedNamePatterns:
         - '^.*sample.*$'
       allowedReferencePatterns:
-        - '^.*sample.*$'
+        - '.*@svetoch.dev'
+        - 'production:.*'
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: Bucket

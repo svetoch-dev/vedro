@@ -77,6 +77,16 @@ func CheckBucket(spec vedro.UsagePolicySpec, bucket vedro.Bucket) Decision {
 	return Allowed()
 }
 
+func CheckBucketAccess(spec vedro.UsagePolicySpec, bucketAccess vedro.BucketAccess) Decision {
+	d := isNamespaceAllowed(bucketAccess.Namespace, spec.AllowedNamespaces)
+
+	if !d.Allowed {
+		return d
+	}
+
+	return Allowed()
+}
+
 func CheckPrincipal(spec vedro.UsagePolicySpec, principal vedro.CloudPrincipal) Decision {
 	d := isNamespaceAllowed(principal.Namespace, spec.AllowedNamespaces)
 

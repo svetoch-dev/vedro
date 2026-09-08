@@ -137,7 +137,7 @@ func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if !decision.Allowed {
 		logger.Info("spec is Restricted", "message", decision.Message)
 		principal.Condition.Status = metav1.ConditionFalse
-		principal.Condition.Reason = conditions.ReasonBucketSpecRestricted
+		principal.Condition.Reason = conditions.ReasonCloudPrincipalSpecRestricted
 		principal.Condition.Message = decision.Message
 		patchErr := r.patchStatus(ctx, req, principal.Generation, func(p *vedro.CloudPrincipal) {
 			p.Status.UnsupportedFeatures = principal.Status.UnsupportedFeatures

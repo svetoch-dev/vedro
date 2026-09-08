@@ -20,6 +20,7 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/svetoch-dev/vedro/internal/usagepolicy"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -252,6 +253,29 @@ func (r *BucketAccessReconciler) reconcileBucketAccess(
 		}
 	}
 
+	decision := usagepolicy.CheckBucketAccess(
+		providerConfig.Spec.UsagePolicy,
+		bucketAccess.BucketAccess,
+	)
+
+	if !decision.Allowed {
+		logger.Info("spec is Restricted", "message", decision.Message)
+		bucketAccess.Condition.Status = metav1.ConditionFalse
+		bucketAccess.Condition.Reason = conditions.ReasonBucketAccessSpecRestricted
+		bucketAccess.Condition.Message = decision.Message
+		patchErr := r.patchStatus(ctx, req, bucketAccess.Generation, func(p *vedro.BucketAccess) {
+			p.Status.UnsupportedFeatures = bucketAccess.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&p.Status.Conditions, bucket.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, bucketAccess.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
 	caps := provider.Capabilities().BucketAccess
 	unsupported := capabilities.ValidateBucketAccessCapabilities(caps, bucketAccess.Spec)
 
@@ -370,6 +394,7 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 			providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
 
 			provider := providerSetup.Provider
+			providerConfig := providerSetup.Config
 
 			if provider != nil {
 				defer func() {
@@ -387,19 +412,43 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 				)
 			}
 
-			err := provider.Access().DeleteBucketAccess(ctx, access.BucketAccess)
-			if err != nil {
-				access.Condition.Status = metav1.ConditionFalse
-				access.Condition.Reason = conditions.ReasonBucketAccessDeleteError
-				access.Condition.Message = err.Error()
+			decision := usagepolicy.CheckBucketAccess(
+				providerConfig.Spec.UsagePolicy,
+				access.BucketAccess,
+			)
 
-				patchErr := r.patchStatus(ctx, req, access.Generation, func(p *vedro.BucketAccess) {
-					meta.SetStatusCondition(&p.Status.Conditions, access.Condition)
-				})
-				if patchErr != nil {
-					return ReconcileError(ctx, patchErr, "patch error")
+			if decision.Allowed {
+				err := provider.Access().DeleteBucketAccess(ctx, access.BucketAccess)
+				if err != nil {
+					access.Condition.Status = metav1.ConditionFalse
+					access.Condition.Reason = conditions.ReasonBucketAccessDeleteError
+					access.Condition.Message = err.Error()
+
+					patchErr := r.patchStatus(ctx, req, access.Generation, func(p *vedro.BucketAccess) {
+						meta.SetStatusCondition(&p.Status.Conditions, access.Condition)
+					})
+					if patchErr != nil {
+						return ReconcileError(ctx, patchErr, "patch error")
+					}
+					return ReconcileError(ctx, err, "unable to delete external BucketAccess")
 				}
-				return ReconcileError(ctx, err, "unable to delete external BucketAccess")
+			} else {
+				logger.Info("skipping BucketAccess deletion because its spec is restricted", "message", decision.Message)
+				if access.IsProvisioned() {
+					message := "Cant remove BucketAccess becasue it was already provisioned" +
+						" and spec is restricted by usagePolicy"
+					logger.Info(message)
+					access.Condition.Status = metav1.ConditionFalse
+					access.Condition.Reason = conditions.ReasonBucketAccessRemoveFinalizerError
+					access.Condition.Message = message
+					patchErr := r.patchStatus(ctx, req, access.Generation, func(b *vedro.BucketAccess) {
+						meta.SetStatusCondition(&b.Status.Conditions, access.Condition)
+					})
+					if patchErr != nil {
+						return ReconcileError(ctx, patchErr, "patch error")
+					}
+					return Reconciled()
+				}
 			}
 		}
 	}

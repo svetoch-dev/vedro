@@ -307,6 +307,95 @@ func TestValidatePrincipalAllUsers(t *testing.T) {
 	}
 }
 
+func TestValidateUsagePolicy(t *testing.T) {
+	tests := []struct {
+		name   string
+		policy vedro.UsagePolicySpec
+		valid  bool
+	}{
+		{
+			name: "Valid",
+			policy: vedro.UsagePolicySpec{
+				AllowedNamespaces: vedro.AllowedNamespacesSpec{
+					Names: []string{
+						"default",
+					},
+					All: false,
+				},
+				BucketPolicy: vedro.BucketPolicySpec{
+					AllowedNamePatterns: []string{
+						".*",
+					},
+				},
+				PrincipalPolicy: vedro.PrincipalPolicySpec{
+					AllowedNamePatterns: []string{
+						".*",
+					},
+					AllowedReferencePatterns: []string{
+						".*",
+					},
+					AllowManaged:    true,
+					AllowReferences: true,
+					AllowedKinds: []vedro.PrincipalKind{
+						vedro.PrincipalKindServiceAccount,
+					},
+				},
+			},
+			valid: true,
+		},
+		{
+			name: "Invalid if patterns do not compile",
+			policy: vedro.UsagePolicySpec{
+				BucketPolicy: vedro.BucketPolicySpec{
+					AllowedNamePatterns: []string{
+						"^valid_pattern$",
+					},
+				},
+				PrincipalPolicy: vedro.PrincipalPolicySpec{
+					AllowedReferencePatterns: []string{
+						"[invalid",
+					},
+					AllowReferences: true,
+				},
+			},
+			valid: false,
+		},
+		{
+			name: "Invalid if kind is not found",
+			policy: vedro.UsagePolicySpec{
+				PrincipalPolicy: vedro.PrincipalPolicySpec{
+					AllowReferences: true,
+					AllowedKinds: []vedro.PrincipalKind{
+						"wrongKind",
+					},
+				},
+			},
+			valid: false,
+		},
+		{
+			name: "Invalid if all namespaces used with Names together",
+			policy: vedro.UsagePolicySpec{
+				AllowedNamespaces: vedro.AllowedNamespacesSpec{
+					Names: []string{
+						"default",
+					},
+					All: true,
+				},
+			},
+			valid: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ValidateUsagePolicy(tt.policy)
+			if result.Valid != tt.valid {
+				t.Errorf("Expect Valid=%v, got %v", tt.valid, result.Valid)
+			}
+		})
+	}
+}
+
 func TestValidateNameImmutability(t *testing.T) {
 	tests := []struct {
 		name         string

@@ -58,6 +58,7 @@ spec:
                 - User
                 - Group
                 - Role
+                - AllUsers
                 type: string
               managed:
                 description: |-
@@ -130,10 +131,10 @@ spec:
             - message: managed must be set and reference must not be set when managementPolicy
                 is Managed
               rule: self.managementPolicy != 'Managed' || (has(self.managed) && !has(self.reference))
-            - message: reference must be set and managed must not be set when managementPolicy
-                is Reference
-              rule: self.managementPolicy != 'Reference' || (has(self.reference) &&
-                !has(self.managed))
+            - message: reference must be set unless kind is AllUsers, and managed
+                must not be set when managementPolicy is Reference
+              rule: self.managementPolicy != 'Reference' || ((self.kind == 'AllUsers'
+                || has(self.reference)) && !has(self.managed))
           status:
             description: Status defines the observed state of the CloudPrincipal.
             properties:

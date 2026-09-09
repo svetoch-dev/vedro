@@ -158,6 +158,7 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 				vedro.PrincipalKindServiceAccount: true,
 				vedro.PrincipalKindGroup:          true,
 				vedro.PrincipalKindUser:           true,
+				vedro.PrincipalKindAllUsers:       true,
 			},
 		},
 	}
@@ -187,6 +188,12 @@ func (p *Provider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validati
 	}
 
 	v := validation.ValidateLocation(cfg.Spec.Region, nil)
+
+	if !v.Valid {
+		return v
+	}
+
+	v = validation.ValidateUsagePolicy(cfg.Spec.UsagePolicy)
 
 	if !v.Valid {
 		return v

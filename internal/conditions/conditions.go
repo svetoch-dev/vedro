@@ -26,26 +26,30 @@ const (
 
 // Condition reasons for Bucket resources.
 const (
-	ReasonBucketNotFound            = "BucketNotFound"
-	ReasonBucketGetFailed           = "BucketGetFailed"
-	ReasonBucketUnsupportedFeatures = "BucketUnsupportedFeatures"
-	ReasonBucketInvalidSpec         = "BucketInvalidSpec"
-	ReasonBucketEnsureError         = "BucketEnsureError"
-	ReasonBucketReconciled          = "Reconciled"
-	ReasonBucketDeleteError         = "BucketDeleteError"
-	ReasonBucketReady               = "BucketReady"
+	ReasonBucketNotFound             = "BucketNotFound"
+	ReasonBucketGetFailed            = "BucketGetFailed"
+	ReasonBucketUnsupportedFeatures  = "BucketUnsupportedFeatures"
+	ReasonBucketInvalidSpec          = "BucketInvalidSpec"
+	ReasonBucketSpecRestricted       = "BucketSpecRestricted"
+	ReasonBucketEnsureError          = "BucketEnsureError"
+	ReasonBucketReconciled           = "Reconciled"
+	ReasonBucketDeleteError          = "BucketDeleteError"
+	ReasonBucketRemoveFinalizerError = "BucketRemoveFinalizerError"
+	ReasonBucketReady                = "BucketReady"
 )
 
 // Condition reasons for CloudPrincipal resources.
 const (
-	ReasonCloudPrincipalNotFound            = "CloudPrincipalNotFound"
-	ReasonCloudPrincipalGetFailed           = "CloudPrincipalGetFailed"
-	ReasonCloudPrincipalInvalidSpec         = "CloudPrincipalInvalidSpec"
-	ReasonCloudPrincipalDeleteError         = "CloudPrincipalDeleteError"
-	ReasonCloudPrincipalUnsupportedFeatures = "CloudPrincipalUnsupportedFeatures"
-	ReasonCloudPrincipalEnsureError         = "CloudPrincipalEnsureError"
-	ReasonCloudPrincipalReconciled          = "Reconciled"
-	ReasonCloudPrincipalReady               = "CloudPrincipalReady"
+	ReasonCloudPrincipalNotFound             = "CloudPrincipalNotFound"
+	ReasonCloudPrincipalGetFailed            = "CloudPrincipalGetFailed"
+	ReasonCloudPrincipalInvalidSpec          = "CloudPrincipalInvalidSpec"
+	ReasonCloudPrincipalDeleteError          = "CloudPrincipalDeleteError"
+	ReasonCloudPrincipalSpecRestricted       = "CloudPrincipalSpecRestricted"
+	ReasonCloudPrincipalRemoveFinalizerError = "CloudPrincipalRemoveFinalizerError"
+	ReasonCloudPrincipalUnsupportedFeatures  = "CloudPrincipalUnsupportedFeatures"
+	ReasonCloudPrincipalEnsureError          = "CloudPrincipalEnsureError"
+	ReasonCloudPrincipalReconciled           = "Reconciled"
+	ReasonCloudPrincipalReady                = "CloudPrincipalReady"
 )
 
 // Condition reasons for ProviderConfig resources.
@@ -66,7 +70,9 @@ const (
 	ReasonBucketAccessGetFailed               = "BucketAccessGetFailed"
 	ReasonBucketAccessDependencyNotReady      = "BucketAccessDependencyNotReady"
 	ReasonBucketAccessProviderConfigMissMatch = "BucketAccessProviderConfigMissMatch"
+	ReasonBucketAccessSpecRestricted          = "BucketAccessSpecRestricted"
 	ReasonBucketAccessDeleteError             = "BucketAccessDeleteError"
+	ReasonBucketAccessRemoveFinalizerError    = "BucketAccessRemoveFinalizerError"
 	ReasonBucketAccessUnsupportedFeatures     = "BucketAccessUnsupportedFeatures"
 	ReasonBucketAccessEnsureError             = "BucketAccessEnsureError"
 	ReasonBucketAccessReconciled              = "Reconciled"

@@ -39,6 +39,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/resolvers"
+	"github.com/svetoch-dev/vedro/internal/usagepolicy"
 )
 
 const bucketFinalizer = "vedro.svetoch.dev/bucket-finalizer"
@@ -127,6 +128,27 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
+	// check usagePolicy
+	decision := usagepolicy.CheckBucket(
+		providerConfig.Spec.UsagePolicy,
+		bucket.Bucket,
+	)
+
+	if !decision.Allowed {
+		logger.Info("spec is Restricted", "message", decision.Message)
+		bucket.Condition.Status = metav1.ConditionFalse
+		bucket.Condition.Reason = conditions.ReasonBucketSpecRestricted
+		bucket.Condition.Message = decision.Message
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+			b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
 	// check bucket capabilities
 	caps := provider.Capabilities().Bucket
 	unsupported := capabilities.ValidateBucketCapabilities(caps, bucket.Spec)
@@ -134,38 +156,25 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if len(unsupported) > 0 {
 		logger.Info("Bucket Unsupported features found")
-
-		if bucket.Spec.UnsupportedFeaturePolicy == vedro.UnsupportedFeaturePolicyFail {
-			logger.Info("UnsupportedFeaturePolicy set to Fail. stopping reconciliation")
-			bucket.Condition.Status = metav1.ConditionFalse
-			bucket.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
-			bucket.Condition.Message = "unsupported features found"
-			patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-				b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
-				meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
-			})
-			if patchErr != nil {
-				return ReconcileError(ctx, patchErr, "patch error")
-			}
-
-			return Reconciled()
-		}
-		if bucket.Spec.UnsupportedFeaturePolicy == vedro.UnsupportedFeaturePolicyWarn {
-			patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-				b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
-			})
-			if patchErr != nil {
-				return ReconcileError(ctx, patchErr, "patch error")
-			}
+		bucket.Condition.Status = metav1.ConditionFalse
+		bucket.Condition.Reason = conditions.ReasonBucketUnsupportedFeatures
+		bucket.Condition.Message = "unsupported features found"
+		patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+			b.Status.UnsupportedFeatures = bucket.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
 		}
 
+		return Reconciled()
 	}
 
 	// check that spec is valid
 	validationResult := provider.Bucket().ValidateBucketSpec(bucket.Bucket, providerConfig.Spec.Type)
 
 	if !validationResult.Valid {
-		logger.Info("spec is invalid")
+		logger.Info("spec is invalid", "message", validationResult.Message)
 		bucket.Condition.Status = metav1.ConditionFalse
 		bucket.Condition.Reason = conditions.ReasonBucketInvalidSpec
 		bucket.Condition.Message = validationResult.Message
@@ -287,6 +296,7 @@ func (r *BucketReconciler) deleteBucket(
 		providerSetup, issue := prepareProvider(ctx, providerRef, r.Client, providerFactory)
 
 		provider := providerSetup.Provider
+		providerConfig := providerSetup.Config
 
 		if provider != nil {
 			defer func() {
@@ -303,20 +313,45 @@ func (r *BucketReconciler) deleteBucket(
 			)
 		}
 
-		err := provider.Bucket().DeleteBucket(ctx, bucket.Bucket)
+		// check usagePolicy
+		decision := usagepolicy.CheckBucket(
+			providerConfig.Spec.UsagePolicy,
+			bucket.Bucket,
+		)
 
-		if err != nil {
-			bucket.Condition.Status = metav1.ConditionFalse
-			bucket.Condition.Reason = conditions.ReasonBucketDeleteError
-			bucket.Condition.Message = err.Error()
+		if decision.Allowed {
+			err := provider.Bucket().DeleteBucket(ctx, bucket.Bucket)
 
-			patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
-				meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
-			})
-			if patchErr != nil {
-				return ReconcileError(ctx, patchErr, "patch error")
+			if err != nil {
+				bucket.Condition.Status = metav1.ConditionFalse
+				bucket.Condition.Reason = conditions.ReasonBucketDeleteError
+				bucket.Condition.Message = err.Error()
+
+				patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+					meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+				})
+				if patchErr != nil {
+					return ReconcileError(ctx, patchErr, "patch error")
+				}
+				return ReconcileError(ctx, err, "unable to delete external bucket")
 			}
-			return ReconcileError(ctx, err, "unable to delete external bucket")
+		} else {
+			logger.Info("Skipping bucket deletion because spec is restricted", "message", decision.Message)
+			if bucket.IsProvisioned() {
+				message := "Cant remove bucket because it was already provisioned" +
+					" and spec is restricted by usagePolicy"
+				logger.Info(message)
+				bucket.Condition.Status = metav1.ConditionFalse
+				bucket.Condition.Reason = conditions.ReasonBucketRemoveFinalizerError
+				bucket.Condition.Message = message
+				patchErr := r.patchStatus(ctx, req, bucket.Generation, func(b *vedro.Bucket) {
+					meta.SetStatusCondition(&b.Status.Conditions, bucket.Condition)
+				})
+				if patchErr != nil {
+					return ReconcileError(ctx, patchErr, "patch error")
+				}
+				return Reconciled()
+			}
 		}
 
 	}

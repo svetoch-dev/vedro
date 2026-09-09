@@ -181,6 +181,8 @@ func (y *ycPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Princ
 			}
 
 			id = fmt.Sprintf("userAccount:%s", user.SubjectClaims.Sub)
+		case vedro.PrincipalKindAllUsers:
+			id = "system:allUsers"
 		default:
 			return nil, fmt.Errorf("unknown principal kind %s", principal.Kind)
 		}

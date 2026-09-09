@@ -203,6 +203,15 @@ func createProviderConfig(ctx context.Context) {
 	createProviderConfigNamed(ctx, "test-provider")
 }
 
+// updateUsagePolicy simulates a policy edit followed by successful provider reconciliation.
+func updateUsagePolicy(ctx context.Context, mutate func(*vedro.UsagePolicySpec)) {
+	provider := &vedro.ProviderConfig{}
+	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-provider"}, provider)).To(Succeed())
+	mutate(&provider.Spec.UsagePolicy)
+	Expect(k8sClient.Update(ctx, provider)).To(Succeed())
+	markProviderConfigReady(ctx, provider)
+}
+
 func createProviderConfigNamed(ctx context.Context, name string) {
 	providerConfig := createUnreadyProviderConfigNamed(ctx, name)
 	markProviderConfigReady(ctx, providerConfig)
@@ -222,6 +231,26 @@ func createUnreadyProviderConfigNamed(ctx context.Context, name string) *vedro.P
 			ProjectId: "test-project",
 			Region:    "europe-west1",
 			Method:    vedro.AuthMethodWorkloadIdentity,
+			UsagePolicy: vedro.UsagePolicySpec{
+				AllowedNamespaces: vedro.AllowedNamespacesSpec{
+					All: true,
+				},
+				BucketPolicy: vedro.BucketPolicySpec{
+					AllowedNamePatterns: []string{
+						".*",
+					},
+				},
+				PrincipalPolicy: vedro.PrincipalPolicySpec{
+					AllowManaged:    true,
+					AllowReferences: true,
+					AllowedNamePatterns: []string{
+						".*",
+					},
+					AllowedReferencePatterns: []string{
+						".*",
+					},
+				},
+			},
 		},
 	}
 

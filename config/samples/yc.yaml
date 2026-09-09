@@ -13,7 +13,19 @@ spec:
   credentialsSecretRef:
     name: yc-creds
     namespace: vedro-system
-
+  usagePolicy:
+    allowedNamespaces:
+      names:
+        - vedro-system
+    bucketPolicy:
+      allowedNamePatterns:
+        - '^.*sample.*$'
+    principalPolicy:
+      allowedNamePatterns:
+        - '^.*sample.*$'
+      allowedReferencePatterns:
+        - '.*@svetoch.dev'
+        - 'production:.*'
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: Bucket
@@ -43,8 +55,6 @@ spec:
   labels:
     app: payments
     env: dev
-
-  unsupportedFeaturePolicy: Fail
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: CloudPrincipal
@@ -58,10 +68,10 @@ spec:
   providerRef:
     name: providerconfig-sample-yc
   kind: ServiceAccount
+  managementPolicy: Managed
   managed:
     name: principal-sample-yc
     deletionPolicy: Delete
-  managementPolicy: Managed
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: BucketAccess
@@ -79,4 +89,4 @@ spec:
     name: bucket-sample-yc
     namespace: vedro-system
   access:
-    level: BucketAdmin
+    level: ObjectReader

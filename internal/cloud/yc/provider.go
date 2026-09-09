@@ -155,6 +155,7 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 			ReferencedKinds: map[vedro.PrincipalKind]bool{
 				vedro.PrincipalKindServiceAccount: true,
 				vedro.PrincipalKindUser:           true,
+				vedro.PrincipalKindAllUsers:       true,
 			},
 		},
 	}
@@ -185,6 +186,12 @@ func (p *Provider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validati
 	}
 
 	v := validation.ValidateLocation(cfg.Spec.Region, nil)
+
+	if !v.Valid {
+		return v
+	}
+
+	v = validation.ValidateUsagePolicy(cfg.Spec.UsagePolicy)
 
 	if !v.Valid {
 		return v

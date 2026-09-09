@@ -34,6 +34,10 @@ func (o *BucketResolver) IsReady() (*metav1.Condition, bool) {
 	return isReady(o.Generation, o.Status.Conditions)
 }
 
+func (o *BucketResolver) IsProvisioned() bool {
+	return o.Status.Applied != nil
+}
+
 func (o *BucketResolver) ShouldBeRetained() bool {
 	return o.Spec.DeletionPolicy == vedro.DeletionPolicyRetain
 }

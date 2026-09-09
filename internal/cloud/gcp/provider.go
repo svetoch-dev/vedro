@@ -161,6 +161,16 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 				vedro.PrincipalKindAllUsers:       true,
 			},
 		},
+		PrincipalAuth: cloud.PrincipalAuthCapabilities{
+			StaticCredentials: true,
+			WorkloadIdentity:  true,
+			WorkloadIdentityKinds: map[vedro.PrincipalKind]bool{
+				vedro.PrincipalKindServiceAccount: true,
+			},
+			StaticCredentialsKinds: map[vedro.PrincipalKind]bool{
+				vedro.PrincipalKindServiceAccount: true,
+			},
+		},
 	}
 }
 

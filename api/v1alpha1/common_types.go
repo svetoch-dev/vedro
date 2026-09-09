@@ -59,3 +59,10 @@ type UnsupportedFeature struct {
 	Message string                   `json:"message"`
 	Reason  UnsupportedFeatureReason `json:"reason"`
 }
+
+type ServiceAccountReference struct {
+	// Kubernetes ServiceAccount name.
+	Name string `json:"name"`
+	// namespace defines the kuberenetes ServiceAccount namespace.
+	Namespace string `json:"namespace"`
+}

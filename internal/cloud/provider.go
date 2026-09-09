@@ -24,9 +24,17 @@ type Provider interface {
 }
 
 type Capabilities struct {
-	Bucket       BucketCapabilities
-	BucketAccess BucketAccessCapabilities
-	Principal    PrincipalCapabilities
+	Bucket        BucketCapabilities
+	BucketAccess  BucketAccessCapabilities
+	Principal     PrincipalCapabilities
+	PrincipalAuth PrincipalAuthCapabilities
+}
+
+type PrincipalAuthCapabilities struct {
+	StaticCredentials      bool
+	WorkloadIdentity       bool
+	WorkloadIdentityKinds  map[vedro.PrincipalKind]bool
+	StaticCredentialsKinds map[vedro.PrincipalKind]bool
 }
 
 type PrincipalCapabilities struct {

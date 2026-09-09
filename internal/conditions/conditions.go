@@ -52,6 +52,21 @@ const (
 	ReasonCloudPrincipalReady                = "CloudPrincipalReady"
 )
 
+// Condition reasons for CloudPrincipalAuth resources.
+const (
+	ReasonCloudPrincipalAuthNotFound             = "CloudPrincipalAuthNotFound"
+	ReasonCloudPrincipalAuthGetFailed            = "CloudPrincipalAuthGetFailed"
+	ReasonCloudPrincipalAuthInvalidSpec          = "CloudPrincipalAuthInvalidSpec"
+	ReasonCloudPrincipalAuthDeleteError          = "CloudPrincipalAuthDeleteError"
+	ReasonCloudPrincipalAuthSpecRestricted       = "CloudPrincipalAuthSpecRestricted"
+	ReasonCloudPrincipalAuthRemoveFinalizerError = "CloudPrincipalAuthRemoveFinalizerError"
+	ReasonCloudPrincipalAuthUnsupportedFeatures  = "CloudPrincipalAuthUnsupportedFeatures"
+	ReasonCloudPrincipalAuthEnsureError          = "CloudPrincipalAuthEnsureError"
+	ReasonCloudPrincipalAuthDependencyNotReady   = "CloudPrincipalAuthDependencyNotReady"
+	ReasonCloudPrincipalAuthReconciled           = "Reconciled"
+	ReasonCloudPrincipalAuthReady                = "CloudPrincipalAuthReady"
+)
+
 // Condition reasons for ProviderConfig resources.
 const (
 	ReasonProviderConfigNotFound    = "ProviderConfigNotFound"

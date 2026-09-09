@@ -337,7 +337,7 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 		} else {
 			logger.Info("skipping CloudPrincipal deletion because its spec is restricted", "message", decision.Message)
 			if principal.IsProvisioned() {
-				message := "Cant remove CloudPrincipal becasue it was already provisioned" +
+				message := "Cant remove CloudPrincipal because it was already provisioned" +
 					" and spec is restricted by usagePolicy"
 				logger.Info(message)
 				principal.Condition.Status = metav1.ConditionFalse

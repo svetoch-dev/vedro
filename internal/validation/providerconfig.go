@@ -13,8 +13,7 @@ func ValidateUsagePolicy(policy vedro.UsagePolicySpec) ValidationResult {
 	}
 
 	for _, k := range policy.PrincipalPolicy.AllowedKinds {
-		kind := vedro.PrincipalKind(k)
-		if !kind.Valid() {
+		if !k.Valid() {
 			return Invalid(fmt.Sprintf("Kind %s is not a valid PrincipalKind", k))
 		}
 	}

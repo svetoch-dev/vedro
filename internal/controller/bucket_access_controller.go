@@ -435,7 +435,7 @@ func (r *BucketAccessReconciler) deleteBucketAccess(
 			} else {
 				logger.Info("skipping BucketAccess deletion because its spec is restricted", "message", decision.Message)
 				if access.IsProvisioned() {
-					message := "Cant remove BucketAccess becasue it was already provisioned" +
+					message := "Cant remove BucketAccess because it was already provisioned" +
 						" and spec is restricted by usagePolicy"
 					logger.Info(message)
 					access.Condition.Status = metav1.ConditionFalse

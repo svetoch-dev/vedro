@@ -24,7 +24,7 @@ spec:
       allowedNamePatterns:
         - '^.*sample.*$'
       allowedReferencePatterns:
-        - '^.*sample.*$'
+        - '^.*$'
 
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1

@@ -102,19 +102,40 @@ spec:
                 - message: type is immutable
                   rule: self == oldSelf
               usagePolicy:
+                description: |-
+                  UsagePolicy defines namespace and resource restrictions for this provider.
+                  Resources must satisfy all applicable restrictions to reconcile.
                 properties:
                   allowedNamespaces:
+                    description: |-
+                      AllowedNamespaces restricts the namespaces of Bucket, CloudPrincipal,
+                      and BucketAccess resources using this provider.
                     properties:
                       all:
+                        description: |-
+                          All allows every Kubernetes namespace to use this provider.
+                          Defaults to false and cannot be combined with a non-empty names list.
                         type: boolean
                       names:
+                        description: |-
+                          Names lists exact Kubernetes namespace names allowed to use this provider.
+                          Must be empty when all is true. If all is false and names is empty,
+                          no namespaces are allowed.
                         items:
                           type: string
                         type: array
                     type: object
                   bucketPolicy:
+                    description: BucketPolicy restricts cloud bucket names managed
+                      through this provider.
                     properties:
                       allowedNamePatterns:
+                        description: |-
+                          AllowedNamePatterns contains Go regular expressions for cloud bucket names.
+                          Checks spec.name, falling back to metadata.name when spec.name is empty.
+                          During deletion, the recorded external name is used when available.
+                          At least one pattern must match; an empty list allows no names.
+                          Use ^ and $ to match the entire name.
                         items:
                           type: string
                         type: array
@@ -122,12 +143,22 @@ spec:
                     - allowedNamePatterns
                     type: object
                   principalPolicy:
+                    description: |-
+                      PrincipalPolicy restricts principal kinds, management policies, and names
+                      used through this provider.
                     properties:
                       allowManaged:
                         default: true
+                        description: |-
+                          AllowManaged permits CloudPrincipals with managementPolicy Managed.
+                          Defaults to true. Kind and name restrictions still apply.
                         type: boolean
                       allowReferences:
                         default: true
+                        description: |-
+                          AllowReferences permits CloudPrincipals with managementPolicy Reference,
+                          including AllUsers. Defaults to true. Kind and applicable reference-name
+                          restrictions still apply.
                         type: boolean
                       allowedKinds:
                         default:
@@ -136,16 +167,32 @@ spec:
                         - User
                         - Group
                         - AllUsers
+                        description: |-
+                          AllowedKinds lists permitted CloudPrincipal kinds for both management
+                          policies. Defaults to ServiceAccount, Role, User, Group, and AllUsers.
+                          An empty list allows no kinds. Provider capability restrictions still apply.
+                          During deletion, the recorded status.kind is checked.
                         items:
                           type: string
                         type: array
                       allowedNamePatterns:
+                        description: |-
+                          AllowedNamePatterns contains Go regular expressions for managed principal
+                          names from spec.managed.name. During deletion, the recorded external name
+                          is used when available. At least one pattern must match; an empty list
+                          allows no names. Use ^ and $ to match the entire name.
                         items:
                           type: string
                         type: array
                       allowedReferencePatterns:
                         default:
                         - .*
+                        description: |-
+                          AllowedReferencePatterns contains Go regular expressions for referenced
+                          principal names from spec.reference.name. Defaults to [".*"], allowing
+                          any reference name. An empty list allows no reference names.
+                          Use ^ and $ to match the entire name. AllUsers has no reference name
+                          and is exempt from this check.
                         items:
                           type: string
                         type: array

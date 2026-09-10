@@ -17,6 +17,7 @@ var (
 type Provider interface {
 	Bucket() BucketProvider
 	Principal() PrincipalProvider
+	PrincipalAuth() PrincipalAuthProvider
 	Access() BucketAccessProvider
 	Capabilities() Capabilities
 	Cleanup(ctx context.Context) error
@@ -81,6 +82,12 @@ type BucketAttrs struct {
 }
 
 type BucketAccessAttrs vedro.BucketAccessProperties
+
+type PrincipalAuthResult struct {
+	ID                        string
+	ServiceAccountAnnotations map[string]string
+	SecretData                map[string][]byte
+}
 
 type PrincipalAttrs struct {
 	Name   string
@@ -166,6 +173,9 @@ type PrincipalAPI interface {
 	GetPrincipal(ctx context.Context, principal PrincipalSetup) (*PrincipalAttrs, error)
 	CreatePrincipal(ctx context.Context, principal PrincipalSetup) (*PrincipalAttrs, error)
 	DeletePrincipal(ctx context.Context, principal PrincipalSetup) error
+	GetPrincipalAuth(ctx context.Context, principal PrincipalSetup, method vedro.AuthMethod) (*PrincipalAuthResult, error)
+	CreatePrincipalAuth(ctx context.Context, principal PrincipalSetup, method vedro.AuthMethod) (*PrincipalAuthResult, error)
+	DeletePrincipalAuth(ctx context.Context, principal PrincipalSetup, method vedro.AuthMethod) error
 	Close(ctx context.Context) error
 }
 
@@ -204,5 +214,18 @@ type PrincipalProvider interface {
 	DeletePrincipal(
 		ctx context.Context,
 		principal vedro.CloudPrincipal,
+	) error
+}
+
+type PrincipalAuthProvider interface {
+	EnsureAuthentication(
+		ctx context.Context,
+		principalAuth vedro.CloudPrincipalAuth,
+		principal vedro.CloudPrincipal,
+	) (*PrincipalAuthResult, error)
+
+	DeleteAuthentication(
+		ctx context.Context,
+		principalAuth vedro.CloudPrincipalAuth,
 	) error
 }

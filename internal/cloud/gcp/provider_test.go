@@ -30,8 +30,9 @@ var _ = Describe("Provider.Cleanup", func() {
 		bucketAPI := &cloudtest.FakeBucketAPI{CloseErr: bucketErr}
 		principalAPI := &cleanupPrincipalAPI{closeErr: principalErr}
 		provider := &Provider{
-			bucket:    &Bucket{api: bucketAPI},
-			principal: &Principal{api: principalAPI},
+			bucket:        &Bucket{api: bucketAPI},
+			principal:     &Principal{api: principalAPI},
+			principalAuth: &PrincipalAuth{api: principalAPI},
 		}
 
 		err := provider.Cleanup(context.Background())

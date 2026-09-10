@@ -448,11 +448,12 @@ var _ = Describe("BucketReconciler", func() {
 })
 
 type fakeProvider struct {
-	capabilities cloud.Capabilities
-	bucket       *fakeBucketProvider
-	principal    *fakePrincipalProvider
-	bucketAccess *fakeBucketAccess
-	cleanupErr   error
+	capabilities  cloud.Capabilities
+	bucket        *fakeBucketProvider
+	principal     *fakePrincipalProvider
+	principalAuth *fakePrincipalAuthProvider
+	bucketAccess  *fakeBucketAccess
+	cleanupErr    error
 
 	cleanupCalled bool
 }
@@ -467,6 +468,10 @@ func (p *fakeProvider) Bucket() cloud.BucketProvider {
 
 func (p *fakeProvider) Principal() cloud.PrincipalProvider {
 	return p.principal
+}
+
+func (p *fakeProvider) PrincipalAuth() cloud.PrincipalAuthProvider {
+	return p.principalAuth
 }
 
 func (p *fakeProvider) Access() cloud.BucketAccessProvider {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	admin "cloud.google.com/go/iam/admin/apiv1"
 	"cloud.google.com/go/iam/admin/apiv1/adminpb"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
@@ -13,7 +12,7 @@ import (
 )
 
 type gcpPrincipalAPI struct {
-	client    *admin.IamClient
+	clients   *gcpClients
 	projectID string
 }
 
@@ -56,7 +55,7 @@ func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Prin
 
 	email, fullName := saEmailAndFullName(principal.Name, p.projectID)
 
-	account, err := p.client.GetServiceAccount(ctx, &adminpb.GetServiceAccountRequest{
+	account, err := p.clients.iamAdmin.GetServiceAccount(ctx, &adminpb.GetServiceAccountRequest{
 		Name: fullName,
 	})
 	if err != nil {
@@ -76,7 +75,7 @@ func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Prin
 }
 
 func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
-	account, err := p.client.CreateServiceAccount(
+	account, err := p.clients.iamAdmin.CreateServiceAccount(
 		ctx,
 		&adminpb.CreateServiceAccountRequest{
 			Name:      fmt.Sprintf("projects/%s", p.projectID),
@@ -102,7 +101,7 @@ func (p *gcpPrincipalAPI) CreatePrincipal(ctx context.Context, principal cloud.P
 
 func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, principal cloud.PrincipalSetup) error {
 	email, fullName := saEmailAndFullName(principal.Name, p.projectID)
-	err := p.client.DeleteServiceAccount(
+	err := p.clients.iamAdmin.DeleteServiceAccount(
 		ctx,
 		&adminpb.DeleteServiceAccountRequest{
 			Name: fullName,
@@ -123,9 +122,31 @@ func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, principal cloud.P
 	return nil
 }
 
+func (p *gcpPrincipalAPI) GetPrincipalAuth(
+	ctx context.Context,
+	principal cloud.PrincipalSetup,
+	method vedro.AuthMethod,
+) (*cloud.PrincipalAuthResult, error) {
+	return nil, nil
+}
+func (p *gcpPrincipalAPI) CreatePrincipalAuth(
+	ctx context.Context,
+	principal cloud.PrincipalSetup,
+	method vedro.AuthMethod,
+) (*cloud.PrincipalAuthResult, error) {
+	return nil, nil
+}
+func (p *gcpPrincipalAPI) DeletePrincipalAuth(
+	ctx context.Context,
+	principal cloud.PrincipalSetup,
+	method vedro.AuthMethod,
+) error {
+	return nil
+}
+
 func (p *gcpPrincipalAPI) Close(ctx context.Context) error {
-	if p.client == nil {
+	if p.clients == nil {
 		return nil
 	}
-	return p.client.Close()
+	return p.clients.Close()
 }

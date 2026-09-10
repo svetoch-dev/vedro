@@ -29,10 +29,11 @@ type sdkShutdowner interface {
 }
 
 type Provider struct {
-	bucket       *Bucket
-	principal    *Principal
-	bucketAccess *BucketAccess
-	sdk          sdkShutdowner
+	bucket        *Bucket
+	principal     *Principal
+	principalAuth *PrincipalAuth
+	bucketAccess  *BucketAccess
+	sdk           sdkShutdowner
 }
 
 func New(
@@ -65,6 +66,9 @@ func New(
 			api: ycsApi,
 		},
 		principal: &Principal{
+			api: ycPrincipalApi,
+		},
+		principalAuth: &PrincipalAuth{
 			api: ycPrincipalApi,
 		},
 		sdk: sdk,
@@ -177,6 +181,10 @@ func (p *Provider) Bucket() cloud.BucketProvider {
 
 func (p *Provider) Principal() cloud.PrincipalProvider {
 	return p.principal
+}
+
+func (p *Provider) PrincipalAuth() cloud.PrincipalAuthProvider {
+	return p.principalAuth
 }
 
 func (p *Provider) Access() cloud.BucketAccessProvider {

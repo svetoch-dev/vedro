@@ -61,3 +61,25 @@ func (f *FakePrincipalAPI) CreatePrincipal(
 func (f *FakePrincipalAPI) DeletePrincipal(ctx context.Context, _ cloud.PrincipalSetup) error {
 	return f.DeleteErr
 }
+
+func (f *FakePrincipalAPI) GetPrincipalAuth(
+	ctx context.Context,
+	principal cloud.PrincipalSetup,
+	method vedro.AuthMethod,
+) (*cloud.PrincipalAuthResult, error) {
+	return nil, nil
+}
+func (f *FakePrincipalAPI) CreatePrincipalAuth(
+	ctx context.Context,
+	principal cloud.PrincipalSetup,
+	method vedro.AuthMethod,
+) (*cloud.PrincipalAuthResult, error) {
+	return nil, nil
+}
+func (f *FakePrincipalAPI) DeletePrincipalAuth(
+	ctx context.Context,
+	principal cloud.PrincipalSetup,
+	method vedro.AuthMethod,
+) error {
+	return nil
+}

@@ -5,6 +5,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	PrincipalAuthUnsupportedStaticCredentials     UnsupportedFeatureReason = "PrincipalAuthUnsupportedStaticCredentials"
+	PrincipalAuthUnsupportedWorkloadIdentity      UnsupportedFeatureReason = "PrincipalAuthUnsupportedWorkloadIdentity"
+	PrincipalAuthUnsupportedWorkloadIdentityKind  UnsupportedFeatureReason = "PrincipalAuthUnsupportedWorkloadIdentityKind"
+	PrincipalAuthUnsupportedStaticCredentialsKind UnsupportedFeatureReason = "PrincipalAuthUnsupportedStaticCredentialsKind"
+)
+
 type StaticCredentialsSpec struct {
 	// SecretRef references a Kubernetes Secret where static credentials should be placed.
 	//

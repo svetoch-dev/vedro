@@ -21,6 +21,7 @@ import (
 	"errors"
 	"reflect"
 
+	"github.com/svetoch-dev/vedro/internal/capabilities"
 	"github.com/svetoch-dev/vedro/internal/usagepolicy"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -132,6 +133,20 @@ func (r *CloudPrincipalAuthReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return Reconciled()
 	}
 
+	if principal.Spec.ManagementPolicy != vedro.PrincipalManagementPolicyManaged {
+		principalAuth.Condition.Status = metav1.ConditionFalse
+		principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalIsNotManaged
+		principalAuth.Condition.Message = "CloudPrincipalAuth cant be used on a not managed CloudPrincipal"
+		patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
+			meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
 	providerFactory := r.ProviderFactory
 	if providerFactory == nil {
 		providerFactory = registry.NewProvider
@@ -187,6 +202,32 @@ func (r *CloudPrincipalAuthReconciler) Reconcile(ctx context.Context, req ctrl.R
 		principalAuth.Condition.Status = metav1.ConditionFalse
 		principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthSpecRestricted
 		principalAuth.Condition.Message = decision.Message
+		patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
+			p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
+	caps := provider.Capabilities().PrincipalAuth
+
+	unsupported := capabilities.ValidatePrincipalAuthCapabilities(
+		caps,
+		principalAuth.Spec,
+		principal.Spec.Kind,
+	)
+	principalAuth.Status.UnsupportedFeatures = unsupported
+
+	if len(unsupported) > 0 {
+		logger.Info("CloudPrincipalAuth Unsupported features found")
+		principalAuth.Condition.Status = metav1.ConditionFalse
+		principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthUnsupportedFeatures
+		principalAuth.Condition.Message = "unsupported features found"
 		patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
 			p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
 			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)

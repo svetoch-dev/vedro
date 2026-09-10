@@ -50,6 +50,7 @@ const (
 	ReasonCloudPrincipalEnsureError          = "CloudPrincipalEnsureError"
 	ReasonCloudPrincipalReconciled           = "Reconciled"
 	ReasonCloudPrincipalReady                = "CloudPrincipalReady"
+	ReasonCloudPrincipalIsNotManaged         = "CloudPrincipalIsNotManaged"
 )
 
 // Condition reasons for CloudPrincipalAuth resources.

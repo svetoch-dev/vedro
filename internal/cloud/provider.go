@@ -84,9 +84,15 @@ type BucketAttrs struct {
 type BucketAccessAttrs vedro.BucketAccessProperties
 
 type PrincipalAuthResult struct {
-	ID                        string
-	ServiceAccountAnnotations map[string]string
-	SecretData                map[string][]byte
+	CredentialsID string
+	Annotations   map[string]string
+	SecretData    map[string][]byte
+}
+
+type PrincipalAuthSetup struct {
+	Method           vedro.AuthMethod
+	ServiceAccountID string
+	CredentialsID    string
 }
 
 type PrincipalAttrs struct {
@@ -173,9 +179,9 @@ type PrincipalAPI interface {
 	GetPrincipal(ctx context.Context, principal PrincipalSetup) (*PrincipalAttrs, error)
 	CreatePrincipal(ctx context.Context, principal PrincipalSetup) (*PrincipalAttrs, error)
 	DeletePrincipal(ctx context.Context, principal PrincipalSetup) error
-	GetPrincipalAuth(ctx context.Context, principal PrincipalSetup, method vedro.AuthMethod) (*PrincipalAuthResult, error)
-	CreatePrincipalAuth(ctx context.Context, principal PrincipalSetup, method vedro.AuthMethod) (*PrincipalAuthResult, error)
-	DeletePrincipalAuth(ctx context.Context, principal PrincipalSetup, method vedro.AuthMethod) error
+	GetPrincipalAuth(ctx context.Context, principalAuth PrincipalAuthSetup) (*PrincipalAuthResult, error)
+	CreatePrincipalAuth(ctx context.Context, principal PrincipalAuthSetup) (*PrincipalAuthResult, error)
+	DeletePrincipalAuth(ctx context.Context, principal PrincipalAuthSetup) error
 	Close(ctx context.Context) error
 }
 

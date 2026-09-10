@@ -124,22 +124,19 @@ func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, principal cloud.P
 
 func (p *gcpPrincipalAPI) GetPrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalSetup,
-	method vedro.AuthMethod,
+	principal cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
 	return nil, nil
 }
 func (p *gcpPrincipalAPI) CreatePrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalSetup,
-	method vedro.AuthMethod,
+	principal cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
 	return nil, nil
 }
 func (p *gcpPrincipalAPI) DeletePrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalSetup,
-	method vedro.AuthMethod,
+	principalAuth cloud.PrincipalAuthSetup,
 ) error {
 	return nil
 }

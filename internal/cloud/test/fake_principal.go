@@ -64,22 +64,19 @@ func (f *FakePrincipalAPI) DeletePrincipal(ctx context.Context, _ cloud.Principa
 
 func (f *FakePrincipalAPI) GetPrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalSetup,
-	method vedro.AuthMethod,
+	principal cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
 	return nil, nil
 }
 func (f *FakePrincipalAPI) CreatePrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalSetup,
-	method vedro.AuthMethod,
+	principal cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
 	return nil, nil
 }
 func (f *FakePrincipalAPI) DeletePrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalSetup,
-	method vedro.AuthMethod,
+	principal cloud.PrincipalAuthSetup,
 ) error {
 	return nil
 }

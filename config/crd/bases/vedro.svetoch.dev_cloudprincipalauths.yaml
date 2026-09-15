@@ -96,15 +96,10 @@ spec:
                       Usually empty when method is WorkloadIdentity.
                     properties:
                       name:
-                        description: name is unique within a namespace to reference
-                          a secret resource.
                         type: string
-                      namespace:
-                        description: namespace defines the space within which the
-                          secret name must be unique.
-                        type: string
+                    required:
+                    - name
                     type: object
-                    x-kubernetes-map-type: atomic
                 type: object
               workloadIdentity:
                 properties:
@@ -126,15 +121,9 @@ spec:
                       Usually empty when method is StaticCredentials.
                     properties:
                       name:
-                        description: Kubernetes ServiceAccount name.
-                        type: string
-                      namespace:
-                        description: namespace defines the kuberenetes ServiceAccount
-                          namespace.
                         type: string
                     required:
                     - name
-                    - namespace
                     type: object
                 type: object
             required:
@@ -151,29 +140,23 @@ spec:
                     type: string
                   method:
                     type: string
+                  principalId:
+                    type: string
                   secretRef:
-                    description: |-
-                      SecretReference represents a Secret Reference. It has enough information to retrieve secret
-                      in any namespace
                     properties:
                       name:
-                        description: name is unique within a namespace to reference
-                          a secret resource.
                         type: string
                       namespace:
-                        description: namespace defines the space within which the
-                          secret name must be unique.
                         type: string
+                    required:
+                    - name
+                    - namespace
                     type: object
-                    x-kubernetes-map-type: atomic
                   serviceAccountRef:
                     properties:
                       name:
-                        description: Kubernetes ServiceAccount name.
                         type: string
                       namespace:
-                        description: namespace defines the kuberenetes ServiceAccount
-                          namespace.
                         type: string
                     required:
                     - name
@@ -182,6 +165,7 @@ spec:
                 required:
                 - credentialsId
                 - method
+                - principalId
                 type: object
               conditions:
                 description: Conditions represent the latest available observations

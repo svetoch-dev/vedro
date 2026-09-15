@@ -18,11 +18,13 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"reflect"
 
 	"github.com/svetoch-dev/vedro/internal/capabilities"
+	"github.com/svetoch-dev/vedro/internal/cloud"
+	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/usagepolicy"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,7 +138,7 @@ func (r *CloudPrincipalAuthReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if principal.Spec.ManagementPolicy != vedro.PrincipalManagementPolicyManaged {
 		principalAuth.Condition.Status = metav1.ConditionFalse
 		principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalIsNotManaged
-		principalAuth.Condition.Message = "CloudPrincipalAuth cant be used on a not managed CloudPrincipal"
+		principalAuth.Condition.Message = "CloudPrincipalAuth cant be used on a none managed CloudPrincipal"
 		patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
 			meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
 			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
@@ -240,7 +242,199 @@ func (r *CloudPrincipalAuthReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return Reconciled()
 	}
 
+	result, err := provider.PrincipalAuth().EnsureAuthentication(
+		ctx,
+		principalAuth.CloudPrincipalAuth,
+		principal.CloudPrincipal,
+	)
+
+	if err != nil {
+		logger.Error(err, "EnsureAuthentication error")
+		principalAuth.Condition.Status = metav1.ConditionFalse
+		principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthEnsureError
+		principalAuth.Condition.Message = err.Error()
+		patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
+			p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
+			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return ReconcileError(ctx, err, "EnsureAuthentication failed")
+	}
+
+	switch principalAuth.Spec.Method {
+	case vedro.AuthMethodStaticCredentials:
+		return r.ensureStaticCredentials(
+			ctx,
+			req,
+			&principalAuth,
+			&principal,
+			&providerConfig,
+			result,
+		)
+	case vedro.AuthMethodWorkloadIdentity:
+		return Reconciled()
+	default:
+		logger.Info("Method is not supported", "method", principalAuth.Spec.Method)
+		return Reconciled()
+	}
+}
+
+func (r *CloudPrincipalAuthReconciler) ensureStaticCredentials(
+	ctx context.Context,
+	req ctrl.Request,
+	principalAuth *resolvers.CloudPrincipalAuthResolver,
+	principal *resolvers.CloudPrincipalResolver,
+	providerConfig *resolvers.ProviderConfigResolver,
+	authResult *cloud.PrincipalAuthResult,
+) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	configured := meta.FindStatusCondition(
+		principalAuth.Status.Conditions,
+		conditions.TypeStaticCredentialsConfigured,
+	)
+
+	if configured == nil || len(authResult.SecretData) != 0 {
+		principalAuth.Status.Applied = &vedro.CloudPrincipalAuthProperties{
+			Method:        principalAuth.Spec.Method,
+			CredentialsId: authResult.CredentialsID,
+			PrincipalId:   principal.Status.ExternalId,
+		}
+
+		staticCredsCondition := metav1.Condition{
+			Type:               conditions.TypeStaticCredentialsConfigured,
+			ObservedGeneration: principalAuth.Generation,
+		}
+
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      principalAuth.Spec.StaticCredentials.SecretRef.Name,
+				Namespace: principalAuth.Namespace,
+			},
+			Type: corev1.SecretTypeOpaque,
+			Data: authResult.SecretData,
+		}
+
+		err := controllerutil.SetControllerReference(
+			&principalAuth.CloudPrincipalAuth,
+			secret,
+			r.Scheme,
+		)
+
+		if err != nil {
+			logger.Error(err, "k8s Secret set owner reference failed")
+			staticCredsCondition.Status = metav1.ConditionFalse
+			staticCredsCondition.Reason = conditions.ReasonStaticCredentialsError
+			staticCredsCondition.Message = err.Error()
+			copyConditionState(&principalAuth.Condition, staticCredsCondition)
+			patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
+				p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
+				p.Status.Applied = principalAuth.Status.Applied
+				meta.SetStatusCondition(&p.Status.Conditions, staticCredsCondition)
+				meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+				meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
+				meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+			})
+			if patchErr != nil {
+				return ReconcileError(ctx, patchErr, "patch error")
+			}
+			return Reconciled()
+		}
+
+		err = r.Create(ctx, secret)
+
+		if err != nil {
+			logger.Error(err, "k8s Secret creation error")
+			staticCredsCondition.Status = metav1.ConditionFalse
+			staticCredsCondition.Reason = conditions.ReasonStaticCredentialsError
+			staticCredsCondition.Message = err.Error()
+			copyConditionState(&principalAuth.Condition, staticCredsCondition)
+			patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
+				p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
+				p.Status.Applied = principalAuth.Status.Applied
+				meta.SetStatusCondition(&p.Status.Conditions, staticCredsCondition)
+				meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+				meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
+				meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+			})
+			if patchErr != nil {
+				return ReconcileError(ctx, patchErr, "patch error")
+			}
+			return Reconciled()
+		}
+
+		principalAuth.Status.Applied.SecretRef = &vedro.NamespacedName{
+			Name:      secret.Name,
+			Namespace: secret.Namespace,
+		}
+
+		principalAuth.Condition.Status = metav1.ConditionTrue
+		principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthReconciled
+		principalAuth.Condition.Message = "CloudPrincipalAuth Reconciled"
+		staticCredsCondition.Status = metav1.ConditionTrue
+		staticCredsCondition.Reason = conditions.ReasonStaticCredentialsReconciled
+		staticCredsCondition.Message = "StaticCredentials created"
+
+		patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
+			p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
+			p.Status.Applied = principalAuth.Status.Applied
+			meta.SetStatusCondition(&p.Status.Conditions, staticCredsCondition)
+			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+
+		logger.Info("CloudPrincipalAuth reconcile success")
+
+		return Reconciled()
+	}
+
+	configured.ObservedGeneration = principalAuth.Generation
+
+	if configured.Status != metav1.ConditionTrue {
+		logger.Info(
+			"Could not create StaticCredentials k8s secret for CloudPrincipalAuth.",
+			"reason",
+			configured.Reason,
+			"message",
+			configured.Message,
+		)
+		copyConditionState(&principalAuth.Condition, *configured)
+		patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
+			p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
+			p.Status.Applied = principalAuth.Status.Applied
+			meta.SetStatusCondition(&p.Status.Conditions, *configured)
+			meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
+			meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+		})
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+		return Reconciled()
+	}
+
+	patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
+		p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
+		p.Status.Applied = principalAuth.Status.Applied
+		meta.SetStatusCondition(&p.Status.Conditions, *configured)
+		meta.SetStatusCondition(&p.Status.Conditions, providerConfig.Condition)
+		meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
+		meta.SetStatusCondition(&p.Status.Conditions, principal.Condition)
+	})
+	if patchErr != nil {
+		return ReconcileError(ctx, patchErr, "patch error")
+	}
+	logger.Info("CloudPrincipalAuth reconcile success")
 	return Reconciled()
+
 }
 
 // reconcileCloudPrincipalFinalizer adds the finalizer to active principal auths and
@@ -280,6 +474,32 @@ func (r *CloudPrincipalAuthReconciler) deleteCloudPrincipalAuth(
 
 	if principalAuth.ShouldBeRetained() {
 		logger.Info("skipping deletion of authentication material because deletionPolicy is Retain")
+		if principalAuth.Status.Applied != nil {
+			applied := principalAuth.Status.Applied
+			if applied.Method == vedro.AuthMethodStaticCredentials &&
+				applied.SecretRef != nil {
+				err := helpers.RemoveAllOwnerRefs(
+					ctx,
+					r.Client,
+					types.NamespacedName{
+						Namespace: applied.SecretRef.Name,
+						Name:      applied.SecretRef.Namespace,
+					},
+					&corev1.Secret{},
+				)
+
+				if err != nil {
+					return ReconcileError(
+						ctx,
+						err,
+						"Error removing owner ref for secret owned by CloudPrincipalAuth",
+						"name", applied.SecretRef.Name,
+						"namespace", applied.SecretRef.Namespace,
+					)
+				}
+			}
+		}
+
 	}
 
 	if principalAuth.ShouldBeDeleted() {
@@ -321,7 +541,10 @@ func (r *CloudPrincipalAuthReconciler) deleteCloudPrincipalAuth(
 			)
 
 			if decision.Allowed {
-				err := errors.New("") //provider.Principal().DeletePrincipal(ctx, principal.CloudPrincipal)
+				err := provider.PrincipalAuth().DeleteAuthentication(
+					ctx,
+					principalAuth.CloudPrincipalAuth,
+				)
 				if err != nil {
 					principalAuth.Condition.Status = metav1.ConditionFalse
 					principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthDeleteError

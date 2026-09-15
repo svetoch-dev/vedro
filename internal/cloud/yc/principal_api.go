@@ -277,21 +277,55 @@ func (y *ycPrincipalAPI) DeletePrincipal(ctx context.Context, principal cloud.Pr
 
 func (p *ycPrincipalAPI) GetPrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalAuthSetup,
+	principalAuth cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
-	return nil, nil
+	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
+		accessKey, err := getStaticS3AccessKey(ctx, p.sdk, principalAuth.ServiceAccountID)
+		if err != nil {
+			if isNotFound(err) {
+				return nil, cloud.ErrAuthNotFound
+			}
+
+			return nil, err
+		}
+		return &cloud.PrincipalAuthResult{
+			CredentialsID: accessKey.id,
+			Method:        principalAuth.Method,
+		}, nil
+	}
+	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
 }
+
 func (p *ycPrincipalAPI) CreatePrincipalAuth(
 	ctx context.Context,
 	principalAuth cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
-	return nil, nil
+	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
+		accessKey, err := createStaticS3AccessKey(ctx, p.sdk, principalAuth.ServiceAccountID)
+		if err != nil {
+			return nil, err
+		}
+
+		return &cloud.PrincipalAuthResult{
+			CredentialsID: accessKey.id,
+			SecretData: map[string][]byte{
+				"AWS_ACCESS_KEY_ID":     []byte(accessKey.accessKeyID),
+				"AWS_SECRET_ACCESS_KEY": []byte(accessKey.secretAccessKey),
+			},
+			Method: principalAuth.Method,
+		}, nil
+
+	}
+	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
 }
 func (p *ycPrincipalAPI) DeletePrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalAuthSetup,
+	principalAuth cloud.PrincipalAuthSetup,
 ) error {
-	return nil
+	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
+		return deleteStaticS3AccessKey(ctx, p.sdk, principalAuth.CredentialsID)
+	}
+	return fmt.Errorf("Method %s is not supported", principalAuth.Method)
 }
 
 func (y *ycPrincipalAPI) Close(ctx context.Context) error {

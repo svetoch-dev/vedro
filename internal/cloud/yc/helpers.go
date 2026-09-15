@@ -145,3 +145,28 @@ func deleteStaticS3AccessKey(
 	return nil
 
 }
+
+func getStaticS3AccessKey(
+	ctx context.Context,
+	sdk *ycsdk.SDK,
+	keyId string,
+) (*staticS3AccessKey, error) {
+	conn, err := sdk.GetConnection(ctx, accessKeyCreateMethod)
+	if err != nil {
+		return nil, fmt.Errorf("get yc iam awscompatibility connection: %w", err)
+	}
+	client := awscompatibility.NewAccessKeyServiceClient(conn)
+
+	key, err := client.Get(ctx, &awscompatibility.GetAccessKeyRequest{
+		AccessKeyId: keyId,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("get access key: %w", err)
+	}
+
+	return &staticS3AccessKey{
+		accessKeyID: key.GetKeyId(),
+		id:          key.GetId(),
+	}, nil
+}

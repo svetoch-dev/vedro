@@ -8,6 +8,7 @@ import (
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -74,6 +75,29 @@ func PrincipalNameForDelete(prncpl vedro.CloudPrincipal) string {
 		return PrincipalNameFromCR(prncpl)
 	}
 	return prncpl.Status.ExternalName
+}
+
+func RemoveAllOwnerRefs(
+	ctx context.Context,
+	kubeClient client.Client,
+	name types.NamespacedName,
+	obj client.Object,
+) error {
+	if err := kubeClient.Get(ctx, name, obj); err != nil {
+		return fmt.Errorf(
+			"Error getting obj %s.%s", name.Namespace, name.Name,
+		)
+	}
+
+	obj.SetOwnerReferences(nil)
+
+	if err := kubeClient.Update(ctx, obj); err != nil {
+		return fmt.Errorf(
+			"Error removing owner ref for obj %s.%s", name.Namespace, name.Name,
+		)
+	}
+
+	return nil
 }
 
 func GetSecretData(

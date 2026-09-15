@@ -12,6 +12,7 @@ var (
 	ErrBucketNotFound       = errors.New("bucket not found")
 	ErrBucketObjectNotFound = errors.New("bucket object not found")
 	ErrPrincipalNotFound    = errors.New("principal not found")
+	ErrAuthNotFound         = errors.New("authentication material not found")
 )
 
 type Provider interface {
@@ -87,6 +88,7 @@ type PrincipalAuthResult struct {
 	CredentialsID string
 	Annotations   map[string]string
 	SecretData    map[string][]byte
+	Method        vedro.AuthMethod
 }
 
 type PrincipalAuthSetup struct {

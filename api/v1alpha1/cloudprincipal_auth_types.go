@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -12,6 +11,15 @@ const (
 	PrincipalAuthUnsupportedStaticCredentialsKind UnsupportedFeatureReason = "PrincipalAuthUnsupportedStaticCredentialsKind"
 )
 
+type AuthObjectReference struct {
+	Name string `json:"name"`
+}
+
+type NamespacedName struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
 type StaticCredentialsSpec struct {
 	// SecretRef references a Kubernetes Secret where static credentials should be placed.
 	//
@@ -19,7 +27,7 @@ type StaticCredentialsSpec struct {
 	// Usually empty when method is WorkloadIdentity.
 	//
 	// +optional
-	SecretRef *corev1.SecretReference `json:"secretRef,omitempty"`
+	SecretRef *AuthObjectReference `json:"secretRef,omitempty"`
 
 	// DeletionPolicy controls what happens to the auth material and secret
 	// when this Kubernetes object is deleted.
@@ -38,7 +46,7 @@ type WorkloadIdentitySpec struct {
 	// Usually empty when method is StaticCredentials.
 	//
 	// +optional
-	ServiceAccountRef *ServiceAccountReference `json:"serviceAccountRef,omitempty"`
+	ServiceAccountRef *AuthObjectReference `json:"serviceAccountRef,omitempty"`
 
 	// DeletionPolicy controls what happens to the auth material and serviceaccount annotation
 	// when this Kubernetes object is deleted.
@@ -71,12 +79,13 @@ type CloudPrincipalAuthProperties struct {
 	Method AuthMethod `json:"method"`
 
 	CredentialsId string `json:"credentialsId"`
+	PrincipalId   string `json:"principalId"`
 
 	// +optional
-	ServiceAccountRef *ServiceAccountReference `json:"serviceAccountRef,omitempty"`
+	ServiceAccountRef *NamespacedName `json:"serviceAccountRef,omitempty"`
 
 	// +optional
-	SecretRef *corev1.SecretReference `json:"secretRef,omitempty"`
+	SecretRef *NamespacedName `json:"secretRef,omitempty"`
 }
 
 type CloudPrincipalAuthStatus struct {

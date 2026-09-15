@@ -2,11 +2,13 @@ package gcp
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"cloud.google.com/go/iam/admin/apiv1/adminpb"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
+	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -25,6 +27,56 @@ func saEmailAndFullName(name, projectId string) (string, string) {
 	)
 
 	return email, fullName
+}
+
+func (p *gcpPrincipalAPI) saCreateKey(
+	ctx context.Context,
+	fullSaName string,
+) (*iam.ServiceAccountKey, error) {
+	key, err := p.clients.iamService.
+		Projects.
+		ServiceAccounts.
+		Keys.Create(fullSaName, &iam.CreateServiceAccountKeyRequest{}).Context(ctx).Do()
+	if err != nil {
+		return nil, fmt.Errorf("create service account key: %w", err)
+	}
+
+	return key, nil
+}
+
+func (p *gcpPrincipalAPI) saGetKey(
+	ctx context.Context,
+	keyId string,
+) (*iam.ServiceAccountKey, error) {
+	key, err := p.clients.iamService.Projects.ServiceAccounts.Keys.Get(keyId).
+		Context(ctx).
+		Do()
+	if err != nil {
+		if isGoogleAPINotFound(err) {
+			return nil, cloud.ErrAuthNotFound
+		}
+
+		return nil, fmt.Errorf("get service account key: %w", err)
+	}
+
+	return key, nil
+}
+
+func (p *gcpPrincipalAPI) saDeleteKey(
+	ctx context.Context,
+	keyId string,
+) error {
+	if _, err := p.clients.iamService.
+		Projects.
+		ServiceAccounts.
+		Keys.
+		Delete(keyId).
+		Context(ctx).
+		Do(); err != nil {
+		return fmt.Errorf("delete service account key: %w", err)
+	}
+
+	return nil
 }
 
 func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
@@ -59,7 +111,7 @@ func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.Prin
 		Name: fullName,
 	})
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
+		if isGoogleAPINotFound(err) {
 			return nil, cloud.ErrPrincipalNotFound
 
 		}
@@ -124,21 +176,60 @@ func (p *gcpPrincipalAPI) DeletePrincipal(ctx context.Context, principal cloud.P
 
 func (p *gcpPrincipalAPI) GetPrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalAuthSetup,
+	principalAuth cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
-	return nil, nil
+	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
+		key, err := p.saGetKey(ctx, principalAuth.CredentialsID)
+		if err != nil {
+			return nil, err
+		}
+		return &cloud.PrincipalAuthResult{
+			Method:        principalAuth.Method,
+			CredentialsID: key.Name,
+		}, nil
+	}
+	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
 }
 func (p *gcpPrincipalAPI) CreatePrincipalAuth(
 	ctx context.Context,
-	principal cloud.PrincipalAuthSetup,
+	principalAuth cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
-	return nil, nil
+	_, fullName := saEmailAndFullName(principalAuth.ServiceAccountID, p.projectID)
+	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
+		key, err := p.saCreateKey(ctx, fullName)
+		if err != nil {
+			return nil, err
+		}
+
+		data, err := base64.StdEncoding.DecodeString(key.PrivateKeyData)
+		if err != nil {
+			return nil, fmt.Errorf("decode private key: %w", err)
+		}
+
+		return &cloud.PrincipalAuthResult{
+			Method:        principalAuth.Method,
+			CredentialsID: key.Name,
+			SecretData: map[string][]byte{
+				"credentials.json": data,
+			},
+		}, nil
+	}
+
+	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
 }
+
 func (p *gcpPrincipalAPI) DeletePrincipalAuth(
 	ctx context.Context,
 	principalAuth cloud.PrincipalAuthSetup,
 ) error {
-	return nil
+	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
+		err := p.saDeleteKey(ctx, principalAuth.CredentialsID)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("Method %s is not supported", principalAuth.Method)
 }
 
 func (p *gcpPrincipalAPI) Close(ctx context.Context) error {

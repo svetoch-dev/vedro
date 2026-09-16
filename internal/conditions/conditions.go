@@ -66,6 +66,7 @@ const (
 	ReasonCloudPrincipalAuthRemoveFinalizerError  = "CloudPrincipalAuthRemoveFinalizerError"
 	ReasonCloudPrincipalAuthUnsupportedFeatures   = "CloudPrincipalAuthUnsupportedFeatures"
 	ReasonCloudPrincipalAuthEnsureError           = "CloudPrincipalAuthEnsureError"
+	ReasonCloudPrincipalAuthError                 = "CloudPrincipalAuthError"
 	ReasonCloudPrincipalAuthDependencyNotReady    = "CloudPrincipalAuthDependencyNotReady"
 	ReasonCloudPrincipalAuthReconciled            = "Reconciled"
 	ReasonCloudPrincipalAuthReady                 = "CloudPrincipalAuthReady"

@@ -21,17 +21,20 @@ func ValidatePrincipalAuthCapabilities(
 	if spec.Method == vedro.AuthMethodWorkloadIdentity &&
 		caps.WorkloadIdentity == false {
 		unsupported = append(unsupported, unsupportedFeatures["MethodWorkloadIdentity"])
-
 	}
 
-	supported, ok := caps.WorkloadIdentityKinds[kind]
-	if !ok || !supported {
-		unsupported = append(unsupported, unsupportedFeatures["WorkloadIdentityKind"])
+	if caps.WorkloadIdentity == true {
+		supported, ok := caps.WorkloadIdentityKinds[kind]
+		if !ok || !supported {
+			unsupported = append(unsupported, unsupportedFeatures["WorkloadIdentityKind"])
+		}
 	}
 
-	supported, ok = caps.StaticCredentialsKinds[kind]
-	if !ok || !supported {
-		unsupported = append(unsupported, unsupportedFeatures["StaticCredentialsKind"])
+	if caps.StaticCredentials == true {
+		supported, ok := caps.StaticCredentialsKinds[kind]
+		if !ok || !supported {
+			unsupported = append(unsupported, unsupportedFeatures["StaticCredentialsKind"])
+		}
 	}
 
 	return unsupported

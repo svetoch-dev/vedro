@@ -280,12 +280,11 @@ func (p *ycPrincipalAPI) GetPrincipalAuth(
 	principalAuth cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
 	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
-		accessKey, err := getStaticS3AccessKey(ctx, p.sdk, principalAuth.ServiceAccountID)
+		accessKey, err := getStaticS3AccessKey(ctx, p.sdk, principalAuth.CredentialsID)
 		if err != nil {
 			if isNotFound(err) {
 				return nil, cloud.ErrAuthNotFound
 			}
-
 			return nil, err
 		}
 		return &cloud.PrincipalAuthResult{
@@ -301,7 +300,8 @@ func (p *ycPrincipalAPI) CreatePrincipalAuth(
 	principalAuth cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
 	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
-		accessKey, err := createStaticS3AccessKey(ctx, p.sdk, principalAuth.ServiceAccountID)
+		_, saId := helpers.ParseIAMMemberString(principalAuth.ServiceAccountID)
+		accessKey, err := createStaticS3AccessKey(ctx, p.sdk, saId)
 		if err != nil {
 			return nil, err
 		}

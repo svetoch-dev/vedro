@@ -17,7 +17,6 @@ rules:
   resources:
   - bucketaccesses
   - buckets
-  - cloudprincipals
   - providerconfigs
   verbs:
   - create
@@ -32,7 +31,6 @@ rules:
   resources:
   - bucketaccesses/finalizers
   - buckets/finalizers
-  - cloudprincipals/finalizers
   - providerconfigs/finalizers
   verbs:
   - update
@@ -41,7 +39,6 @@ rules:
   resources:
   - bucketaccesses/status
   - buckets/status
-  - cloudprincipals/status
   - providerconfigs/status
   verbs:
   - get

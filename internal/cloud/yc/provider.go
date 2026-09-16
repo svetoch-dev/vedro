@@ -164,10 +164,12 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 		},
 		PrincipalAuth: cloud.PrincipalAuthCapabilities{
 			StaticCredentials: true,
-			WorkloadIdentity:  true,
-			WorkloadIdentityKinds: map[vedro.PrincipalKind]bool{
-				vedro.PrincipalKindServiceAccount: true,
-			},
+			// We need to remove workloadIdentity from yandex cloud
+			// provider capabilities because currently none of the
+			// yandex cloud sdks support accessing s3 bucket objects
+			// using iam token. Although you can perform read/write etc
+			// operations using raw rest api or grpc api calls.
+			WorkloadIdentity: false,
 			StaticCredentialsKinds: map[vedro.PrincipalKind]bool{
 				vedro.PrincipalKindServiceAccount: true,
 			},

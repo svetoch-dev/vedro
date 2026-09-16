@@ -12,6 +12,8 @@ const (
 )
 
 type AuthObjectReference struct {
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 }
 
@@ -25,9 +27,7 @@ type StaticCredentialsSpec struct {
 	//
 	// Required when method is StaticCredentials.
 	// Usually empty when method is WorkloadIdentity.
-	//
-	// +optional
-	SecretRef *AuthObjectReference `json:"secretRef,omitempty"`
+	SecretRef AuthObjectReference `json:"secretRef"`
 
 	// DeletionPolicy controls what happens to the auth material and secret
 	// when this Kubernetes object is deleted.
@@ -44,9 +44,7 @@ type WorkloadIdentitySpec struct {
 	//
 	// Required when method is WorkloadIdentity.
 	// Usually empty when method is StaticCredentials.
-	//
-	// +optional
-	ServiceAccountRef *AuthObjectReference `json:"serviceAccountRef,omitempty"`
+	ServiceAccountRef AuthObjectReference `json:"serviceAccountRef"`
 
 	// DeletionPolicy controls what happens to the auth material and serviceaccount annotation
 	// when this Kubernetes object is deleted.
@@ -57,15 +55,18 @@ type WorkloadIdentitySpec struct {
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="self.method != 'StaticCredentials' || (has(self.staticCredentials) && !has(self.workloadIdentity))",message="staticCredentials must be set and workloadIdentity must not be set when method is StaticCredentials"
+// +kubebuilder:validation:XValidation:rule="self.method != 'WorkloadIdentity' || (has(self.workloadIdentity) && !has(self.staticCredentials))",message="workloadIdentity must be set and staticCredentials must not be set when method is WorkloadIdentity"
 type CloudPrincipalAuthSpec struct {
 
 	// CloudPrincipal reference the cloud principal for whom to create
 	// auth material
 	//
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="principalRef is immutable"
-	PrincipalRef PrincipalReference `json:"providerRef"`
+	PrincipalRef PrincipalReference `json:"principalRef"`
 
 	// +kubebuilder:validation:Enum=StaticCredentials;WorkloadIdentity
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="method is immutable"
 	Method AuthMethod `json:"method"`
 
 	// +optional

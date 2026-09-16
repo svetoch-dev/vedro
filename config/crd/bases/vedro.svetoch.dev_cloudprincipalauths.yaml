@@ -57,7 +57,10 @@ spec:
                 - StaticCredentials
                 - WorkloadIdentity
                 type: string
-              providerRef:
+                x-kubernetes-validations:
+                - message: method is immutable
+                  rule: self == oldSelf
+              principalRef:
                 description: |-
                   CloudPrincipal reference the cloud principal for whom to create
                   auth material
@@ -96,10 +99,16 @@ spec:
                       Usually empty when method is WorkloadIdentity.
                     properties:
                       name:
+                        minLength: 1
                         type: string
+                        x-kubernetes-validations:
+                        - message: name is immutable
+                          rule: self == oldSelf
                     required:
                     - name
                     type: object
+                required:
+                - secretRef
                 type: object
               workloadIdentity:
                 properties:
@@ -121,15 +130,30 @@ spec:
                       Usually empty when method is StaticCredentials.
                     properties:
                       name:
+                        minLength: 1
                         type: string
+                        x-kubernetes-validations:
+                        - message: name is immutable
+                          rule: self == oldSelf
                     required:
                     - name
                     type: object
+                required:
+                - serviceAccountRef
                 type: object
             required:
             - method
-            - providerRef
+            - principalRef
             type: object
+            x-kubernetes-validations:
+            - message: staticCredentials must be set and workloadIdentity must not
+                be set when method is StaticCredentials
+              rule: self.method != 'StaticCredentials' || (has(self.staticCredentials)
+                && !has(self.workloadIdentity))
+            - message: workloadIdentity must be set and staticCredentials must not
+                be set when method is WorkloadIdentity
+              rule: self.method != 'WorkloadIdentity' || (has(self.workloadIdentity)
+                && !has(self.staticCredentials))
           status:
             description: Status defines the observed state of the CloudPrincipal.
             properties:

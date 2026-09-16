@@ -8,6 +8,7 @@ import (
 	"cloud.google.com/go/iam/admin/apiv1/adminpb"
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
+	"github.com/svetoch-dev/vedro/internal/helpers"
 	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -73,6 +74,9 @@ func (p *gcpPrincipalAPI) saDeleteKey(
 		Delete(keyId).
 		Context(ctx).
 		Do(); err != nil {
+		if isGoogleAPINotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("delete service account key: %w", err)
 	}
 
@@ -194,7 +198,13 @@ func (p *gcpPrincipalAPI) CreatePrincipalAuth(
 	ctx context.Context,
 	principalAuth cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
-	_, fullName := saEmailAndFullName(principalAuth.ServiceAccountID, p.projectID)
+	_, email := helpers.ParseIAMMemberString(principalAuth.ServiceAccountID)
+	fullName := fmt.Sprintf(
+		"projects/%s/serviceAccounts/%s",
+		p.projectID,
+		email,
+	)
+
 	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
 		key, err := p.saCreateKey(ctx, fullName)
 		if err != nil {

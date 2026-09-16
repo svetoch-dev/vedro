@@ -756,6 +756,7 @@ func (r *CloudPrincipalAuthReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			&vedro.ProviderConfig{},
 			handler.EnqueueRequestsFromMapFunc(r.findCloudPrincipalAuthsOfProviderConfig),
 		).
+		Owns(&corev1.Secret{}).
 		Named("CloudPrincipalAuth").
 		Complete(r)
 }

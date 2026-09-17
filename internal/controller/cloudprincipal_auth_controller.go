@@ -60,6 +60,7 @@ type CloudPrincipalAuthReconciler struct {
 }
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=cloudprincipalauths,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=cloudprincipalauths/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=cloudprincipalauths/finalizers,verbs=update
@@ -333,7 +334,7 @@ func (r *CloudPrincipalAuthReconciler) ensureWorkloadIdentity(
 
 	if configured == nil {
 		configured = &metav1.Condition{
-			Type:               conditions.TypeStaticCredentialsConfigured,
+			Type:               conditions.TypeWorkloadIdentityConfigured,
 			ObservedGeneration: principalAuth.Generation,
 		}
 	}
@@ -361,6 +362,7 @@ func (r *CloudPrincipalAuthReconciler) ensureWorkloadIdentity(
 		configured.Status = metav1.ConditionFalse
 		configured.Reason = conditions.ReasonWorkloadIdentityError
 		configured.Message = err.Error()
+		copyConditionState(&principalAuth.Condition, *configured)
 		patchErr := patchWorkloadIdentityStatus(*configured)
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")
@@ -387,6 +389,7 @@ func (r *CloudPrincipalAuthReconciler) ensureWorkloadIdentity(
 		configured.Status = metav1.ConditionFalse
 		configured.Reason = conditions.ReasonWorkloadIdentityError
 		configured.Message = err.Error()
+		copyConditionState(&principalAuth.Condition, *configured)
 		patchErr := patchWorkloadIdentityStatus(*configured)
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")

@@ -222,13 +222,12 @@ func (p *gcpPrincipalAPI) CreatePrincipalAuth(
 			k8sServiceAccount.Namespace,
 			k8sServiceAccount.Name,
 		)
-		err := modifyServiceAccountIAMBinding(
+		err := grantServiceAccountIAMBinding(
 			ctx,
 			p.clients.iamService,
 			email,
 			workloadIdentityRole,
 			principal,
-			IAMBindingGrant,
 		)
 		if err != nil {
 			return nil, err
@@ -271,17 +270,16 @@ func (p *gcpPrincipalAPI) DeletePrincipalAuth(
 
 	if principalAuth.Method == vedro.AuthMethodWorkloadIdentity {
 		_, email := helpers.ParseIAMMemberString(principalAuth.ServiceAccountID)
-		err := modifyServiceAccountIAMBinding(
+		err := revokeServiceAccountIAMBinding(
 			ctx,
 			p.clients.iamService,
 			email,
 			workloadIdentityRole,
 			principalAuth.CredentialsID,
-			IAMBindingRevoke,
 		)
 
 		if err != nil {
-			return nil
+			return err
 		}
 
 		return nil

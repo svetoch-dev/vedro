@@ -114,20 +114,12 @@ func hasServiceAccountIAMBinding(
 	return false, nil
 }
 
-type IAMBindingModifier string
-
-const (
-	IAMBindingGrant  IAMBindingModifier = "grant"
-	IAMBindingRevoke IAMBindingModifier = "revoke"
-)
-
-func modifyServiceAccountIAMBinding(
+func grantServiceAccountIAMBinding(
 	ctx context.Context,
 	service *iam.Service,
 	serviceAccountEmail string,
 	role string,
 	principal string,
-	modifier IAMBindingModifier,
 ) error {
 	resource := fmt.Sprintf(
 		"projects/-/serviceAccounts/%s",
@@ -151,21 +143,13 @@ func modifyServiceAccountIAMBinding(
 			continue
 		}
 
-		members := make([]string, 0, len(binding.Members))
-
 		for _, member := range binding.Members {
-			if member == principal && modifier == IAMBindingRevoke {
-				continue
-			}
-			if member == principal && modifier == IAMBindingGrant {
+			if member == principal {
 				return nil
 			}
-			members = append(members, member)
 		}
 
-		members = append(members, principal)
-
-		binding.Members = members
+		binding.Members = append(binding.Members, principal)
 
 		_, err = service.Projects.ServiceAccounts.
 			SetIamPolicy(
@@ -185,14 +169,79 @@ func modifyServiceAccountIAMBinding(
 	}
 
 	// Role doesn't exist yet.
-	if modifier == IAMBindingGrant {
-		policy.Bindings = append(
-			policy.Bindings,
-			&iam.Binding{
-				Role:    role,
-				Members: []string{principal},
+	policy.Bindings = append(
+		policy.Bindings,
+		&iam.Binding{
+			Role:    role,
+			Members: []string{principal},
+		},
+	)
+
+	_, err = service.Projects.ServiceAccounts.
+		SetIamPolicy(
+			resource,
+			&iam.SetIamPolicyRequest{
+				Policy: policy,
 			},
+		).
+		Context(ctx).
+		Do()
+
+	if err != nil {
+		return fmt.Errorf("set service account IAM policy: %w", err)
+	}
+
+	return nil
+}
+
+func revokeServiceAccountIAMBinding(
+	ctx context.Context,
+	service *iam.Service,
+	serviceAccountEmail string,
+	role string,
+	principal string,
+) error {
+	resource := fmt.Sprintf(
+		"projects/-/serviceAccounts/%s",
+		serviceAccountEmail,
+	)
+
+	policy, err := service.Projects.ServiceAccounts.
+		GetIamPolicy(resource).
+		Context(ctx).
+		Do()
+
+	if err != nil {
+		if isGoogleAPINotFound(err) {
+			return nil
+		}
+		return fmt.Errorf(
+			"get IAM policy for service account %q: %w",
+			serviceAccountEmail,
+			err,
 		)
+	}
+
+	for _, binding := range policy.Bindings {
+		if binding.Role != role {
+			continue
+		}
+
+		members := make([]string, 0, len(binding.Members))
+
+		for _, member := range binding.Members {
+			if member == principal {
+				continue
+			}
+
+			members = append(members, member)
+		}
+
+		if len(members) == 0 {
+			return nil
+		}
+
+		binding.Members = members
 
 		_, err = service.Projects.ServiceAccounts.
 			SetIamPolicy(
@@ -207,6 +256,8 @@ func modifyServiceAccountIAMBinding(
 		if err != nil {
 			return fmt.Errorf("set service account IAM policy: %w", err)
 		}
+
+		return nil
 	}
 
 	return nil

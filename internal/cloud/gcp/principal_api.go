@@ -9,78 +9,21 @@ import (
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
-	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	workloadIdentityRole = "roles/iam.workloadIdentityUser"
+	k8sAnnotationKey     = "iam.gke.io/gcp-service-account"
 )
 
 type gcpPrincipalAPI struct {
 	clients   *gcpClients
 	projectID string
-}
-
-func saEmailAndFullName(name, projectId string) (string, string) {
-	email := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", name, projectId)
-	fullName := fmt.Sprintf(
-		"projects/%s/serviceAccounts/%s",
-		projectId,
-		email,
-	)
-
-	return email, fullName
-}
-
-func (p *gcpPrincipalAPI) saCreateKey(
-	ctx context.Context,
-	fullSaName string,
-) (*iam.ServiceAccountKey, error) {
-	key, err := p.clients.iamService.
-		Projects.
-		ServiceAccounts.
-		Keys.Create(fullSaName, &iam.CreateServiceAccountKeyRequest{}).Context(ctx).Do()
-	if err != nil {
-		return nil, fmt.Errorf("create service account key: %w", err)
-	}
-
-	return key, nil
-}
-
-func (p *gcpPrincipalAPI) saGetKey(
-	ctx context.Context,
-	keyId string,
-) (*iam.ServiceAccountKey, error) {
-	key, err := p.clients.iamService.Projects.ServiceAccounts.Keys.Get(keyId).
-		Context(ctx).
-		Do()
-	if err != nil {
-		if isGoogleAPINotFound(err) {
-			return nil, cloud.ErrAuthNotFound
-		}
-
-		return nil, fmt.Errorf("get service account key: %w", err)
-	}
-
-	return key, nil
-}
-
-func (p *gcpPrincipalAPI) saDeleteKey(
-	ctx context.Context,
-	keyId string,
-) error {
-	if _, err := p.clients.iamService.
-		Projects.
-		ServiceAccounts.
-		Keys.
-		Delete(keyId).
-		Context(ctx).
-		Do(); err != nil {
-		if isGoogleAPINotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("delete service account key: %w", err)
-	}
-
-	return nil
 }
 
 func (p *gcpPrincipalAPI) GetPrincipal(ctx context.Context, principal cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
@@ -183,7 +126,7 @@ func (p *gcpPrincipalAPI) GetPrincipalAuth(
 	principalAuth cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
 	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
-		key, err := p.saGetKey(ctx, principalAuth.CredentialsID)
+		key, err := saGetKey(ctx, p.clients.iamService, principalAuth.CredentialsID)
 		if err != nil {
 			return nil, err
 		}
@@ -192,8 +135,51 @@ func (p *gcpPrincipalAPI) GetPrincipalAuth(
 			CredentialsID: key.Name,
 		}, nil
 	}
+
+	if principalAuth.Method == vedro.AuthMethodWorkloadIdentity {
+		k8sServiceAccount := principalAuth.K8sServiceAccount
+		if k8sServiceAccount == nil {
+			return nil, fmt.Errorf("serviceAccountRef is mandatory set with method=WorkloadIdentity")
+		}
+		_, email := helpers.ParseIAMMemberString(principalAuth.ServiceAccountID)
+		yes, err := hasServiceAccountIAMBinding(
+			ctx,
+			p.clients.iamService,
+			email,
+			workloadIdentityRole,
+			principalAuth.CredentialsID,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if !yes {
+			return nil, cloud.ErrAuthNotFound
+		}
+
+		return &cloud.PrincipalAuthResult{
+			Method:        principalAuth.Method,
+			CredentialsID: principalAuth.CredentialsID,
+			ServiceAccountPatch: &corev1.ServiceAccount{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "ServiceAccount",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name:      k8sServiceAccount.Name,
+					Namespace: k8sServiceAccount.Namespace,
+					Annotations: map[string]string{
+						k8sAnnotationKey: email,
+					},
+				},
+			},
+		}, nil
+
+	}
 	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
 }
+
 func (p *gcpPrincipalAPI) CreatePrincipalAuth(
 	ctx context.Context,
 	principalAuth cloud.PrincipalAuthSetup,
@@ -206,7 +192,7 @@ func (p *gcpPrincipalAPI) CreatePrincipalAuth(
 	)
 
 	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
-		key, err := p.saCreateKey(ctx, fullName)
+		key, err := saCreateKey(ctx, p.clients.iamService, fullName)
 		if err != nil {
 			return nil, err
 		}
@@ -225,6 +211,49 @@ func (p *gcpPrincipalAPI) CreatePrincipalAuth(
 		}, nil
 	}
 
+	if principalAuth.Method == vedro.AuthMethodWorkloadIdentity {
+		k8sServiceAccount := principalAuth.K8sServiceAccount
+		if k8sServiceAccount == nil {
+			return nil, fmt.Errorf("serviceAccountRef is mandatory set with method=WorkloadIdentity")
+		}
+		principal := fmt.Sprintf(
+			"serviceAccount:%s.svc.id.goog[%s/%s]",
+			p.projectID,
+			k8sServiceAccount.Namespace,
+			k8sServiceAccount.Name,
+		)
+		err := modifyServiceAccountIAMBinding(
+			ctx,
+			p.clients.iamService,
+			email,
+			workloadIdentityRole,
+			principal,
+			IAMBindingGrant,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		return &cloud.PrincipalAuthResult{
+			Method:        principalAuth.Method,
+			CredentialsID: principal,
+			ServiceAccountPatch: &corev1.ServiceAccount{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "ServiceAccount",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name:      k8sServiceAccount.Name,
+					Namespace: k8sServiceAccount.Namespace,
+					Annotations: map[string]string{
+						k8sAnnotationKey: email,
+					},
+				},
+			},
+		}, nil
+
+	}
+
 	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
 }
 
@@ -233,10 +262,28 @@ func (p *gcpPrincipalAPI) DeletePrincipalAuth(
 	principalAuth cloud.PrincipalAuthSetup,
 ) error {
 	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
-		err := p.saDeleteKey(ctx, principalAuth.CredentialsID)
+		err := saDeleteKey(ctx, p.clients.iamService, principalAuth.CredentialsID)
 		if err != nil {
 			return err
 		}
+		return nil
+	}
+
+	if principalAuth.Method == vedro.AuthMethodWorkloadIdentity {
+		_, email := helpers.ParseIAMMemberString(principalAuth.ServiceAccountID)
+		err := modifyServiceAccountIAMBinding(
+			ctx,
+			p.clients.iamService,
+			email,
+			workloadIdentityRole,
+			principalAuth.CredentialsID,
+			IAMBindingRevoke,
+		)
+
+		if err != nil {
+			return nil
+		}
+
 		return nil
 	}
 	return fmt.Errorf("Method %s is not supported", principalAuth.Method)

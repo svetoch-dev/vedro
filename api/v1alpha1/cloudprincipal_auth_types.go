@@ -23,7 +23,7 @@ type NamespacedName struct {
 }
 
 type StaticCredentialsSpec struct {
-	// SecretRef references a Kubernetes Secret where static credentials should be placed.
+	// Creates a Kubernetes Secret which is specified in SecretRef and adds static credentials to it.
 	//
 	// Required when method is StaticCredentials.
 	// Usually empty when method is WorkloadIdentity.
@@ -40,7 +40,7 @@ type StaticCredentialsSpec struct {
 
 type WorkloadIdentitySpec struct {
 	// ServiceAccountRef references a Kubernetes ServiceAccount to which
-	// needed annotations should be added
+	// needed patch should be applied
 	//
 	// Required when method is WorkloadIdentity.
 	// Usually empty when method is StaticCredentials.

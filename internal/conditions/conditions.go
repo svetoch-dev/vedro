@@ -18,6 +18,9 @@ const (
 
 	// TypeStaticCredentialsConfigured indicates status of StaticCredentials of CloudPrincipalAuth
 	TypeStaticCredentialsConfigured = "StaticCredentialsConfigured"
+
+	// TypeWorkloadIdentityConfigured indicates status of WorkloadIdentity of CloudPrincipalAuth
+	TypeWorkloadIdentityConfigured = "WorkloadIdentityConfigured"
 )
 
 // Generic condition reasons
@@ -74,6 +77,8 @@ const (
 	ReasonCloudPrincipalAuthCredentialsNotEnsured = "CloudPrincipalCredentialsNotEnsured"
 	ReasonStaticCredentialsError                  = "StaticCredentialsError"
 	ReasonStaticCredentialsReconciled             = "StaticCredentialsReconciled"
+	ReasonWorkloadIdentityError                   = "WorkloadIdentityError"
+	ReasonWorkloadIdentityReconciled              = "WorkloadIdentityReconciled"
 )
 
 // Condition reasons for ProviderConfig resources.

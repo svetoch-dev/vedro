@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -45,7 +46,10 @@ import (
 	"github.com/svetoch-dev/vedro/internal/resolvers"
 )
 
-const principalAuthFinalizer = "vedro.svetoch.dev/cloudprincipalauth-finalizer"
+const (
+	principalAuthFinalizer  = "vedro.svetoch.dev/cloudprincipalauth-finalizer"
+	principalAuthFieldOwner = "vedro-cloudprincipal-auth"
+)
 
 // BucketReconciler reconciles a Bucket object
 type CloudPrincipalAuthReconciler struct {
@@ -279,11 +283,135 @@ func (r *CloudPrincipalAuthReconciler) Reconcile(ctx context.Context, req ctrl.R
 			result,
 		)
 	case vedro.AuthMethodWorkloadIdentity:
-		return Reconciled()
+		return r.ensureWorkloadIdentity(
+			ctx,
+			req,
+			&principalAuth,
+			&principal,
+			&providerConfig,
+			result,
+		)
 	default:
 		logger.Info("Method is not supported", "method", principalAuth.Spec.Method)
 		return Reconciled()
 	}
+}
+
+func (r *CloudPrincipalAuthReconciler) ensureWorkloadIdentity(
+	ctx context.Context,
+	req ctrl.Request,
+	principalAuth *resolvers.CloudPrincipalAuthResolver,
+	principal *resolvers.CloudPrincipalResolver,
+	providerConfig *resolvers.ProviderConfigResolver,
+	authResult *cloud.PrincipalAuthResult,
+) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	patchWorkloadIdentityStatus := func(condition metav1.Condition) error {
+		return r.patchStatus(ctx, req, principalAuth.Generation,
+			func(p *vedro.CloudPrincipalAuth) {
+				p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
+				p.Status.Applied = principalAuth.Status.Applied
+				p.Status.ObservedProvider = principal.Spec.ProviderRef.Name
+
+				for _, c := range []metav1.Condition{
+					condition,
+					providerConfig.Condition,
+					principalAuth.Condition,
+					principal.Condition,
+				} {
+					meta.SetStatusCondition(&p.Status.Conditions, c)
+				}
+			},
+		)
+	}
+
+	configured := meta.FindStatusCondition(
+		principalAuth.Status.Conditions,
+		conditions.TypeWorkloadIdentityConfigured,
+	)
+
+	if configured == nil {
+		configured = &metav1.Condition{
+			Type:               conditions.TypeStaticCredentialsConfigured,
+			ObservedGeneration: principalAuth.Generation,
+		}
+	}
+
+	key := types.NamespacedName{
+		Namespace: authResult.ServiceAccountPatch.Namespace,
+		Name:      authResult.ServiceAccountPatch.Name,
+	}
+
+	principalAuth.Status.Applied = &vedro.CloudPrincipalAuthProperties{
+		Method:        principalAuth.Spec.Method,
+		CredentialsId: authResult.CredentialsID,
+		PrincipalId:   principal.Status.ExternalId,
+	}
+
+	var serviceAccount corev1.ServiceAccount
+
+	err := r.Get(
+		ctx,
+		key,
+		&serviceAccount,
+	)
+
+	if err != nil {
+		configured.Status = metav1.ConditionFalse
+		configured.Reason = conditions.ReasonWorkloadIdentityError
+		configured.Message = err.Error()
+		patchErr := patchWorkloadIdentityStatus(*configured)
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+
+		if apierrors.IsNotFound(err) {
+			logger.Info("ServiceAccount not found", "name", key.Name, "namespace", key.Namespace)
+			return Reconciled()
+		}
+
+		return ReconcileError(ctx, err, "error getting k8s service account")
+	}
+
+	// Use server side apply in order to easily delete any
+	// fields set
+	err = r.Patch(
+		ctx,
+		authResult.ServiceAccountPatch,
+		client.Apply,
+		client.FieldOwner(principalAuthFieldOwner),
+	)
+
+	if err != nil {
+		configured.Status = metav1.ConditionFalse
+		configured.Reason = conditions.ReasonWorkloadIdentityError
+		configured.Message = err.Error()
+		patchErr := patchWorkloadIdentityStatus(*configured)
+		if patchErr != nil {
+			return ReconcileError(ctx, patchErr, "patch error")
+		}
+
+		return ReconcileError(ctx, err, "error patching k8s service account")
+	}
+
+	principalAuth.Condition.Status = metav1.ConditionTrue
+	principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthReconciled
+	principalAuth.Condition.Message = "CloudPrincipalAuth Reconciled"
+	principalAuth.Status.Applied.ServiceAccountRef = &vedro.NamespacedName{
+		Name:      key.Name,
+		Namespace: key.Namespace,
+	}
+	configured.Status = metav1.ConditionTrue
+	configured.Reason = conditions.ReasonWorkloadIdentityReconciled
+	configured.Message = "WorkloadIdentity reconciled"
+	patchErr := patchWorkloadIdentityStatus(*configured)
+	if patchErr != nil {
+		return ReconcileError(ctx, patchErr, "patch error")
+	}
+	logger.Info("CloudPrincipalAuth reconcile success")
+	return Reconciled()
+
 }
 
 func (r *CloudPrincipalAuthReconciler) ensureStaticCredentials(
@@ -535,10 +663,11 @@ func (r *CloudPrincipalAuthReconciler) deleteCloudPrincipalAuth(
 		return Reconciled()
 	}
 
+	applied := principalAuth.Status.Applied
+
 	if principalAuth.ShouldBeRetained() {
 		logger.Info("skipping deletion of authentication material because deletionPolicy is Retain")
-		if principalAuth.Status.Applied != nil {
-			applied := principalAuth.Status.Applied
+		if applied != nil {
 			if applied.Method == vedro.AuthMethodStaticCredentials &&
 				applied.SecretRef != nil {
 				err := helpers.RemoveAllOwnerRefs(
@@ -566,7 +695,7 @@ func (r *CloudPrincipalAuthReconciler) deleteCloudPrincipalAuth(
 	}
 
 	if principalAuth.ShouldBeDeleted() {
-		if principalAuth.Status.Applied != nil {
+		if applied != nil {
 			logger.Info("deleting auth material for CloudPrincipal")
 			providerFactory := r.ProviderFactory
 			if providerFactory == nil {
@@ -621,6 +750,39 @@ func (r *CloudPrincipalAuthReconciler) deleteCloudPrincipalAuth(
 					}
 					return ReconcileError(ctx, err, "unable to delete auth material for CloudPrincipal")
 				}
+
+				if applied.Method == vedro.AuthMethodWorkloadIdentity {
+					sa := &corev1.ServiceAccount{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "ServiceAccount",
+						},
+						ObjectMeta: v1.ObjectMeta{
+							Name:      applied.ServiceAccountRef.Name,
+							Namespace: applied.ServiceAccountRef.Namespace,
+						},
+					}
+					err := r.Patch(
+						ctx,
+						sa,
+						client.Apply,
+						client.FieldOwner(principalAuthFieldOwner),
+					)
+					if err != nil {
+						principalAuth.Condition.Status = metav1.ConditionFalse
+						principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthDeleteError
+						principalAuth.Condition.Message = err.Error()
+
+						patchErr := r.patchStatus(ctx, req, principalAuth.Generation, func(p *vedro.CloudPrincipalAuth) {
+							meta.SetStatusCondition(&p.Status.Conditions, principalAuth.Condition)
+						})
+						if patchErr != nil {
+							return ReconcileError(ctx, patchErr, "patch error")
+						}
+						return ReconcileError(ctx, err, "unable to delete auth material for CloudPrincipal")
+					}
+				}
+
 			} else {
 				logger.Info("skipping auth material deletion because CloudPrincipalAuth spec is restricted", "message", decision.Message)
 				if principalAuth.IsProvisioned() {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	corev1 "k8s.io/api/core/v1"
+
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/validation"
 )
@@ -85,16 +87,17 @@ type BucketAttrs struct {
 type BucketAccessAttrs vedro.BucketAccessProperties
 
 type PrincipalAuthResult struct {
-	CredentialsID string
-	Annotations   map[string]string
-	SecretData    map[string][]byte
-	Method        vedro.AuthMethod
+	CredentialsID       string
+	ServiceAccountPatch *corev1.ServiceAccount
+	SecretData          map[string][]byte
+	Method              vedro.AuthMethod
 }
 
 type PrincipalAuthSetup struct {
-	Method           vedro.AuthMethod
-	ServiceAccountID string
-	CredentialsID    string
+	Method            vedro.AuthMethod
+	ServiceAccountID  string
+	CredentialsID     string
+	K8sServiceAccount *vedro.NamespacedName
 }
 
 type PrincipalAttrs struct {

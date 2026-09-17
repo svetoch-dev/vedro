@@ -30,6 +30,13 @@ func (o *PrincipalAuth) EnsureAuthentication(
 		CredentialsID:    credentialsID,
 	}
 
+	if principalAuth.Spec.Method == vedro.AuthMethodWorkloadIdentity {
+		authSetup.K8sServiceAccount = &vedro.NamespacedName{
+			Name:      principalAuth.Spec.WorkloadIdentity.ServiceAccountRef.Name,
+			Namespace: principalAuth.Namespace,
+		}
+	}
+
 	if authSetup.CredentialsID == "" {
 		result, err := o.api.CreatePrincipalAuth(ctx, authSetup)
 		if err != nil {

@@ -343,6 +343,9 @@ func (r *CloudPrincipalAuthReconciler) ensureWorkloadIdentity(
 	)
 
 	if handled {
+		if apierrors.IsNotFound(err) {
+			return result, nil
+		}
 		return result, err
 	}
 
@@ -375,7 +378,6 @@ func (r *CloudPrincipalAuthReconciler) reconcileServiceAccount(
 	principalAuth *resolvers.CloudPrincipalAuthResolver,
 	patcher func(condition metav1.Condition) error,
 ) (ctrl.Result, error, bool) {
-	logger := log.FromContext(ctx)
 
 	configured := meta.FindStatusCondition(
 		principalAuth.Status.Conditions,
@@ -414,8 +416,13 @@ func (r *CloudPrincipalAuthReconciler) reconcileServiceAccount(
 		}
 
 		if apierrors.IsNotFound(err) {
-			logger.Info("ServiceAccount not found", "name", key.Name, "namespace", key.Namespace)
-			res, rerr := Reconciled()
+			res, rerr := ReconcileError(
+				ctx,
+				err,
+				"ServiceAccount not found",
+				"name", key.Name,
+				"namespace", key.Namespace,
+			)
 			return res, rerr, true
 		}
 
@@ -914,6 +921,42 @@ func (r *CloudPrincipalAuthReconciler) findCloudPrincipalAuthsOfCloudPrincipal(
 	return requests
 }
 
+func (r *CloudPrincipalAuthReconciler) findCloudPrincipalAuthsOfServiceAccount(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	sa, ok := obj.(*corev1.ServiceAccount)
+	if !ok {
+		return nil
+	}
+
+	var list vedro.CloudPrincipalAuthList
+	if err := r.List(
+		ctx,
+		&list,
+		client.InNamespace(sa.Namespace),
+		client.MatchingFields{
+			"spec.workloadIdentity.serviceAccountRef": sa.Name,
+		},
+	); err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "unable to list CloudPrincipalAuth objects")
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0, len(list.Items))
+
+	for _, obj := range list.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      obj.Name,
+				Namespace: obj.Namespace,
+			},
+		})
+	}
+
+	return requests
+}
+
 func (r *CloudPrincipalAuthReconciler) findCloudPrincipalAuthsOfProviderConfig(
 	ctx context.Context,
 	obj client.Object,
@@ -944,6 +987,21 @@ func (r *CloudPrincipalAuthReconciler) findCloudPrincipalAuthsOfProviderConfig(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *CloudPrincipalAuthReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&vedro.CloudPrincipalAuth{},
+		"spec.workloadIdentity.serviceAccountRef",
+		func(obj client.Object) []string {
+			auth := obj.(*vedro.CloudPrincipalAuth)
+
+			if auth.Spec.WorkloadIdentity == nil ||
+				auth.Spec.WorkloadIdentity.ServiceAccountRef.Name == "" {
+				return nil
+			}
+
+			return []string{auth.Spec.WorkloadIdentity.ServiceAccountRef.Name}
+		},
+	)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
 			&vedro.CloudPrincipalAuth{},
@@ -959,6 +1017,10 @@ func (r *CloudPrincipalAuthReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			// CloudPrincipalAuths that reference it
 			&vedro.ProviderConfig{},
 			handler.EnqueueRequestsFromMapFunc(r.findCloudPrincipalAuthsOfProviderConfig),
+		).
+		Watches(
+			&corev1.ServiceAccount{},
+			handler.EnqueueRequestsFromMapFunc(r.findCloudPrincipalAuthsOfServiceAccount),
 		).
 		Owns(&corev1.Secret{}).
 		Named("CloudPrincipalAuth").

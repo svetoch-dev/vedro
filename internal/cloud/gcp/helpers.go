@@ -222,8 +222,12 @@ func revokeServiceAccountIAMBinding(
 		)
 	}
 
+	hasChanges := false
+	bindings := make([]*iam.Binding, 0, len(policy.Bindings))
+
 	for _, binding := range policy.Bindings {
 		if binding.Role != role {
+			bindings = append(bindings, binding)
 			continue
 		}
 
@@ -231,14 +235,26 @@ func revokeServiceAccountIAMBinding(
 
 		for _, member := range binding.Members {
 			if member == principal {
+				hasChanges = true
 				continue
 			}
 
 			members = append(members, member)
 		}
 
-		binding.Members = members
+		// gcp sdk doesnt accept bindings with
+		// 0 members so we pass it
+		if len(members) == 0 {
+			continue
+		} else {
+			binding.Members = members
+			bindings = append(bindings, binding)
+		}
+	}
 
+	policy.Bindings = bindings
+
+	if hasChanges {
 		_, err = service.Projects.ServiceAccounts.
 			SetIamPolicy(
 				resource,
@@ -252,8 +268,6 @@ func revokeServiceAccountIAMBinding(
 		if err != nil {
 			return fmt.Errorf("set service account IAM policy: %w", err)
 		}
-
-		return nil
 	}
 
 	return nil

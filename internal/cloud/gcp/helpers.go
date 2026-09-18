@@ -237,10 +237,6 @@ func revokeServiceAccountIAMBinding(
 			members = append(members, member)
 		}
 
-		if len(members) == 0 {
-			return nil
-		}
-
 		binding.Members = members
 
 		_, err = service.Projects.ServiceAccounts.

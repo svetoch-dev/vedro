@@ -123,11 +123,6 @@ var (
 			Message: "Referenced AllUsers is unsupported by this provider",
 			Reason:  vedro.PrincipalUnsupportedReferencedAllUsers,
 		},
-		"MethodStaticCredentials": {
-			Field:   "method",
-			Message: "Method StaticCredentials is unsupported",
-			Reason:  vedro.PrincipalAuthUnsupportedStaticCredentials,
-		},
 		"MethodWorkloadIdentity": {
 			Field:   "method",
 			Message: "Method WorkloadIdentity is unsupported",
@@ -138,10 +133,15 @@ var (
 			Message: "CloudPrincipal Kind can not authenticate using WorkloadIdentity",
 			Reason:  vedro.PrincipalAuthUnsupportedWorkloadIdentityKind,
 		},
+		"MethodStaticCredentials": {
+			Field:   "method",
+			Message: "Method StaticCredentials is unsupported",
+			Reason:  vedro.PrincipalAuthUnsupportedStaticCredentials,
+		},
 		"StaticCredentialsKind": {
 			Field:   "principalRef.name",
 			Message: "StaticCredentials can not be issued for CloudPrincipals Kind",
-			Reason:  vedro.PrincipalAuthUnsupportedStaticCredentials,
+			Reason:  vedro.PrincipalAuthUnsupportedStaticCredentialsKind,
 		},
 	}
 )

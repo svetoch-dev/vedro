@@ -12,28 +12,25 @@ func ValidatePrincipalAuthCapabilities(
 ) []vedro.UnsupportedFeature {
 	var unsupported []vedro.UnsupportedFeature
 
-	if spec.Method == vedro.AuthMethodStaticCredentials &&
-		caps.StaticCredentials == false {
-		unsupported = append(unsupported, unsupportedFeatures["MethodStaticCredentials"])
-
-	}
-
-	if spec.Method == vedro.AuthMethodWorkloadIdentity &&
-		caps.WorkloadIdentity == false {
-		unsupported = append(unsupported, unsupportedFeatures["MethodWorkloadIdentity"])
-	}
-
-	if caps.WorkloadIdentity == true {
-		supported, ok := caps.WorkloadIdentityKinds[kind]
-		if !ok || !supported {
-			unsupported = append(unsupported, unsupportedFeatures["WorkloadIdentityKind"])
+	if spec.Method == vedro.AuthMethodStaticCredentials {
+		if caps.StaticCredentials == false {
+			unsupported = append(unsupported, unsupportedFeatures["MethodStaticCredentials"])
 		}
-	}
 
-	if caps.StaticCredentials == true {
 		supported, ok := caps.StaticCredentialsKinds[kind]
 		if !ok || !supported {
 			unsupported = append(unsupported, unsupportedFeatures["StaticCredentialsKind"])
+		}
+	}
+
+	if spec.Method == vedro.AuthMethodWorkloadIdentity {
+		if caps.WorkloadIdentity == false {
+			unsupported = append(unsupported, unsupportedFeatures["MethodWorkloadIdentity"])
+		}
+
+		supported, ok := caps.WorkloadIdentityKinds[kind]
+		if !ok || !supported {
+			unsupported = append(unsupported, unsupportedFeatures["WorkloadIdentityKind"])
 		}
 	}
 

@@ -11,11 +11,14 @@ import (
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/conditions"
 	"github.com/svetoch-dev/vedro/internal/validation"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -186,17 +189,261 @@ var _ = Describe("ProviderConfigReconciler", func() {
 		Expect(fetched.Finalizers).To(ContainElement(providerConfigFinalizer))
 		Expect(provider.cleanupCalled).To(BeFalse())
 	})
+
+	It("finishes deletion after the referencing resource is removed", func() {
+		providerConfig := createUnreadyProviderConfigNamed(ctx, "provider-config-reference-removed")
+		bucket := createBucket(ctx, "temporary-provider-reference", func(spec *vedro.BucketSpec) {
+			spec.ProviderRef.Name = providerConfig.Name
+		})
+		addProviderConfigFinalizer(ctx, providerConfig)
+		Expect(k8sClient.Delete(ctx, providerConfig)).To(Succeed())
+
+		result, err := reconcileProviderConfig(ctx, reconciler, providerConfig)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.RequeueAfter).To(Equal(10 * time.Second))
+		Expect(k8sClient.Delete(ctx, bucket)).To(Succeed())
+
+		result, err = reconcileProviderConfig(ctx, reconciler, providerConfig)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(providerConfig), &vedro.ProviderConfig{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("recovers from an invalid spec after the next generation validates", func() {
+		providerConfig := createUnreadyProviderConfigNamed(ctx, "provider-config-recovers")
+		provider.validation = validation.Invalid("invalid region")
+
+		_, err := reconcileProviderConfig(ctx, reconciler, providerConfig)
+		Expect(err).NotTo(HaveOccurred())
+		invalid := getProviderConfig(ctx, client.ObjectKeyFromObject(providerConfig))
+		invalidGeneration := invalid.Generation
+		condition := meta.FindStatusCondition(invalid.Status.Conditions, conditions.TypeProviderConfigReady)
+		Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(condition.Reason).To(Equal(conditions.ReasonProviderConfigInvalidSpec))
+
+		invalid.Spec.Region = "europe-west2"
+		Expect(k8sClient.Update(ctx, invalid)).To(Succeed())
+		provider.validation = validation.Valid()
+
+		_, err = reconcileProviderConfig(ctx, reconciler, providerConfig)
+
+		Expect(err).NotTo(HaveOccurred())
+		fetched := getProviderConfig(ctx, client.ObjectKeyFromObject(providerConfig))
+		Expect(fetched.Generation).To(BeNumerically(">", invalidGeneration))
+		Expect(fetched.Status.ObservedGeneration).To(Equal(fetched.Generation))
+		Expect(fetched.Status.Conditions).To(HaveLen(1))
+		condition = meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeProviderConfigReady)
+		Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(condition.Reason).To(Equal(conditions.ReasonProviderConfigReconciled))
+		Expect(condition.Message).To(Equal("ProviderConfig Reconciled"))
+	})
+
+	It("reconciles idempotently", func() {
+		providerConfig := createUnreadyProviderConfigNamed(ctx, "provider-config-idempotent")
+
+		_, err := reconcileProviderConfig(ctx, reconciler, providerConfig)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = reconcileProviderConfig(ctx, reconciler, providerConfig)
+
+		Expect(err).NotTo(HaveOccurred())
+		fetched := getProviderConfig(ctx, client.ObjectKeyFromObject(providerConfig))
+		Expect(fetched.Finalizers).To(ConsistOf(providerConfigFinalizer))
+		Expect(fetched.Status.Conditions).To(HaveLen(1))
+		Expect(provider.cleanupCalls).To(Equal(2))
+	})
+
+	Describe("CRD validation", func() {
+		It("rejects provider type changes", func() {
+			providerConfig := createUnreadyProviderConfigNamed(ctx, "immutable-provider-type")
+			providerConfig.Spec.Type = vedro.ProviderTypeYandexCloud
+
+			err := k8sClient.Update(ctx, providerConfig)
+
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err).To(MatchError(ContainSubstring("type is immutable")))
+		})
+
+		It("rejects project ID changes", func() {
+			providerConfig := createUnreadyProviderConfigNamed(ctx, "immutable-project-id")
+			providerConfig.Spec.ProjectId = "another-project"
+
+			err := k8sClient.Update(ctx, providerConfig)
+
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err).To(MatchError(ContainSubstring("projectId is immutable")))
+		})
+
+		It("requires a credentials Secret for StaticCredentials", func() {
+			providerConfig := newProviderConfig("static-without-secret")
+			providerConfig.Spec.Method = vedro.AuthMethodStaticCredentials
+
+			err := k8sClient.Create(ctx, providerConfig)
+
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err).To(MatchError(ContainSubstring(
+				"credentialsSecretRef is required when method is StaticCredentials",
+			)))
+		})
+
+		It("rejects a credentials Secret for WorkloadIdentity", func() {
+			providerConfig := newProviderConfig("workload-with-secret")
+			providerConfig.Spec.CredentialsSecretRef = &corev1.SecretReference{
+				Name: "provider-secret", Namespace: "default",
+			}
+
+			err := k8sClient.Create(ctx, providerConfig)
+
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err).To(MatchError(ContainSubstring(
+				"credentialsSecretRef must not be set when method is WorkloadIdentity",
+			)))
+		})
+	})
+
+	Describe("Secret watch mapping", func() {
+		It("enqueues every ProviderConfig referencing the Secret", func() {
+			first := newProviderConfig("first-secret-provider")
+			first.Spec.Method = vedro.AuthMethodStaticCredentials
+			first.Spec.CredentialsSecretRef = &corev1.SecretReference{Name: "credentials", Namespace: "team"}
+			second := first.DeepCopy()
+			second.Name = "second-secret-provider"
+			unrelated := newProviderConfig("unrelated-secret-provider")
+			unrelated.Spec.Method = vedro.AuthMethodStaticCredentials
+			unrelated.Spec.CredentialsSecretRef = &corev1.SecretReference{Name: "other", Namespace: "team"}
+			otherNamespace := first.DeepCopy()
+			otherNamespace.Name = "other-namespace-provider"
+			otherNamespace.Spec.CredentialsSecretRef.Namespace = "other"
+			watchClient := newProviderConfigWatchClient(first, second, unrelated, otherNamespace)
+			watchReconciler := &ProviderConfigReconciler{Client: watchClient}
+
+			requests := watchReconciler.findProviderConfigsOfSecret(ctx, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "credentials", Namespace: "team"},
+			})
+
+			Expect(requests).To(ConsistOf(
+				reconcile.Request{NamespacedName: types.NamespacedName{Name: first.Name}},
+				reconcile.Request{NamespacedName: types.NamespacedName{Name: second.Name}},
+			))
+		})
+
+		It("returns no requests for an unrelated Secret or object type", func() {
+			providerConfig := newProviderConfig("watched-provider")
+			providerConfig.Spec.Method = vedro.AuthMethodStaticCredentials
+			providerConfig.Spec.CredentialsSecretRef = &corev1.SecretReference{Name: "credentials", Namespace: "team"}
+			watchReconciler := &ProviderConfigReconciler{
+				Client: newProviderConfigWatchClient(providerConfig),
+			}
+
+			requests := watchReconciler.findProviderConfigsOfSecret(ctx, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "other", Namespace: "team"},
+			})
+			Expect(requests).To(BeEmpty())
+			Expect(watchReconciler.findProviderConfigsOfSecret(ctx, &vedro.Bucket{})).To(BeNil())
+		})
+
+		It("returns no requests when ProviderConfigs cannot be listed", func() {
+			watchReconciler := &ProviderConfigReconciler{Client: &providerConfigErrorClient{
+				Client:  newProviderConfigWatchClient(),
+				listErr: errors.New("list failed"),
+			}}
+
+			requests := watchReconciler.findProviderConfigsOfSecret(ctx, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "credentials", Namespace: "team"},
+			})
+
+			Expect(requests).To(BeNil())
+		})
+	})
+
+	Describe("client failures", func() {
+		It("returns an error when adding the finalizer fails", func() {
+			providerConfig := createUnreadyProviderConfigNamed(ctx, "add-finalizer-error")
+			reconciler.Client = &providerConfigErrorClient{
+				Client: k8sClient, updateErr: errors.New("update failed"),
+			}
+
+			_, err := reconcileProviderConfig(ctx, reconciler, providerConfig)
+
+			Expect(err).To(MatchError("update failed"))
+			Expect(provider.cleanupCalled).To(BeFalse())
+		})
+
+		It("returns an error when references cannot be listed", func() {
+			providerConfig := createUnreadyProviderConfigNamed(ctx, "reference-list-error")
+			addProviderConfigFinalizer(ctx, providerConfig)
+			Expect(k8sClient.Delete(ctx, providerConfig)).To(Succeed())
+			reconciler.Client = &providerConfigErrorClient{
+				Client: k8sClient, listErr: errors.New("list failed"),
+			}
+
+			_, err := reconcileProviderConfig(ctx, reconciler, providerConfig)
+
+			Expect(err).To(MatchError("list failed"))
+		})
+
+		It("returns an error when removing the finalizer fails", func() {
+			providerConfig := createUnreadyProviderConfigNamed(ctx, "remove-finalizer-error")
+			addProviderConfigFinalizer(ctx, providerConfig)
+			Expect(k8sClient.Delete(ctx, providerConfig)).To(Succeed())
+			reconciler.Client = &providerConfigErrorClient{
+				Client: k8sClient, updateErr: errors.New("update failed"),
+			}
+
+			_, err := reconcileProviderConfig(ctx, reconciler, providerConfig)
+
+			Expect(err).To(MatchError("update failed"))
+		})
+
+		It("returns an error when status cannot be patched", func() {
+			providerConfig := createUnreadyProviderConfigNamed(ctx, "status-patch-error")
+			wrapped := &providerConfigErrorClient{
+				Client: k8sClient, statusPatchErr: errors.New("status patch failed"),
+			}
+			reconciler.Client = wrapped
+
+			_, err := reconcileProviderConfig(ctx, reconciler, providerConfig)
+
+			Expect(err).To(MatchError("status patch failed"))
+			Expect(wrapped.statusPatchCalls).To(Equal(1))
+			Expect(provider.cleanupCalled).To(BeTrue())
+		})
+
+		It("retries a conflicting status patch", func() {
+			providerConfig := createUnreadyProviderConfigNamed(ctx, "status-patch-conflict")
+			wrapped := &providerConfigErrorClient{
+				Client: k8sClient, statusPatchConflicts: 1,
+			}
+			reconciler.Client = wrapped
+
+			_, err := reconcileProviderConfig(ctx, reconciler, providerConfig)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(wrapped.statusPatchCalls).To(Equal(2))
+			fetched := getProviderConfig(ctx, client.ObjectKeyFromObject(providerConfig))
+			condition := meta.FindStatusCondition(fetched.Status.Conditions, conditions.TypeProviderConfigReady)
+			Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+		})
+	})
 })
 
 type providerConfigTestProvider struct {
 	*fakeProvider
-	validation validation.ValidationResult
+	validation   validation.ValidationResult
+	cleanupCalls int
 }
 
 func (p *providerConfigTestProvider) ValidateProviderConfigSpec(
 	vedro.ProviderConfig,
 ) validation.ValidationResult {
 	return p.validation
+}
+
+func (p *providerConfigTestProvider) Cleanup(ctx context.Context) error {
+	p.cleanupCalls++
+	return p.fakeProvider.Cleanup(ctx)
 }
 
 func createProviderConfig(ctx context.Context) {
@@ -217,8 +464,8 @@ func createProviderConfigNamed(ctx context.Context, name string) {
 	markProviderConfigReady(ctx, providerConfig)
 }
 
-func createUnreadyProviderConfigNamed(ctx context.Context, name string) *vedro.ProviderConfig {
-	providerConfig := &vedro.ProviderConfig{
+func newProviderConfig(name string) *vedro.ProviderConfig {
+	return &vedro.ProviderConfig{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "vedro.svetoch.dev/v1alpha1",
 			Kind:       "ProviderConfig",
@@ -253,6 +500,10 @@ func createUnreadyProviderConfigNamed(ctx context.Context, name string) *vedro.P
 			},
 		},
 	}
+}
+
+func createUnreadyProviderConfigNamed(ctx context.Context, name string) *vedro.ProviderConfig {
+	providerConfig := newProviderConfig(name)
 
 	Expect(k8sClient.Create(ctx, providerConfig)).To(Succeed())
 
@@ -337,4 +588,97 @@ func addProviderConfigFinalizer(ctx context.Context, providerConfig *vedro.Provi
 	fetched := getProviderConfig(ctx, client.ObjectKeyFromObject(providerConfig))
 	fetched.Finalizers = append(fetched.Finalizers, providerConfigFinalizer)
 	Expect(k8sClient.Update(ctx, fetched)).To(Succeed())
+}
+
+func newProviderConfigWatchClient(
+	providerConfigs ...*vedro.ProviderConfig,
+) client.Client {
+	objects := make([]client.Object, 0, len(providerConfigs))
+	for _, providerConfig := range providerConfigs {
+		objects = append(objects, providerConfig)
+	}
+
+	return fake.NewClientBuilder().
+		WithScheme(k8sClient.Scheme()).
+		WithObjects(objects...).
+		WithIndex(
+			&vedro.ProviderConfig{},
+			providerConfigSecretRefIndex,
+			func(obj client.Object) []string {
+				providerConfig := obj.(*vedro.ProviderConfig)
+				if providerConfig.Spec.CredentialsSecretRef == nil ||
+					providerConfig.Spec.CredentialsSecretRef.Name == "" {
+					return nil
+				}
+				return []string{types.NamespacedName{
+					Name:      providerConfig.Spec.CredentialsSecretRef.Name,
+					Namespace: providerConfig.Spec.CredentialsSecretRef.Namespace,
+				}.String()}
+			},
+		).
+		Build()
+}
+
+type providerConfigErrorClient struct {
+	client.Client
+	updateErr            error
+	listErr              error
+	statusPatchErr       error
+	statusPatchConflicts int
+	statusPatchCalls     int
+}
+
+func (c *providerConfigErrorClient) Update(
+	ctx context.Context,
+	obj client.Object,
+	opts ...client.UpdateOption,
+) error {
+	if c.updateErr != nil {
+		return c.updateErr
+	}
+	return c.Client.Update(ctx, obj, opts...)
+}
+
+func (c *providerConfigErrorClient) List(
+	ctx context.Context,
+	list client.ObjectList,
+	opts ...client.ListOption,
+) error {
+	if c.listErr != nil {
+		return c.listErr
+	}
+	return c.Client.List(ctx, list, opts...)
+}
+
+func (c *providerConfigErrorClient) Status() client.SubResourceWriter {
+	return &providerConfigStatusWriter{
+		SubResourceWriter: c.Client.Status(),
+		client:            c,
+	}
+}
+
+type providerConfigStatusWriter struct {
+	client.SubResourceWriter
+	client *providerConfigErrorClient
+}
+
+func (w *providerConfigStatusWriter) Patch(
+	ctx context.Context,
+	obj client.Object,
+	patch client.Patch,
+	opts ...client.SubResourcePatchOption,
+) error {
+	w.client.statusPatchCalls++
+	if w.client.statusPatchConflicts > 0 {
+		w.client.statusPatchConflicts--
+		return apierrors.NewConflict(
+			schema.GroupResource{Group: vedro.GroupVersion.Group, Resource: "providerconfigs"},
+			obj.GetName(),
+			errors.New("conflict"),
+		)
+	}
+	if w.client.statusPatchErr != nil {
+		return w.client.statusPatchErr
+	}
+	return w.SubResourceWriter.Patch(ctx, obj, patch, opts...)
 }

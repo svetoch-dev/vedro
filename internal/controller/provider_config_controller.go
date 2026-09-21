@@ -40,7 +40,10 @@ import (
 	"github.com/svetoch-dev/vedro/internal/resolvers"
 )
 
-const providerConfigFinalizer = "vedro.svetoch.dev/providerconfig-finalizer"
+const (
+	providerConfigFinalizer      = "vedro.svetoch.dev/providerconfig-finalizer"
+	providerConfigSecretRefIndex = "spec.credentialsSecretRef"
+)
 
 type ProviderConfigReconciler struct {
 	client.Client
@@ -227,7 +230,9 @@ func (r *ProviderConfigReconciler) findProviderConfigsOfSecret(
 		ctx,
 		&list,
 		client.MatchingFields{
-			"spec.credentialsSecretRef.name": secret.Name,
+			providerConfigSecretRefIndex: types.NamespacedName{
+				Name: secret.Name, Namespace: secret.Namespace,
+			}.String(),
 		},
 	); err != nil {
 		ctrl.LoggerFrom(ctx).Error(err, "unable to list ProviderConfig objects")
@@ -253,7 +258,7 @@ func (r *ProviderConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&vedro.ProviderConfig{},
-		"spec.credentialsSecretRef.name",
+		providerConfigSecretRefIndex,
 		func(obj client.Object) []string {
 			pc := obj.(*vedro.ProviderConfig)
 
@@ -262,7 +267,10 @@ func (r *ProviderConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return nil
 			}
 
-			return []string{pc.Spec.CredentialsSecretRef.Name}
+			return []string{types.NamespacedName{
+				Name:      pc.Spec.CredentialsSecretRef.Name,
+				Namespace: pc.Spec.CredentialsSecretRef.Namespace,
+			}.String()}
 		},
 	)
 	return ctrl.NewControllerManagedBy(mgr).

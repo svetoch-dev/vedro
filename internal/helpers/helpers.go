@@ -119,10 +119,10 @@ func CreateOrUpdateOwned(
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		createErr := kubeClient.Create(ctx, obj)
-		if createErr != nil {
-			return createErr
-		}
+		return kubeClient.Create(
+			ctx,
+			obj,
+		)
 	}
 
 	yes, err := controllerutil.HasOwnerReference(
@@ -146,11 +146,13 @@ func CreateOrUpdateOwned(
 
 	}
 
-	updateErr := kubeClient.Update(ctx, obj)
-	if updateErr != nil {
-		return updateErr
-	}
-	return nil
+	return kubeClient.Patch(
+		ctx,
+		obj,
+		client.Apply,
+		client.FieldOwner(owner.GetName()),
+		client.ForceOwnership,
+	)
 }
 
 func GetSecretData(

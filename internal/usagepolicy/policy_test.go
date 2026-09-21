@@ -83,6 +83,61 @@ func TestCheckBucketAccess(t *testing.T) {
 	}
 }
 
+func TestCheckPrincipalAuth(t *testing.T) {
+	tests := []struct {
+		name       string
+		namespaces vedro.AllowedNamespacesSpec
+		namespace  string
+		allowed    bool
+	}{
+		{
+			name:       "listed namespace allowed",
+			namespaces: vedro.AllowedNamespacesSpec{Names: []string{"other", "team"}},
+			namespace:  "team",
+			allowed:    true,
+		},
+		{
+			name:       "unlisted namespace denied",
+			namespaces: vedro.AllowedNamespacesSpec{Names: []string{"team"}},
+			namespace:  "other",
+		},
+		{
+			name:       "namespace prefix does not match",
+			namespaces: vedro.AllowedNamespacesSpec{Names: []string{"team"}},
+			namespace:  "team-other",
+		},
+		{
+			name:      "empty namespace list denies",
+			namespace: "team",
+		},
+		{
+			name:       "all namespaces allowed",
+			namespaces: vedro.AllowedNamespacesSpec{All: true},
+			namespace:  "other",
+			allowed:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := vedro.UsagePolicySpec{AllowedNamespaces: tt.namespaces}
+			principalAuth := vedro.CloudPrincipalAuth{
+				ObjectMeta: metav1.ObjectMeta{Name: "auth", Namespace: tt.namespace},
+			}
+
+			got := CheckPrincipalAuth(policy, principalAuth)
+
+			checkDecision(t, got, tt.allowed)
+			if !tt.allowed {
+				want := "Namespace " + tt.namespace + " is not allowed by ProviderConfig usagePolicy"
+				if got.Message != want {
+					t.Errorf("Message = %q, want %q", got.Message, want)
+				}
+			}
+		})
+	}
+}
+
 func TestCheckBucket(t *testing.T) {
 	tests := []struct {
 		name    string

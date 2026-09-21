@@ -35,6 +35,16 @@ type FakePrincipalAPI struct {
 	GetErr      error
 	CreateErr   error
 	DeleteErr   error
+
+	GetAuthResult    *cloud.PrincipalAuthResult
+	CreateAuthResult *cloud.PrincipalAuthResult
+	GetAuthErr       error
+	CreateAuthErr    error
+	DeleteAuthErr    error
+
+	GetAuthInputs    []cloud.PrincipalAuthSetup
+	CreateAuthInputs []cloud.PrincipalAuthSetup
+	DeleteAuthInputs []cloud.PrincipalAuthSetup
 }
 
 func (f *FakePrincipalAPI) GetPrincipal(ctx context.Context, _ cloud.PrincipalSetup) (*cloud.PrincipalAttrs, error) {
@@ -66,17 +76,20 @@ func (f *FakePrincipalAPI) GetPrincipalAuth(
 	ctx context.Context,
 	principal cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
-	return nil, nil
+	f.GetAuthInputs = append(f.GetAuthInputs, principal)
+	return f.GetAuthResult, f.GetAuthErr
 }
 func (f *FakePrincipalAPI) CreatePrincipalAuth(
 	ctx context.Context,
 	principal cloud.PrincipalAuthSetup,
 ) (*cloud.PrincipalAuthResult, error) {
-	return nil, nil
+	f.CreateAuthInputs = append(f.CreateAuthInputs, principal)
+	return f.CreateAuthResult, f.CreateAuthErr
 }
 func (f *FakePrincipalAPI) DeletePrincipalAuth(
 	ctx context.Context,
 	principal cloud.PrincipalAuthSetup,
 ) error {
-	return nil
+	f.DeleteAuthInputs = append(f.DeleteAuthInputs, principal)
+	return f.DeleteAuthErr
 }

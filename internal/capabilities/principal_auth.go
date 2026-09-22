@@ -13,7 +13,7 @@ func ValidatePrincipalAuthCapabilities(
 	var unsupported []vedro.UnsupportedFeature
 
 	if spec.Method == vedro.AuthMethodStaticCredentials {
-		if caps.StaticCredentials == false {
+		if !caps.StaticCredentials {
 			unsupported = append(unsupported, unsupportedFeatures["MethodStaticCredentials"])
 		}
 
@@ -24,7 +24,7 @@ func ValidatePrincipalAuthCapabilities(
 	}
 
 	if spec.Method == vedro.AuthMethodWorkloadIdentity {
-		if caps.WorkloadIdentity == false {
+		if !caps.WorkloadIdentity {
 			unsupported = append(unsupported, unsupportedFeatures["MethodWorkloadIdentity"])
 		}
 

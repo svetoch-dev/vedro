@@ -255,7 +255,7 @@ func (r *ProviderConfigReconciler) findProviderConfigsOfSecret(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ProviderConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	mgr.GetFieldIndexer().IndexField(
+	err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&vedro.ProviderConfig{},
 		providerConfigSecretRefIndex,
@@ -273,6 +273,9 @@ func (r *ProviderConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}.String()}
 		},
 	)
+	if err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
 			&vedro.ProviderConfig{},

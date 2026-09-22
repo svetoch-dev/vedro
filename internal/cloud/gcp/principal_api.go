@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -166,7 +165,7 @@ func (p *gcpPrincipalAPI) GetPrincipalAuth(
 					APIVersion: "v1",
 					Kind:       "ServiceAccount",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      k8sServiceAccount.Name,
 					Namespace: k8sServiceAccount.Namespace,
 					Annotations: map[string]string{
@@ -177,7 +176,7 @@ func (p *gcpPrincipalAPI) GetPrincipalAuth(
 		}, nil
 
 	}
-	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
+	return nil, fmt.Errorf("method %s is not supported", principalAuth.Method)
 }
 
 func (p *gcpPrincipalAPI) CreatePrincipalAuth(
@@ -241,7 +240,7 @@ func (p *gcpPrincipalAPI) CreatePrincipalAuth(
 					APIVersion: "v1",
 					Kind:       "ServiceAccount",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      k8sServiceAccount.Name,
 					Namespace: k8sServiceAccount.Namespace,
 					Annotations: map[string]string{
@@ -253,7 +252,7 @@ func (p *gcpPrincipalAPI) CreatePrincipalAuth(
 
 	}
 
-	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
+	return nil, fmt.Errorf("method %s is not supported", principalAuth.Method)
 }
 
 func (p *gcpPrincipalAPI) DeletePrincipalAuth(
@@ -284,7 +283,7 @@ func (p *gcpPrincipalAPI) DeletePrincipalAuth(
 
 		return nil
 	}
-	return fmt.Errorf("Method %s is not supported", principalAuth.Method)
+	return fmt.Errorf("method %s is not supported", principalAuth.Method)
 }
 
 func (p *gcpPrincipalAPI) Close(ctx context.Context) error {

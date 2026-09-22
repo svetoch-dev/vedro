@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -436,7 +435,10 @@ func (r *CloudPrincipalAuthReconciler) reconcileServiceAccount(
 	err = r.Patch(
 		ctx,
 		serviceAccount,
-		client.Apply,
+		// we dont use r.Apply here because its hard to transform
+		// serviceAccount with unknown set of fields (various providers can set
+		// various fields) to ApplyConfiguration
+		client.Apply, //nolint:staticcheck
 		client.FieldOwner(principalAuth.Name),
 	)
 
@@ -525,7 +527,7 @@ func (r *CloudPrincipalAuthReconciler) ensureStaticCredentials(
 		}
 
 		secret := &corev1.Secret{
-			TypeMeta: v1.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Secret",
 				APIVersion: "v1",
 			},
@@ -818,7 +820,7 @@ func (r *CloudPrincipalAuthReconciler) deleteCloudPrincipalAuth(
 							APIVersion: "v1",
 							Kind:       "ServiceAccount",
 						},
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name:      applied.ServiceAccountRef.Name,
 							Namespace: applied.ServiceAccountRef.Namespace,
 						},
@@ -1004,7 +1006,7 @@ func (r *CloudPrincipalAuthReconciler) findCloudPrincipalAuthsOfProviderConfig(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *CloudPrincipalAuthReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	mgr.GetFieldIndexer().IndexField(
+	err := mgr.GetFieldIndexer().IndexField(
 		context.Background(),
 		&vedro.CloudPrincipalAuth{},
 		"spec.workloadIdentity.serviceAccountRef",
@@ -1019,6 +1021,9 @@ func (r *CloudPrincipalAuthReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			return []string{auth.Spec.WorkloadIdentity.ServiceAccountRef.Name}
 		},
 	)
+	if err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
 			&vedro.CloudPrincipalAuth{},

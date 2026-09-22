@@ -72,7 +72,7 @@ func (o *PrincipalAuth) DeleteAuthentication(
 ) error {
 	if principalAuth.Status.Applied == nil ||
 		principalAuth.Status.Applied.CredentialsId == "" {
-		return fmt.Errorf("No credentialsId in CloudPrincipalAuth.Status")
+		return fmt.Errorf("no credentialsId in CloudPrincipalAuth.Status")
 	}
 	authSetup := cloud.PrincipalAuthSetup{
 		Method:           principalAuth.Status.Applied.Method,

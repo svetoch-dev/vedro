@@ -11,7 +11,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 func BucketNameFromCR(bckt vedro.Bucket) string {
@@ -91,7 +91,7 @@ func RemoveAllOwnerRefs(
 		}
 
 		return fmt.Errorf(
-			"Error getting obj %s.%s", name.Namespace, name.Name,
+			"error getting obj %s.%s: %w", name.Namespace, name.Name, err,
 		)
 	}
 
@@ -99,7 +99,7 @@ func RemoveAllOwnerRefs(
 
 	if err := kubeClient.Update(ctx, obj); err != nil {
 		return fmt.Errorf(
-			"Error removing owner ref for obj %s.%s", name.Namespace, name.Name,
+			"error removing owner ref for obj %s.%s: %w", name.Namespace, name.Name, err,
 		)
 	}
 
@@ -125,14 +125,19 @@ func CreateOrUpdateOwned(
 		)
 	}
 
-	yes, err := controllerutil.HasOwnerReference(
-		existing.GetOwnerReferences(),
-		owner,
-		kubeClient.Scheme(),
-	)
-
+	gvk, err := apiutil.GVKForObject(owner, kubeClient.Scheme())
 	if err != nil {
 		return err
+	}
+	yes := false
+	for _, ref := range existing.GetOwnerReferences() {
+		if ref.APIVersion == gvk.GroupVersion().String() &&
+			ref.Kind == gvk.Kind &&
+			ref.Name == owner.GetName() &&
+			ref.UID == owner.GetUID() {
+			yes = true
+			break
+		}
 	}
 
 	if !yes {
@@ -149,7 +154,7 @@ func CreateOrUpdateOwned(
 	return kubeClient.Patch(
 		ctx,
 		obj,
-		client.Apply,
+		client.Apply, //nolint:staticcheck //We need this beacuase we want i generic obj api
 		client.FieldOwner(owner.GetName()),
 		client.ForceOwnership,
 	)

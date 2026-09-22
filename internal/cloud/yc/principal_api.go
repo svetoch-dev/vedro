@@ -289,7 +289,7 @@ func (p *ycPrincipalAPI) GetPrincipalAuth(
 			Method:        principalAuth.Method,
 		}, nil
 	}
-	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
+	return nil, fmt.Errorf("method %s is not supported", principalAuth.Method)
 }
 
 func (p *ycPrincipalAPI) CreatePrincipalAuth(
@@ -313,7 +313,7 @@ func (p *ycPrincipalAPI) CreatePrincipalAuth(
 		}, nil
 
 	}
-	return nil, fmt.Errorf("Method %s is not supported", principalAuth.Method)
+	return nil, fmt.Errorf("method %s is not supported", principalAuth.Method)
 }
 func (p *ycPrincipalAPI) DeletePrincipalAuth(
 	ctx context.Context,
@@ -322,7 +322,7 @@ func (p *ycPrincipalAPI) DeletePrincipalAuth(
 	if principalAuth.Method == vedro.AuthMethodStaticCredentials {
 		return deleteStaticS3AccessKey(ctx, p.sdk, principalAuth.CredentialsID)
 	}
-	return fmt.Errorf("Method %s is not supported", principalAuth.Method)
+	return fmt.Errorf("method %s is not supported", principalAuth.Method)
 }
 
 func (y *ycPrincipalAPI) Close(ctx context.Context) error {

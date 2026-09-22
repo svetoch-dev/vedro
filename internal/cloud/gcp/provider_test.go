@@ -8,17 +8,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
-	"github.com/svetoch-dev/vedro/internal/cloud"
-	cloudtest "github.com/svetoch-dev/vedro/internal/cloud/test"
 )
 
-type cleanupPrincipalAPI struct {
-	cloud.PrincipalAPI
-	closeCalled bool
+type fakeClients struct {
 	closeErr    error
+	closeCalled bool
 }
 
-func (f *cleanupPrincipalAPI) Close(context.Context) error {
+func (f *fakeClients) Close() error {
 	f.closeCalled = true
 	return f.closeErr
 }
@@ -26,21 +23,15 @@ func (f *cleanupPrincipalAPI) Close(context.Context) error {
 var _ = Describe("Provider.Cleanup", func() {
 	It("closes the principal API when closing the bucket API fails", func() {
 		bucketErr := errors.New("close bucket API")
-		principalErr := errors.New("close principal API")
-		bucketAPI := &cloudtest.FakeBucketAPI{CloseErr: bucketErr}
-		principalAPI := &cleanupPrincipalAPI{closeErr: principalErr}
+		clients := &fakeClients{closeErr: bucketErr}
 		provider := &Provider{
-			bucket:        &Bucket{api: bucketAPI},
-			principal:     &Principal{api: principalAPI},
-			principalAuth: &PrincipalAuth{api: principalAPI},
+			clients: clients,
 		}
 
 		err := provider.Cleanup(context.Background())
 
-		Expect(bucketAPI.CloseCalled).To(BeTrue())
-		Expect(principalAPI.closeCalled).To(BeTrue())
+		Expect(clients.closeCalled).To(BeTrue())
 		Expect(errors.Is(err, bucketErr)).To(BeTrue())
-		Expect(errors.Is(err, principalErr)).To(BeTrue())
 	})
 })
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 
 	"cloud.google.com/go/storage"
@@ -49,6 +50,7 @@ type Provider struct {
 	principal     *Principal
 	principalAuth *PrincipalAuth
 	bucketAccess  *BucketAccess
+	clients       io.Closer
 }
 
 func New(
@@ -62,7 +64,9 @@ func New(
 		return nil, err
 	}
 
-	p := &Provider{}
+	p := &Provider{
+		clients: clients,
+	}
 
 	gcsApi := &gcsAPI{
 		projectID: cfg.Spec.ProjectId,
@@ -236,10 +240,10 @@ func (p *Provider) Access() cloud.BucketAccessProvider {
 }
 
 func (p *Provider) Cleanup(ctx context.Context) error {
-	bucketCloseErr := p.bucket.api.Close(ctx)
-	principalCloseErr := p.principal.api.Close(ctx)
-	principalAuthCloseErr := p.principalAuth.api.Close(ctx)
-	return errors.Join(bucketCloseErr, principalCloseErr, principalAuthCloseErr)
+	if p.clients == nil {
+		return nil
+	}
+	return p.clients.Close()
 }
 
 func (p *Provider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {

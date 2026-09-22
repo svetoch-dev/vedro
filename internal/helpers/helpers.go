@@ -11,7 +11,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func BucketNameFromCR(bckt vedro.Bucket) string {
@@ -125,19 +125,14 @@ func CreateOrUpdateOwned(
 		)
 	}
 
-	gvk, err := apiutil.GVKForObject(owner, kubeClient.Scheme())
+	yes, err := controllerutil.HasOwnerReference(
+		existing.GetOwnerReferences(),
+		owner,
+		kubeClient.Scheme(),
+	)
+
 	if err != nil {
 		return err
-	}
-	yes := false
-	for _, ref := range existing.GetOwnerReferences() {
-		if ref.APIVersion == gvk.GroupVersion().String() &&
-			ref.Kind == gvk.Kind &&
-			ref.Name == owner.GetName() &&
-			ref.UID == owner.GetUID() {
-			yes = true
-			break
-		}
 	}
 
 	if !yes {

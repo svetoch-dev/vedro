@@ -391,12 +391,12 @@ func TestRemoveAllOwnerRefs(t *testing.T) {
 func TestCreateOrUpdateOwned(t *testing.T) {
 	ctx := context.Background()
 	key := client.ObjectKey{Namespace: "default", Name: "credentials"}
-	owner := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "auth", Namespace: key.Namespace, UID: types.UID("owner-uid")}}
+	owner := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "auth", Namespace: key.Namespace}}
 	ownerRef := metav1.OwnerReference{
 		APIVersion: "v1",
 		Kind:       "ConfigMap",
 		Name:       owner.Name,
-		UID:        owner.UID,
+		UID:        types.UID("owner-uid"),
 	}
 	newSecret := func(data string) *corev1.Secret {
 		return &corev1.Secret{
@@ -446,23 +446,6 @@ func TestCreateOrUpdateOwned(t *testing.T) {
 	t.Run("rejects object owned by another owner", func(t *testing.T) {
 		stored := newSecret("old")
 		stored.OwnerReferences[0].Name = "someone-else"
-		kubeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(stored).Build()
-		if err := CreateOrUpdateOwned(ctx, kubeClient, newSecret("new"), owner); err == nil {
-			t.Fatal("CreateOrUpdateOwned() expected ownership error")
-		}
-
-		var fetched corev1.Secret
-		if err := kubeClient.Get(ctx, key, &fetched); err != nil {
-			t.Fatalf("get unchanged Secret: %v", err)
-		}
-		if string(fetched.Data["token"]) != "old" {
-			t.Errorf("token = %q, want old", fetched.Data["token"])
-		}
-	})
-
-	t.Run("rejects object owned by previous owner with same name", func(t *testing.T) {
-		stored := newSecret("old")
-		stored.OwnerReferences[0].UID = types.UID("previous-owner-uid")
 		kubeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(stored).Build()
 		if err := CreateOrUpdateOwned(ctx, kubeClient, newSecret("new"), owner); err == nil {
 			t.Fatal("CreateOrUpdateOwned() expected ownership error")

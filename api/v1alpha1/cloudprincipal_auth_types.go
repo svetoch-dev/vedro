@@ -5,25 +5,35 @@ import (
 )
 
 const (
-	PrincipalAuthUnsupportedStaticCredentials     UnsupportedFeatureReason = "PrincipalAuthUnsupportedStaticCredentials"
-	PrincipalAuthUnsupportedWorkloadIdentity      UnsupportedFeatureReason = "PrincipalAuthUnsupportedWorkloadIdentity"
-	PrincipalAuthUnsupportedWorkloadIdentityKind  UnsupportedFeatureReason = "PrincipalAuthUnsupportedWorkloadIdentityKind"
+	// PrincipalAuthUnsupportedStaticCredentials indicates that the provider does not support static credentials.
+	PrincipalAuthUnsupportedStaticCredentials UnsupportedFeatureReason = "PrincipalAuthUnsupportedStaticCredentials"
+	// PrincipalAuthUnsupportedWorkloadIdentity indicates that the provider does not support workload identity.
+	PrincipalAuthUnsupportedWorkloadIdentity UnsupportedFeatureReason = "PrincipalAuthUnsupportedWorkloadIdentity"
+	// PrincipalAuthUnsupportedWorkloadIdentityKind indicates that workload identity is unavailable for this principal kind.
+	PrincipalAuthUnsupportedWorkloadIdentityKind UnsupportedFeatureReason = "PrincipalAuthUnsupportedWorkloadIdentityKind"
+	// PrincipalAuthUnsupportedStaticCredentialsKind indicates that static credentials are unavailable for this principal kind.
 	PrincipalAuthUnsupportedStaticCredentialsKind UnsupportedFeatureReason = "PrincipalAuthUnsupportedStaticCredentialsKind"
 )
 
+// AuthObjectReference identifies a Kubernetes object by name within the CloudPrincipalAuth namespace.
 type AuthObjectReference struct {
+	// Name is the name of the referenced Kubernetes object.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 }
 
+// NamespacedName identifies a Kubernetes object by name and namespace.
 type NamespacedName struct {
-	Name      string `json:"name"`
+	// Name is the name of the referenced Kubernetes object.
+	Name string `json:"name"`
+	// Namespace is the namespace of the referenced Kubernetes object.
 	Namespace string `json:"namespace"`
 }
 
+// StaticCredentialsSpec configures credentials stored in a Kubernetes Secret.
 type StaticCredentialsSpec struct {
-	// Creates a Kubernetes Secret which is specified in SecretRef and adds static credentials to it.
+	// SecretRef names the Kubernetes Secret in which static credentials are stored.
 	//
 	// Required when method is StaticCredentials.
 	// Usually empty when method is WorkloadIdentity.
@@ -38,9 +48,9 @@ type StaticCredentialsSpec struct {
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 }
 
+// WorkloadIdentitySpec configures authentication through a Kubernetes ServiceAccount.
 type WorkloadIdentitySpec struct {
-	// ServiceAccountRef references a Kubernetes ServiceAccount to which
-	// needed patch should be applied
+	// ServiceAccountRef names the Kubernetes ServiceAccount to configure for workload identity.
 	//
 	// Required when method is WorkloadIdentity.
 	// Usually empty when method is StaticCredentials.
@@ -55,42 +65,57 @@ type WorkloadIdentitySpec struct {
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 }
 
+// CloudPrincipalAuthSpec defines the desired authentication method for a CloudPrincipal.
 // +kubebuilder:validation:XValidation:rule="self.method != 'StaticCredentials' || (has(self.staticCredentials) && !has(self.workloadIdentity))",message="staticCredentials must be set and workloadIdentity must not be set when method is StaticCredentials"
 // +kubebuilder:validation:XValidation:rule="self.method != 'WorkloadIdentity' || (has(self.workloadIdentity) && !has(self.staticCredentials))",message="workloadIdentity must be set and staticCredentials must not be set when method is WorkloadIdentity"
 type CloudPrincipalAuthSpec struct {
 
-	// CloudPrincipal reference the cloud principal for whom to create
-	// auth material
+	// PrincipalRef references the CloudPrincipal for which authentication is configured.
 	//
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="principalRef is immutable"
 	PrincipalRef PrincipalReference `json:"principalRef"`
 
+	// Method selects the authentication method.
+	//
 	// +kubebuilder:validation:Enum=StaticCredentials;WorkloadIdentity
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="method is immutable"
 	Method AuthMethod `json:"method"`
 
+	// StaticCredentials configures the Secret used when Method is StaticCredentials.
+	//
 	// +optional
 	StaticCredentials *StaticCredentialsSpec `json:"staticCredentials,omitempty"`
 
+	// WorkloadIdentity configures the ServiceAccount used when Method is WorkloadIdentity.
+	//
 	// +optional
 	WorkloadIdentity *WorkloadIdentitySpec `json:"workloadIdentity,omitempty"`
 }
 
+// CloudPrincipalAuthProperties records the authentication resources created or configured by the controller.
 type CloudPrincipalAuthProperties struct {
+	// Method is the authentication method applied to the cloud principal.
 	Method AuthMethod `json:"method"`
 
+	// CredentialsId is the provider-side identifier of the credentials.
 	CredentialsId string `json:"credentialsId"`
-	PrincipalId   string `json:"principalId"`
+	// PrincipalId is the provider-side identifier of the cloud principal.
+	PrincipalId string `json:"principalId"`
 
+	// ServiceAccountRef identifies the configured Kubernetes ServiceAccount, if any.
+	//
 	// +optional
 	ServiceAccountRef *NamespacedName `json:"serviceAccountRef,omitempty"`
 
+	// SecretRef identifies the Kubernetes Secret containing static credentials, if any.
+	//
 	// +optional
 	SecretRef *NamespacedName `json:"secretRef,omitempty"`
 }
 
+// CloudPrincipalAuthStatus defines the observed state of a CloudPrincipalAuth.
 type CloudPrincipalAuthStatus struct {
-	// Applied - what has been already applied by this controller
+	// Applied records the authentication method and resources applied by the controller.
 	//
 	// +optional
 	Applied *CloudPrincipalAuthProperties `json:"applied,omitempty"`
@@ -102,11 +127,11 @@ type CloudPrincipalAuthStatus struct {
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Provider used for this CloudPrincipalAuth
+	// ObservedProvider is the ProviderConfig used for the last successful reconciliation.
 	//
 	// +optional
 	ObservedProvider string `json:"observedProvider,omitempty"`
-	// List of unsupported features set on CloudPrincipalAuth resource
+	// UnsupportedFeatures lists requested features that the selected provider does not support.
 	//
 	// +optional
 	UnsupportedFeatures []UnsupportedFeature `json:"unsupported,omitempty"`
@@ -124,10 +149,10 @@ type CloudPrincipalAuth struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec defines the desired state of the CloudPrincipal.
+	// Spec defines the desired state of the CloudPrincipalAuth.
 	Spec CloudPrincipalAuthSpec `json:"spec,omitempty"`
 
-	// Status defines the observed state of the CloudPrincipal.
+	// Status defines the observed state of the CloudPrincipalAuth.
 	//
 	// +optional
 	Status CloudPrincipalAuthStatus `json:"status,omitempty"`
@@ -135,11 +160,11 @@ type CloudPrincipalAuth struct {
 
 // +kubebuilder:object:root=true
 
-// CloudPrincipalList contains a list of CloudPrincipal resources.
+// CloudPrincipalAuthList contains a list of CloudPrincipalAuth resources.
 type CloudPrincipalAuthList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 
-	// Items contains the CloudPrincipal resources in this list.
+	// Items contains the CloudPrincipalAuth resources in this list.
 	Items []CloudPrincipalAuth `json:"items"`
 }

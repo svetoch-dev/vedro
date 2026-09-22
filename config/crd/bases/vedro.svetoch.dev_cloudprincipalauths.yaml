@@ -50,9 +50,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: Spec defines the desired state of the CloudPrincipal.
+            description: Spec defines the desired state of the CloudPrincipalAuth.
             properties:
               method:
+                description: Method selects the authentication method.
                 enum:
                 - StaticCredentials
                 - WorkloadIdentity
@@ -61,9 +62,8 @@ spec:
                 - message: method is immutable
                   rule: self == oldSelf
               principalRef:
-                description: |-
-                  CloudPrincipal reference the cloud principal for whom to create
-                  auth material
+                description: PrincipalRef references the CloudPrincipal for which
+                  authentication is configured.
                 properties:
                   name:
                     description: Name is the name of the CloudPrincipal.
@@ -81,6 +81,8 @@ spec:
                 - message: principalRef is immutable
                   rule: self == oldSelf
               staticCredentials:
+                description: StaticCredentials configures the Secret used when Method
+                  is StaticCredentials.
                 properties:
                   deletionPolicy:
                     default: Retain
@@ -93,12 +95,14 @@ spec:
                     type: string
                   secretRef:
                     description: |-
-                      Creates a Kubernetes Secret which is specified in SecretRef and adds static credentials to it.
+                      SecretRef names the Kubernetes Secret in which static credentials are stored.
 
                       Required when method is StaticCredentials.
                       Usually empty when method is WorkloadIdentity.
                     properties:
                       name:
+                        description: Name is the name of the referenced Kubernetes
+                          object.
                         minLength: 1
                         type: string
                         x-kubernetes-validations:
@@ -111,6 +115,8 @@ spec:
                 - secretRef
                 type: object
               workloadIdentity:
+                description: WorkloadIdentity configures the ServiceAccount used when
+                  Method is WorkloadIdentity.
                 properties:
                   deletionPolicy:
                     default: Retain
@@ -123,13 +129,14 @@ spec:
                     type: string
                   serviceAccountRef:
                     description: |-
-                      ServiceAccountRef references a Kubernetes ServiceAccount to which
-                      needed patch should be applied
+                      ServiceAccountRef names the Kubernetes ServiceAccount to configure for workload identity.
 
                       Required when method is WorkloadIdentity.
                       Usually empty when method is StaticCredentials.
                     properties:
                       name:
+                        description: Name is the name of the referenced Kubernetes
+                          object.
                         minLength: 1
                         type: string
                         x-kubernetes-validations:
@@ -155,32 +162,51 @@ spec:
               rule: self.method != 'WorkloadIdentity' || (has(self.workloadIdentity)
                 && !has(self.staticCredentials))
           status:
-            description: Status defines the observed state of the CloudPrincipal.
+            description: Status defines the observed state of the CloudPrincipalAuth.
             properties:
               applied:
-                description: Applied - what has been already applied by this controller
+                description: Applied records the authentication method and resources
+                  applied by the controller.
                 properties:
                   credentialsId:
+                    description: CredentialsId is the provider-side identifier of
+                      the credentials.
                     type: string
                   method:
+                    description: Method is the authentication method applied to the
+                      cloud principal.
                     type: string
                   principalId:
+                    description: PrincipalId is the provider-side identifier of the
+                      cloud principal.
                     type: string
                   secretRef:
+                    description: SecretRef identifies the Kubernetes Secret containing
+                      static credentials, if any.
                     properties:
                       name:
+                        description: Name is the name of the referenced Kubernetes
+                          object.
                         type: string
                       namespace:
+                        description: Namespace is the namespace of the referenced
+                          Kubernetes object.
                         type: string
                     required:
                     - name
                     - namespace
                     type: object
                   serviceAccountRef:
+                    description: ServiceAccountRef identifies the configured Kubernetes
+                      ServiceAccount, if any.
                     properties:
                       name:
+                        description: Name is the name of the referenced Kubernetes
+                          object.
                         type: string
                       namespace:
+                        description: Namespace is the namespace of the referenced
+                          Kubernetes object.
                         type: string
                     required:
                     - name
@@ -255,11 +281,12 @@ spec:
                 format: int64
                 type: integer
               observedProvider:
-                description: Provider used for this CloudPrincipalAuth
+                description: ObservedProvider is the ProviderConfig used for the last
+                  successful reconciliation.
                 type: string
               unsupported:
-                description: List of unsupported features set on CloudPrincipalAuth
-                  resource
+                description: UnsupportedFeatures lists requested features that the
+                  selected provider does not support.
                 items:
                   properties:
                     field:

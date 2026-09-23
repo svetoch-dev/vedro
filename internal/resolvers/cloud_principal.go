@@ -55,9 +55,21 @@ func (o *CloudPrincipalResolver) IsReferenced(
 		return false, err
 	}
 
+	var principalAuthList vedro.CloudPrincipalAuthList
+	if err := o.KubeClient.List(ctx, &principalAuthList); err != nil {
+		return false, err
+	}
+
 	for _, bucketAccess := range bucketAccessList.Items {
 		if bucketAccess.Spec.PrincipalRef.Name == o.Name &&
 			bucketAccess.Spec.PrincipalRef.Namespace == o.Namespace {
+			return true, nil
+		}
+	}
+
+	for _, principalAuth := range principalAuthList.Items {
+		if principalAuth.Spec.PrincipalRef.Name == o.Name &&
+			principalAuth.Spec.PrincipalRef.Namespace == o.Namespace {
 			return true, nil
 		}
 	}

@@ -8,7 +8,10 @@ import (
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func BucketNameFromCR(bckt vedro.Bucket) string {
@@ -74,6 +77,82 @@ func PrincipalNameForDelete(prncpl vedro.CloudPrincipal) string {
 		return PrincipalNameFromCR(prncpl)
 	}
 	return prncpl.Status.ExternalName
+}
+
+func RemoveAllOwnerRefs(
+	ctx context.Context,
+	kubeClient client.Client,
+	name types.NamespacedName,
+	obj client.Object,
+) error {
+	if err := kubeClient.Get(ctx, name, obj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return fmt.Errorf(
+			"error getting obj %s.%s: %w", name.Namespace, name.Name, err,
+		)
+	}
+
+	obj.SetOwnerReferences(nil)
+
+	if err := kubeClient.Update(ctx, obj); err != nil {
+		return fmt.Errorf(
+			"error removing owner ref for obj %s.%s: %w", name.Namespace, name.Name, err,
+		)
+	}
+
+	return nil
+}
+
+func CreateOrUpdateOwned(
+	ctx context.Context,
+	kubeClient client.Client,
+	obj client.Object,
+	owner client.Object,
+) error {
+	existing := obj.DeepCopyObject().(client.Object)
+	key := client.ObjectKeyFromObject(obj)
+	err := kubeClient.Get(ctx, key, existing)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		return kubeClient.Create(
+			ctx,
+			obj,
+		)
+	}
+
+	yes, err := controllerutil.HasOwnerReference(
+		existing.GetOwnerReferences(),
+		owner,
+		kubeClient.Scheme(),
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if !yes {
+		return fmt.Errorf(
+			"%s/%s is not owned by %s/%s",
+			obj.GetObjectKind().GroupVersionKind().Kind,
+			obj.GetName(),
+			owner.GetObjectKind().GroupVersionKind().Kind,
+			owner.GetName(),
+		)
+
+	}
+
+	return kubeClient.Patch(
+		ctx,
+		obj,
+		client.Apply, //nolint:staticcheck //We need this beacuase we want i generic obj api
+		client.FieldOwner(owner.GetName()),
+		client.ForceOwnership,
+	)
 }
 
 func GetSecretData(

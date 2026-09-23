@@ -21,14 +21,18 @@ import (
 	"reflect"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud/registry"
@@ -36,7 +40,10 @@ import (
 	"github.com/svetoch-dev/vedro/internal/resolvers"
 )
 
-const providerConfigFinalizer = "vedro.svetoch.dev/providerconfig-finalizer"
+const (
+	providerConfigFinalizer      = "vedro.svetoch.dev/providerconfig-finalizer"
+	providerConfigSecretRefIndex = "spec.credentialsSecretRef"
+)
 
 type ProviderConfigReconciler struct {
 	client.Client
@@ -209,11 +216,73 @@ func (r *ProviderConfigReconciler) patchStatus(
 	})
 }
 
+func (r *ProviderConfigReconciler) findProviderConfigsOfSecret(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return nil
+	}
+
+	var list vedro.ProviderConfigList
+	if err := r.List(
+		ctx,
+		&list,
+		client.MatchingFields{
+			providerConfigSecretRefIndex: types.NamespacedName{
+				Name: secret.Name, Namespace: secret.Namespace,
+			}.String(),
+		},
+	); err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "unable to list ProviderConfig objects")
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0, len(list.Items))
+
+	for _, obj := range list.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      obj.Name,
+				Namespace: obj.Namespace,
+			},
+		})
+	}
+
+	return requests
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *ProviderConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&vedro.ProviderConfig{},
+		providerConfigSecretRefIndex,
+		func(obj client.Object) []string {
+			pc := obj.(*vedro.ProviderConfig)
+
+			if pc.Spec.CredentialsSecretRef == nil ||
+				pc.Spec.CredentialsSecretRef.Name == "" {
+				return nil
+			}
+
+			return []string{types.NamespacedName{
+				Name:      pc.Spec.CredentialsSecretRef.Name,
+				Namespace: pc.Spec.CredentialsSecretRef.Namespace,
+			}.String()}
+		},
+	)
+	if err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
 			&vedro.ProviderConfig{},
+		).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.findProviderConfigsOfSecret),
 		).
 		Named("ProviderConfig").
 		Complete(r)

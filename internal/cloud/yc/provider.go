@@ -29,10 +29,11 @@ type sdkShutdowner interface {
 }
 
 type Provider struct {
-	bucket       *Bucket
-	principal    *Principal
-	bucketAccess *BucketAccess
-	sdk          sdkShutdowner
+	bucket        *Bucket
+	principal     *Principal
+	principalAuth *PrincipalAuth
+	bucketAccess  *BucketAccess
+	sdk           sdkShutdowner
 }
 
 func New(
@@ -65,6 +66,9 @@ func New(
 			api: ycsApi,
 		},
 		principal: &Principal{
+			api: ycPrincipalApi,
+		},
+		principalAuth: &PrincipalAuth{
 			api: ycPrincipalApi,
 		},
 		sdk: sdk,
@@ -158,6 +162,18 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 				vedro.PrincipalKindAllUsers:       true,
 			},
 		},
+		PrincipalAuth: cloud.PrincipalAuthCapabilities{
+			StaticCredentials: true,
+			// We need to remove workloadIdentity from yandex cloud
+			// provider capabilities because currently none of the
+			// yandex cloud sdks support accessing s3 bucket objects
+			// using iam token. Although you can perform read/write etc
+			// operations using raw rest api or grpc api calls.
+			WorkloadIdentity: false,
+			StaticCredentialsKinds: map[vedro.PrincipalKind]bool{
+				vedro.PrincipalKindServiceAccount: true,
+			},
+		},
 	}
 }
 
@@ -167,6 +183,10 @@ func (p *Provider) Bucket() cloud.BucketProvider {
 
 func (p *Provider) Principal() cloud.PrincipalProvider {
 	return p.principal
+}
+
+func (p *Provider) PrincipalAuth() cloud.PrincipalAuthProvider {
+	return p.principalAuth
 }
 
 func (p *Provider) Access() cloud.BucketAccessProvider {

@@ -56,7 +56,7 @@ type CloudPrincipalReconciler struct {
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=cloudprincipals,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=cloudprincipals/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=cloudprincipals/finalizers,verbs=update
-// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=providerconfigs,verbs=create;update;get;list;watch
+// +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=providerconfigs,verbs=get;list;watch
 
 func (r *CloudPrincipalReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -271,11 +271,11 @@ func (r *CloudPrincipalReconciler) deleteCloudPrincipal(
 	referenced, err := principal.IsReferenced(ctx)
 
 	if err != nil {
-		return ReconcileError(ctx, err, "Unable to list BucketAccess objects")
+		return ReconcileError(ctx, err, "Unable to list referenced objects")
 	}
 
 	if referenced {
-		return ReconcileAfter(ctx, time.Second*10, "CloudPrincipal is referenced by BucketAccess objects waiting for them to be deleted. Requeuing after 10s")
+		return ReconcileAfter(ctx, time.Second*10, "CloudPrincipal is referenced by other objects waiting for them to be deleted. Requeuing after 10s")
 	}
 
 	if principal.ShouldBeDeleted() {

@@ -8,6 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -300,6 +301,187 @@ func TestPatchTo(t *testing.T) {
 	})
 }
 
+func TestRemoveAllOwnerRefs(t *testing.T) {
+	ctx := context.Background()
+	key := types.NamespacedName{
+		Name:      "credentials",
+		Namespace: "default",
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.Name,
+			Namespace: key.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "vedro.svetoch.dev/v1alpha1",
+					Kind:       "CloudPrincipalAuth",
+					Name:       "auth",
+					UID:        types.UID("owner-uid"),
+				},
+			},
+		},
+		Data: map[string][]byte{"key": []byte("value")},
+	}
+
+	t.Run("removes owner refs", func(t *testing.T) {
+		kubeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(secret).Build()
+		err := RemoveAllOwnerRefs(
+			ctx,
+			kubeClient,
+			key,
+			&corev1.Secret{},
+		)
+		if err != nil {
+			t.Fatalf("RemoveAllOwnerRefs() error = %v", err)
+		}
+
+		var fetched corev1.Secret
+		if err := kubeClient.Get(ctx, key, &fetched); err != nil {
+			t.Fatalf("get updated Secret: %v", err)
+		}
+
+		if len(fetched.OwnerReferences) != 0 {
+			t.Errorf("OwnerReferences = %v, want empty", fetched.OwnerReferences)
+		}
+		if string(fetched.Data["key"]) != "value" {
+			t.Errorf("Secret data was unexpectedly changed. %s", string(fetched.Data["key"]))
+		}
+	})
+	t.Run("ignores missing objects", func(t *testing.T) {
+		kubeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+		err := RemoveAllOwnerRefs(
+			ctx,
+			kubeClient,
+			key,
+			&corev1.Secret{},
+		)
+		if err != nil {
+			t.Fatalf("RemoveAllOwnerRefs() error = %v, want nil", err)
+		}
+	})
+	t.Run("returns get error", func(t *testing.T) {
+		kubeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(secret).Build()
+		failingClient := failingClient{
+			Client: kubeClient,
+			getErr: errAlwaysFail,
+		}
+
+		err := RemoveAllOwnerRefs(
+			ctx,
+			&failingClient,
+			key,
+			&corev1.Secret{},
+		)
+
+		if !errors.Is(err, errAlwaysFail) {
+			t.Errorf("RemoveAllOwnerRefs() error = %v, want %v", err, errAlwaysFail)
+		}
+	})
+	t.Run("returns update error", func(t *testing.T) {
+		kubeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(secret).Build()
+		failingClient := failingClient{Client: kubeClient, updateErr: errAlwaysFail}
+		err := RemoveAllOwnerRefs(ctx, &failingClient, key, &corev1.Secret{})
+		if !errors.Is(err, errAlwaysFail) {
+			t.Errorf("RemoveAllOwnerRefs() error = %v, want %v", err, errAlwaysFail)
+		}
+	})
+}
+
+func TestCreateOrUpdateOwned(t *testing.T) {
+	ctx := context.Background()
+	key := client.ObjectKey{Namespace: "default", Name: "credentials"}
+	owner := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "auth", Namespace: key.Namespace}}
+	ownerRef := metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+		Name:       owner.Name,
+		UID:        types.UID("owner-uid"),
+	}
+	newSecret := func(data string) *corev1.Secret {
+		return &corev1.Secret{
+			TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            key.Name,
+				Namespace:       key.Namespace,
+				OwnerReferences: []metav1.OwnerReference{ownerRef},
+			},
+			Data: map[string][]byte{"token": []byte(data)},
+		}
+	}
+
+	t.Run("creates missing object", func(t *testing.T) {
+		kubeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+		if err := CreateOrUpdateOwned(ctx, kubeClient, newSecret("new"), owner); err != nil {
+			t.Fatalf("CreateOrUpdateOwned() error = %v", err)
+		}
+
+		var stored corev1.Secret
+		if err := kubeClient.Get(ctx, key, &stored); err != nil {
+			t.Fatalf("get created Secret: %v", err)
+		}
+		if string(stored.Data["token"]) != "new" {
+			t.Errorf("created token = %q, want new", stored.Data["token"])
+		}
+		if len(stored.OwnerReferences) != 1 || stored.OwnerReferences[0] != ownerRef {
+			t.Errorf("created owner references = %v, want %v", stored.OwnerReferences, ownerRef)
+		}
+	})
+
+	t.Run("patches object owned by caller", func(t *testing.T) {
+		kubeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(newSecret("old")).Build()
+		if err := CreateOrUpdateOwned(ctx, kubeClient, newSecret("new"), owner); err != nil {
+			t.Fatalf("CreateOrUpdateOwned() error = %v", err)
+		}
+
+		var stored corev1.Secret
+		if err := kubeClient.Get(ctx, key, &stored); err != nil {
+			t.Fatalf("get patched Secret: %v", err)
+		}
+		if string(stored.Data["token"]) != "new" {
+			t.Errorf("patched token = %q, want new", stored.Data["token"])
+		}
+	})
+
+	t.Run("rejects object owned by another owner", func(t *testing.T) {
+		stored := newSecret("old")
+		stored.OwnerReferences[0].Name = "someone-else"
+		kubeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(stored).Build()
+		if err := CreateOrUpdateOwned(ctx, kubeClient, newSecret("new"), owner); err == nil {
+			t.Fatal("CreateOrUpdateOwned() expected ownership error")
+		}
+
+		var fetched corev1.Secret
+		if err := kubeClient.Get(ctx, key, &fetched); err != nil {
+			t.Fatalf("get unchanged Secret: %v", err)
+		}
+		if string(fetched.Data["token"]) != "old" {
+			t.Errorf("token = %q, want old", fetched.Data["token"])
+		}
+	})
+
+	t.Run("returns get error", func(t *testing.T) {
+		kubeClient := &failingClient{Client: fake.NewClientBuilder().WithScheme(scheme.Scheme).Build(), getErr: errAlwaysFail}
+		if err := CreateOrUpdateOwned(ctx, kubeClient, newSecret("new"), owner); !errors.Is(err, errAlwaysFail) {
+			t.Errorf("CreateOrUpdateOwned() error = %v, want %v", err, errAlwaysFail)
+		}
+	})
+
+	t.Run("returns create error", func(t *testing.T) {
+		kubeClient := &failingClient{Client: fake.NewClientBuilder().WithScheme(scheme.Scheme).Build(), createErr: errAlwaysFail}
+		if err := CreateOrUpdateOwned(ctx, kubeClient, newSecret("new"), owner); !errors.Is(err, errAlwaysFail) {
+			t.Errorf("CreateOrUpdateOwned() error = %v, want %v", err, errAlwaysFail)
+		}
+	})
+
+	t.Run("returns patch error", func(t *testing.T) {
+		kubeClient := &failingClient{Client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(newSecret("old")).Build(), patchErr: errAlwaysFail}
+		if err := CreateOrUpdateOwned(ctx, kubeClient, newSecret("new"), owner); !errors.Is(err, errAlwaysFail) {
+			t.Errorf("CreateOrUpdateOwned() error = %v, want %v", err, errAlwaysFail)
+		}
+	})
+}
+
 func TestGetSecretData(t *testing.T) {
 	ctx := context.Background()
 
@@ -390,16 +572,48 @@ var errAlwaysFail = errors.New("always fail")
 
 type failingClient struct {
 	client.Client
+	getErr    error
+	createErr error
+	updateErr error
+	patchErr  error
 }
 
 func (f *failingClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	return errAlwaysFail
+	if f.getErr != nil {
+		return f.getErr
+	}
+	return f.Client.Get(ctx, key, obj, opts...)
+}
+
+func (f *failingClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if f.createErr != nil {
+		return f.createErr
+	}
+	return f.Client.Create(ctx, obj, opts...)
+}
+
+func (f *failingClient) Update(
+	ctx context.Context,
+	obj client.Object,
+	opts ...client.UpdateOption,
+) error {
+	if f.updateErr != nil {
+		return f.updateErr
+	}
+	return f.Client.Update(ctx, obj, opts...)
+}
+
+func (f *failingClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+	if f.patchErr != nil {
+		return f.patchErr
+	}
+	return f.Client.Patch(ctx, obj, patch, opts...)
 }
 
 func TestGetSecretDataClientError(t *testing.T) {
 	ctx := context.Background()
 
-	_, err := GetSecretData(ctx, &failingClient{}, corev1.SecretReference{
+	_, err := GetSecretData(ctx, &failingClient{getErr: errAlwaysFail}, corev1.SecretReference{
 		Name: "my-secret",
 	})
 

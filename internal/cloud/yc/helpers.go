@@ -11,10 +11,9 @@ import (
 	awssdkconfig "github.com/aws/aws-sdk-go-v2/config"
 	awssdkcreds "github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/svetoch-dev/vedro/internal/cloud"
 	awscompatibility "github.com/yandex-cloud/go-genproto/yandex/cloud/iam/v1/awscompatibility"
 	ycsdk "github.com/yandex-cloud/go-sdk/v2"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -136,7 +135,7 @@ func deleteStaticS3AccessKey(
 		AccessKeyId: keyId,
 	})
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
+		if isNotFound(err) {
 			return nil
 		}
 		return fmt.Errorf("delete yc static access key %q: %w", keyId, err)
@@ -144,4 +143,32 @@ func deleteStaticS3AccessKey(
 
 	return nil
 
+}
+
+func getStaticS3AccessKey(
+	ctx context.Context,
+	sdk *ycsdk.SDK,
+	keyId string,
+) (*staticS3AccessKey, error) {
+	conn, err := sdk.GetConnection(ctx, accessKeyCreateMethod)
+	if err != nil {
+		return nil, fmt.Errorf("get yc iam awscompatibility connection: %w", err)
+	}
+	client := awscompatibility.NewAccessKeyServiceClient(conn)
+
+	key, err := client.Get(ctx, &awscompatibility.GetAccessKeyRequest{
+		AccessKeyId: keyId,
+	})
+
+	if err != nil {
+		if isNotFound(err) {
+			return nil, cloud.ErrAuthNotFound
+		}
+		return nil, fmt.Errorf("get access key: %w", err)
+	}
+
+	return &staticS3AccessKey{
+		accessKeyID: key.GetKeyId(),
+		id:          key.GetId(),
+	}, nil
 }

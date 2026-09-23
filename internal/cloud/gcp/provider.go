@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 
 	"cloud.google.com/go/storage"
@@ -15,6 +16,7 @@ import (
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"github.com/svetoch-dev/vedro/internal/helpers"
 	"github.com/svetoch-dev/vedro/internal/validation"
+	iam "google.golang.org/api/iam/v1"
 )
 
 const (
@@ -24,14 +26,31 @@ const (
 var gcpProjectIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
 
 type gcpClients struct {
-	storage *storage.Client
-	iam     *admin.IamClient
+	storage    *storage.Client
+	iamAdmin   *admin.IamClient
+	iamService *iam.Service
+}
+
+func (o *gcpClients) Close() error {
+	var storageCloseErr error
+	var iamAdminCloseErr error
+	if o.storage != nil {
+		storageCloseErr = o.storage.Close()
+	}
+
+	if o.iamAdmin != nil {
+		iamAdminCloseErr = o.iamAdmin.Close()
+	}
+
+	return errors.Join(storageCloseErr, iamAdminCloseErr)
 }
 
 type Provider struct {
-	bucket       *Bucket
-	principal    *Principal
-	bucketAccess *BucketAccess
+	bucket        *Bucket
+	principal     *Principal
+	principalAuth *PrincipalAuth
+	bucketAccess  *BucketAccess
+	clients       io.Closer
 }
 
 func New(
@@ -45,7 +64,9 @@ func New(
 		return nil, err
 	}
 
-	p := &Provider{}
+	p := &Provider{
+		clients: clients,
+	}
 
 	gcsApi := &gcsAPI{
 		projectID: cfg.Spec.ProjectId,
@@ -59,10 +80,18 @@ func New(
 	p.bucketAccess = &BucketAccess{
 		api: gcsApi,
 	}
+
 	p.principal = &Principal{
 		api: &gcpPrincipalAPI{
 			projectID: cfg.Spec.ProjectId,
-			client:    clients.iam,
+			clients:   clients,
+		},
+	}
+
+	p.principalAuth = &PrincipalAuth{
+		api: &gcpPrincipalAPI{
+			projectID: cfg.Spec.ProjectId,
+			clients:   clients,
 		},
 	}
 
@@ -80,17 +109,27 @@ func newClient(
 		if err != nil {
 			return nil, fmt.Errorf("WorkloadIdentity: error getting storage client %w", err)
 		}
-		iamClient, err := admin.NewIamClient(ctx)
+		iamAdminClient, err := admin.NewIamClient(ctx)
 		if err != nil {
 			return nil, errors.Join(
 				storageClient.Close(),
-				fmt.Errorf("WorkloadIdentity: error getting iam client %w", err),
+				fmt.Errorf("WorkloadIdentity: error getting iam admin client %w", err),
+			)
+		}
+
+		iamServiceClient, err := iam.NewService(ctx)
+		if err != nil {
+			return nil, errors.Join(
+				storageClient.Close(),
+				iamAdminClient.Close(),
+				fmt.Errorf("WorkloadIdentity: error getting iam service client %w", err),
 			)
 		}
 
 		return &gcpClients{
-			storage: storageClient,
-			iam:     iamClient,
+			storage:    storageClient,
+			iamAdmin:   iamAdminClient,
+			iamService: iamServiceClient,
 		}, nil
 
 	case vedro.AuthMethodStaticCredentials:
@@ -106,22 +145,32 @@ func newClient(
 		}
 
 		credentials := option.WithAuthCredentialsJSON(option.ServiceAccount, data[gcpCredentialsSecretKey])
+
 		storageClient, err := storage.NewClient(ctx, credentials)
 		if err != nil {
 			return nil, fmt.Errorf("StaticCredentials: error getting storage client %w", err)
 		}
-		iamClient, err := admin.NewIamClient(ctx, credentials)
-		if err != nil {
 
+		iamAdminClient, err := admin.NewIamClient(ctx, credentials)
+		if err != nil {
 			return nil, errors.Join(
 				storageClient.Close(),
-				fmt.Errorf("StaticCredentials: error getting iam client %w", err),
+				fmt.Errorf("StaticCredentials: error getting iam admin client %w", err),
 			)
 		}
 
+		iamServiceClient, err := iam.NewService(ctx, credentials)
+		if err != nil {
+			return nil, errors.Join(
+				storageClient.Close(),
+				iamAdminClient.Close(),
+				fmt.Errorf("StaticCredentials: error getting iam service client %w", err),
+			)
+		}
 		return &gcpClients{
-			storage: storageClient,
-			iam:     iamClient,
+			storage:    storageClient,
+			iamAdmin:   iamAdminClient,
+			iamService: iamServiceClient,
 		}, nil
 
 	default:
@@ -161,6 +210,16 @@ func (p *Provider) Capabilities() cloud.Capabilities {
 				vedro.PrincipalKindAllUsers:       true,
 			},
 		},
+		PrincipalAuth: cloud.PrincipalAuthCapabilities{
+			StaticCredentials: true,
+			WorkloadIdentity:  true,
+			WorkloadIdentityKinds: map[vedro.PrincipalKind]bool{
+				vedro.PrincipalKindServiceAccount: true,
+			},
+			StaticCredentialsKinds: map[vedro.PrincipalKind]bool{
+				vedro.PrincipalKindServiceAccount: true,
+			},
+		},
 	}
 }
 
@@ -172,14 +231,19 @@ func (p *Provider) Principal() cloud.PrincipalProvider {
 	return p.principal
 }
 
+func (p *Provider) PrincipalAuth() cloud.PrincipalAuthProvider {
+	return p.principalAuth
+}
+
 func (p *Provider) Access() cloud.BucketAccessProvider {
 	return p.bucketAccess
 }
 
 func (p *Provider) Cleanup(ctx context.Context) error {
-	bucketCloseErr := p.bucket.api.Close(ctx)
-	principalCloseErr := p.principal.api.Close(ctx)
-	return errors.Join(bucketCloseErr, principalCloseErr)
+	if p.clients == nil {
+		return nil
+	}
+	return p.clients.Close()
 }
 
 func (p *Provider) ValidateProviderConfigSpec(cfg vedro.ProviderConfig) validation.ValidationResult {

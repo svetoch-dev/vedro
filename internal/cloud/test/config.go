@@ -41,4 +41,12 @@ type Config struct {
 	// fake API. Implemented inside each provider's package so it can reach
 	// unexported fields.
 	NewPrincipal func(api cloud.PrincipalAPI) cloud.PrincipalProvider
+
+	// NewPrincipalAuth wires the provider's cloud.PrincipalAuthProvider to the
+	// supplied fake API. Implemented inside each provider's package so it can
+	// reach unexported fields.
+	NewPrincipalAuth func(api cloud.PrincipalAPI) cloud.PrincipalAuthProvider
+
+	// SupportsWorkloadIdentity enables the shared workload identity setup spec.
+	SupportsWorkloadIdentity bool
 }

@@ -45,6 +45,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProviderConfigList{},
 		&CloudPrincipal{},
 		&CloudPrincipalList{},
+		&CloudPrincipalAuth{},
+		&CloudPrincipalAuthList{},
 		&BucketAccess{},
 		&BucketAccessList{},
 	)

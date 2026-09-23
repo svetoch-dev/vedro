@@ -15,6 +15,12 @@ const (
 
 	// TypeCloudPrincipalReady indicates whether a CloudPrincipal dependency is ready for use.
 	TypeCloudPrincipalReady = "CloudPrincipalReady"
+
+	// TypeStaticCredentialsConfigured indicates status of StaticCredentials of CloudPrincipalAuth
+	TypeStaticCredentialsConfigured = "StaticCredentialsConfigured"
+
+	// TypeWorkloadIdentityConfigured indicates status of WorkloadIdentity of CloudPrincipalAuth
+	TypeWorkloadIdentityConfigured = "WorkloadIdentityConfigured"
 )
 
 // Generic condition reasons
@@ -50,6 +56,29 @@ const (
 	ReasonCloudPrincipalEnsureError          = "CloudPrincipalEnsureError"
 	ReasonCloudPrincipalReconciled           = "Reconciled"
 	ReasonCloudPrincipalReady                = "CloudPrincipalReady"
+	ReasonCloudPrincipalIsNotManaged         = "CloudPrincipalIsNotManaged"
+)
+
+// Condition reasons for CloudPrincipalAuth resources.
+const (
+	ReasonCloudPrincipalAuthNotFound              = "CloudPrincipalAuthNotFound"
+	ReasonCloudPrincipalAuthGetFailed             = "CloudPrincipalAuthGetFailed"
+	ReasonCloudPrincipalAuthInvalidSpec           = "CloudPrincipalAuthInvalidSpec"
+	ReasonCloudPrincipalAuthDeleteError           = "CloudPrincipalAuthDeleteError"
+	ReasonCloudPrincipalAuthSpecRestricted        = "CloudPrincipalAuthSpecRestricted"
+	ReasonCloudPrincipalAuthRemoveFinalizerError  = "CloudPrincipalAuthRemoveFinalizerError"
+	ReasonCloudPrincipalAuthUnsupportedFeatures   = "CloudPrincipalAuthUnsupportedFeatures"
+	ReasonCloudPrincipalAuthEnsureError           = "CloudPrincipalAuthEnsureError"
+	ReasonCloudPrincipalAuthError                 = "CloudPrincipalAuthError"
+	ReasonCloudPrincipalAuthDependencyNotReady    = "CloudPrincipalAuthDependencyNotReady"
+	ReasonCloudPrincipalAuthReconciled            = "Reconciled"
+	ReasonCloudPrincipalAuthReady                 = "CloudPrincipalAuthReady"
+	ReasonCloudPrincipalAuthCredentialsEnsured    = "CloudPrincipalCredentialsEnsured"
+	ReasonCloudPrincipalAuthCredentialsNotEnsured = "CloudPrincipalCredentialsNotEnsured"
+	ReasonStaticCredentialsError                  = "StaticCredentialsError"
+	ReasonStaticCredentialsReconciled             = "StaticCredentialsReconciled"
+	ReasonWorkloadIdentityError                   = "WorkloadIdentityError"
+	ReasonWorkloadIdentityReconciled              = "WorkloadIdentityReconciled"
 )
 
 // Condition reasons for ProviderConfig resources.

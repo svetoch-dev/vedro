@@ -9,14 +9,29 @@ rules:
   resources:
   - secrets
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - vedro.svetoch.dev
   resources:
   - bucketaccesses
   - buckets
+  - cloudprincipalauths
   - cloudprincipals
   - providerconfigs
   verbs:
@@ -32,6 +47,7 @@ rules:
   resources:
   - bucketaccesses/finalizers
   - buckets/finalizers
+  - cloudprincipalauths/finalizers
   - cloudprincipals/finalizers
   - providerconfigs/finalizers
   verbs:
@@ -41,6 +57,7 @@ rules:
   resources:
   - bucketaccesses/status
   - buckets/status
+  - cloudprincipalauths/status
   - cloudprincipals/status
   - providerconfigs/status
   verbs:

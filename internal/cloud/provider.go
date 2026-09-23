@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	corev1 "k8s.io/api/core/v1"
+
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/validation"
 )
@@ -12,11 +14,13 @@ var (
 	ErrBucketNotFound       = errors.New("bucket not found")
 	ErrBucketObjectNotFound = errors.New("bucket object not found")
 	ErrPrincipalNotFound    = errors.New("principal not found")
+	ErrAuthNotFound         = errors.New("authentication material not found")
 )
 
 type Provider interface {
 	Bucket() BucketProvider
 	Principal() PrincipalProvider
+	PrincipalAuth() PrincipalAuthProvider
 	Access() BucketAccessProvider
 	Capabilities() Capabilities
 	Cleanup(ctx context.Context) error
@@ -24,9 +28,17 @@ type Provider interface {
 }
 
 type Capabilities struct {
-	Bucket       BucketCapabilities
-	BucketAccess BucketAccessCapabilities
-	Principal    PrincipalCapabilities
+	Bucket        BucketCapabilities
+	BucketAccess  BucketAccessCapabilities
+	Principal     PrincipalCapabilities
+	PrincipalAuth PrincipalAuthCapabilities
+}
+
+type PrincipalAuthCapabilities struct {
+	StaticCredentials      bool
+	WorkloadIdentity       bool
+	WorkloadIdentityKinds  map[vedro.PrincipalKind]bool
+	StaticCredentialsKinds map[vedro.PrincipalKind]bool
 }
 
 type PrincipalCapabilities struct {
@@ -73,6 +85,20 @@ type BucketAttrs struct {
 }
 
 type BucketAccessAttrs vedro.BucketAccessProperties
+
+type PrincipalAuthResult struct {
+	CredentialsID       string
+	ServiceAccountPatch *corev1.ServiceAccount
+	SecretData          map[string][]byte
+	Method              vedro.AuthMethod
+}
+
+type PrincipalAuthSetup struct {
+	Method            vedro.AuthMethod
+	ServiceAccountID  string
+	CredentialsID     string
+	K8sServiceAccount *vedro.NamespacedName
+}
 
 type PrincipalAttrs struct {
 	Name   string
@@ -158,6 +184,9 @@ type PrincipalAPI interface {
 	GetPrincipal(ctx context.Context, principal PrincipalSetup) (*PrincipalAttrs, error)
 	CreatePrincipal(ctx context.Context, principal PrincipalSetup) (*PrincipalAttrs, error)
 	DeletePrincipal(ctx context.Context, principal PrincipalSetup) error
+	GetPrincipalAuth(ctx context.Context, principalAuth PrincipalAuthSetup) (*PrincipalAuthResult, error)
+	CreatePrincipalAuth(ctx context.Context, principal PrincipalAuthSetup) (*PrincipalAuthResult, error)
+	DeletePrincipalAuth(ctx context.Context, principal PrincipalAuthSetup) error
 	Close(ctx context.Context) error
 }
 
@@ -196,5 +225,18 @@ type PrincipalProvider interface {
 	DeletePrincipal(
 		ctx context.Context,
 		principal vedro.CloudPrincipal,
+	) error
+}
+
+type PrincipalAuthProvider interface {
+	EnsureAuthentication(
+		ctx context.Context,
+		principalAuth vedro.CloudPrincipalAuth,
+		principal vedro.CloudPrincipal,
+	) (*PrincipalAuthResult, error)
+
+	DeleteAuthentication(
+		ctx context.Context,
+		principalAuth vedro.CloudPrincipalAuth,
 	) error
 }

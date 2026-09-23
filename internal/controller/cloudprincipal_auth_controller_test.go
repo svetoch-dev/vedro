@@ -51,8 +51,9 @@ var _ = Describe("CloudPrincipalAuthReconciler", func() {
 			principalAuth: principalAuth,
 		}
 		reconciler = &CloudPrincipalAuthReconciler{
-			Client: k8sClient,
-			Scheme: k8sClient.Scheme(),
+			Client:    k8sClient,
+			APIReader: k8sClient,
+			Scheme:    k8sClient.Scheme(),
 			ProviderFactory: func(
 				context.Context,
 				vedro.ProviderConfig,

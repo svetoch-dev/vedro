@@ -90,3 +90,21 @@ spec:
     namespace: vedro-system
   access:
     level: ObjectReader
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: CloudPrincipalAuth
+metadata:
+  labels:
+    app.kubernetes.io/name: vedro
+    app.kubernetes.io/managed-by: kustomize
+  name: principal-auth-sample-yc
+  namespace: vedro-system
+spec:
+  principalRef:
+    name: principal-sample-yc
+    namespace: vedro-system
+  method: StaticCredentials
+  staticCredentials:
+    secretRef:
+      name: super-secret-yc
+    deletionPolicy: Delete

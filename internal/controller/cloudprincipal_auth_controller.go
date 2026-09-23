@@ -57,6 +57,9 @@ type CloudPrincipalAuthReconciler struct {
 	Scheme *runtime.Scheme
 	// Needed abstraction for tests
 	ProviderFactory ProviderFactory
+	// This reader gets objects directly from
+	// k8s api bypassing cache
+	APIReader client.Reader
 }
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -69,7 +72,7 @@ type CloudPrincipalAuthReconciler struct {
 func (r *CloudPrincipalAuthReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	principalAuth := resolvers.CloudPrincipalAuthResolver{
-		KubeClient: r.Client,
+		KubeClient: r.APIReader,
 		Logger:     logger,
 	}
 
@@ -472,20 +475,18 @@ func (r *CloudPrincipalAuthReconciler) ensureStaticCredentials(
 	logger := log.FromContext(ctx)
 
 	patchCredentialsStatus := func(
-		ctx context.Context,
 		configured metav1.Condition,
-		pa *resolvers.CloudPrincipalAuthResolver,
 	) error {
-		return r.patchStatus(ctx, req, pa.Generation,
+		return r.patchStatus(ctx, req, principalAuth.Generation,
 			func(p *vedro.CloudPrincipalAuth) {
-				p.Status.UnsupportedFeatures = pa.Status.UnsupportedFeatures
-				p.Status.Applied = pa.Status.Applied
+				p.Status.UnsupportedFeatures = principalAuth.Status.UnsupportedFeatures
+				p.Status.Applied = principalAuth.Status.Applied
 				p.Status.ObservedProvider = principal.Spec.ProviderRef.Name
 
 				for _, c := range []metav1.Condition{
 					configured,
 					providerConfig.Condition,
-					pa.Condition,
+					principalAuth.Condition,
 					principal.Condition,
 				} {
 					meta.SetStatusCondition(&p.Status.Conditions, c)
@@ -495,17 +496,15 @@ func (r *CloudPrincipalAuthReconciler) ensureStaticCredentials(
 	}
 
 	cloudCredsDeleter := func(
-		ctx context.Context,
 		configured metav1.Condition,
-		pa *resolvers.CloudPrincipalAuthResolver,
 		message string,
 	) (ctrl.Result, error) {
-		deleteErr := provider.PrincipalAuth().DeleteAuthentication(ctx, pa.CloudPrincipalAuth)
+		deleteErr := provider.PrincipalAuth().DeleteAuthentication(ctx, principalAuth.CloudPrincipalAuth)
 		if deleteErr != nil {
 			principalAuth.Condition.Status = metav1.ConditionFalse
 			principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthDeleteError
 			principalAuth.Condition.Message = deleteErr.Error()
-			patchErr := patchCredentialsStatus(ctx, configured, pa)
+			patchErr := patchCredentialsStatus(configured)
 			if patchErr != nil {
 				return ReconcileError(ctx, patchErr, "patch error")
 			}
@@ -551,7 +550,7 @@ func (r *CloudPrincipalAuthReconciler) ensureStaticCredentials(
 	configured.ObservedGeneration = principalAuth.Generation
 
 	if principalAuth.Status.Applied.SecretRef == nil {
-		return cloudCredsDeleter(ctx, *configured, principalAuth, "No applied secret ref.")
+		return cloudCredsDeleter(*configured, "No applied secret ref.")
 	}
 
 	var secret corev1.Secret
@@ -570,25 +569,25 @@ func (r *CloudPrincipalAuthReconciler) ensureStaticCredentials(
 			principalAuth.Condition.Status = metav1.ConditionFalse
 			principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthError
 			principalAuth.Condition.Message = err.Error()
-			patchErr := patchCredentialsStatus(ctx, *configured, principalAuth)
+			patchErr := patchCredentialsStatus(*configured)
 			if patchErr != nil {
 				return ReconcileError(ctx, patchErr, "patch error")
 			}
 			return ReconcileError(ctx, err, "Could not get Applied secret")
 		}
 
-		return cloudCredsDeleter(ctx, *configured, principalAuth, "No secret found.")
+		return cloudCredsDeleter(*configured, "No secret found.")
 	}
 
 	if len(secret.Data) == 0 {
-		return cloudCredsDeleter(ctx, *configured, principalAuth, "No data in secret.")
+		return cloudCredsDeleter(*configured, "No data in secret.")
 	}
 
 	principalAuth.Condition.Status = metav1.ConditionTrue
 	principalAuth.Condition.Reason = conditions.ReasonCloudPrincipalAuthReconciled
 	principalAuth.Condition.Message = "CloudPrincipalAuth Reconciled"
 
-	patchErr := patchCredentialsStatus(ctx, *configured, principalAuth)
+	patchErr := patchCredentialsStatus(*configured)
 	if patchErr != nil {
 		return ReconcileError(ctx, patchErr, "patch error")
 	}
@@ -602,14 +601,10 @@ func (r *CloudPrincipalAuthReconciler) reconcileSecret(
 	secret *corev1.Secret,
 	principalAuth *resolvers.CloudPrincipalAuthResolver,
 	patcher func(
-		ctx context.Context,
 		configuredCondition metav1.Condition,
-		pa *resolvers.CloudPrincipalAuthResolver,
 	) error,
 	cloudCredsDeleter func(
-		ctx context.Context,
 		configuredCondition metav1.Condition,
-		pa *resolvers.CloudPrincipalAuthResolver,
 		msg string,
 	) (ctrl.Result, error),
 ) (ctrl.Result, error) {
@@ -631,7 +626,7 @@ func (r *CloudPrincipalAuthReconciler) reconcileSecret(
 		staticCredsCondition.Reason = conditions.ReasonStaticCredentialsError
 		staticCredsCondition.Message = err.Error()
 		copyConditionState(&principalAuth.Condition, staticCredsCondition)
-		patchErr := patcher(ctx, staticCredsCondition, principalAuth)
+		patchErr := patcher(staticCredsCondition)
 		if patchErr != nil {
 			return ReconcileError(ctx, patchErr, "patch error")
 		}
@@ -651,12 +646,10 @@ func (r *CloudPrincipalAuthReconciler) reconcileSecret(
 		staticCredsCondition.Reason = conditions.ReasonStaticCredentialsError
 		staticCredsCondition.Message = err.Error()
 		copyConditionState(&principalAuth.Condition, staticCredsCondition)
-		patchErr := patcher(ctx, staticCredsCondition, principalAuth)
+		patchErr := patcher(staticCredsCondition)
 		if patchErr != nil {
 			return cloudCredsDeleter(
-				ctx,
 				staticCredsCondition,
-				principalAuth,
 				fmt.Sprintf("Error while patching status after Secret successful creation. Error: %s", patchErr.Error()),
 			)
 		}
@@ -675,17 +668,15 @@ func (r *CloudPrincipalAuthReconciler) reconcileSecret(
 	staticCredsCondition.Reason = conditions.ReasonStaticCredentialsReconciled
 	staticCredsCondition.Message = "StaticCredentials created"
 
-	patchErr := patcher(ctx, staticCredsCondition, principalAuth)
+	patchErr := patcher(staticCredsCondition)
 	if patchErr != nil {
 		return cloudCredsDeleter(
-			ctx,
 			staticCredsCondition,
-			principalAuth,
 			fmt.Sprintf("Error while patching status after Secret successful creation. Error: %s", patchErr.Error()),
 		)
 	}
 
-	logger.Info("CloudPrincipalAuth reconcile success")
+	logger.Info("k8s secret created/patched. CloudPrincipalAuth reconcile success")
 
 	return Reconciled()
 }

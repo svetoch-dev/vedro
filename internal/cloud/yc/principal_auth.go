@@ -7,6 +7,7 @@ import (
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type PrincipalAuth struct {
@@ -18,6 +19,7 @@ func (o *PrincipalAuth) EnsureAuthentication(
 	principalAuth vedro.CloudPrincipalAuth,
 	principal vedro.CloudPrincipal,
 ) (*cloud.PrincipalAuthResult, error) {
+	logger := log.FromContext(ctx)
 	credentialsID := ""
 
 	if principalAuth.Status.Applied != nil {
@@ -31,6 +33,7 @@ func (o *PrincipalAuth) EnsureAuthentication(
 	}
 
 	if authSetup.CredentialsID == "" {
+		logger.Info("initial credentials creation")
 		result, err := o.api.CreatePrincipalAuth(ctx, authSetup)
 		if err != nil {
 			return nil, fmt.Errorf("create auth failed %w", err)
@@ -43,6 +46,7 @@ func (o *PrincipalAuth) EnsureAuthentication(
 	result, err := o.api.GetPrincipalAuth(ctx, authSetup)
 
 	if errors.Is(err, cloud.ErrAuthNotFound) {
+		logger.Info("credentials not found")
 		result, err := o.api.CreatePrincipalAuth(ctx, authSetup)
 		if err != nil {
 			return nil, err

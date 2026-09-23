@@ -15,7 +15,7 @@ import (
 type CloudPrincipalAuthResolver struct {
 	vedro.CloudPrincipalAuth
 
-	KubeClient client.Client
+	KubeClient client.Reader
 	Logger     logr.Logger
 
 	Condition metav1.Condition
@@ -61,7 +61,7 @@ func (o *CloudPrincipalAuthResolver) Resolve(
 ) {
 	o.Error = nil
 	o.CloudPrincipalAuth = vedro.CloudPrincipalAuth{}
-	o.Logger.V(1).Info("getting CloudPrincipal")
+	o.Logger.V(1).Info("getting CloudPrincipalAuth")
 
 	o.Condition = metav1.Condition{
 		Type:   conditions.TypeReady,

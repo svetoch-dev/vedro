@@ -40,7 +40,7 @@ spec:
     name: providerconfig-sample-yc
   location: ru-central1
 
-  deletionPolicy: Retain
+  deletionPolicy: Delete
   storageClass: Standard
 
   versioning:
@@ -108,3 +108,32 @@ spec:
     secretRef:
       name: super-secret-yc
     deletionPolicy: Delete
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: list-bucket-sample-yc
+  namespace: vedro-system
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: aws-cli
+          image: public.ecr.aws/aws-cli/aws-cli:latest
+          command: ["aws"]
+          args:
+            - s3
+            - ls
+            - s3://bucket-sample-yc
+            - --recursive
+            - --endpoint-url=https://storage.yandexcloud.net
+          envFrom:
+            - secretRef:
+                name: super-secret-yc
+          env:
+            - name: AWS_DEFAULT_REGION
+              value: ru-central1
+            - name: AWS_PAGER
+              value: ""

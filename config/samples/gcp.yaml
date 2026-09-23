@@ -9,10 +9,7 @@ spec:
   type: gcp
   projectId: ${GCP_PROJECT_ID}
   region: europe-west2
-  method: StaticCredentials
-  credentialsSecretRef:
-    name: gcp-creds
-    namespace: vedro-system
+  method: WorkloadIdentity
   usagePolicy:
     allowedNamespaces:
       names:
@@ -92,6 +89,12 @@ spec:
   access:
     level: ObjectReader
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bucket-list-sample-gcp
+  namespace: vedro-system
+---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: CloudPrincipalAuth
 metadata:
@@ -104,8 +107,29 @@ spec:
   principalRef:
     name: principal-sample-gcp
     namespace: vedro-system
-  method: StaticCredentials
-  staticCredentials:
-    secretRef:
-      name: super-secret
+  method: WorkloadIdentity
+  workloadIdentity:
+    serviceAccountRef:
+      name: bucket-list-sample-gcp
     deletionPolicy: Delete
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: list-bucket-sample-gcp
+  namespace: vedro-system
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: bucket-list-sample-gcp
+      restartPolicy: OnFailure
+      containers:
+        - name: gcloud
+          image: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+          command: ["gcloud"]
+          args:
+            - storage
+            - ls
+            - --recursive
+            - gs://bucket-sample-gcp

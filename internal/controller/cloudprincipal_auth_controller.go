@@ -62,6 +62,15 @@ type CloudPrincipalAuthReconciler struct {
 	APIReader client.Reader
 }
 
+func GetCredentialsId(applied *vedro.CloudPrincipalAuthProperties) string {
+	id := ""
+
+	if applied != nil {
+		id = applied.CredentialsId
+	}
+	return id
+}
+
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=vedro.svetoch.dev,resources=cloudprincipalauths,verbs=get;list;watch;create;update;patch;delete
@@ -88,6 +97,7 @@ func (r *CloudPrincipalAuthReconciler) Reconcile(ctx context.Context, req ctrl.R
 		"principalAuthName", principalAuth.Name,
 		"principal", principalAuth.Spec.PrincipalRef.Name,
 		"method", principalAuth.Spec.Method,
+		"credentialsId", GetCredentialsId(principalAuth.Status.Applied),
 	)
 
 	ctx = log.IntoContext(ctx, logger)
@@ -335,6 +345,7 @@ func (r *CloudPrincipalAuthReconciler) ensureWorkloadIdentity(
 			Method:        principalAuth.Spec.Method,
 			CredentialsId: authResult.CredentialsID,
 			PrincipalId:   principal.Status.ExternalId,
+			CreatedAt:     metav1.Now(),
 		}
 	}
 
@@ -523,6 +534,7 @@ func (r *CloudPrincipalAuthReconciler) ensureStaticCredentials(
 			Method:        principalAuth.Spec.Method,
 			CredentialsId: authResult.CredentialsID,
 			PrincipalId:   principal.Status.ExternalId,
+			CreatedAt:     metav1.Now(),
 		}
 
 		secret := &corev1.Secret{

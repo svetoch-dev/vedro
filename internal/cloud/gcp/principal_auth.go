@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	vedro "github.com/svetoch-dev/vedro/api/v1alpha1"
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+const gcpKeyPropagationGracePeriod = time.Second * 60
 
 type PrincipalAuth struct {
 	api cloud.PrincipalAPI
@@ -19,22 +22,25 @@ func (o *PrincipalAuth) EnsureAuthentication(
 	principalAuth vedro.CloudPrincipalAuth,
 	principal vedro.CloudPrincipal,
 ) (*cloud.PrincipalAuthResult, error) {
+	spec := principalAuth.Spec
+	status := principalAuth.Status
+
 	logger := log.FromContext(ctx)
 	credentialsID := ""
 
-	if principalAuth.Status.Applied != nil {
-		credentialsID = principalAuth.Status.Applied.CredentialsId
+	if status.Applied != nil {
+		credentialsID = status.Applied.CredentialsId
 	}
 
 	authSetup := cloud.PrincipalAuthSetup{
-		Method:           principalAuth.Spec.Method,
+		Method:           spec.Method,
 		ServiceAccountID: principal.Status.ExternalId,
 		CredentialsID:    credentialsID,
 	}
 
-	if principalAuth.Spec.Method == vedro.AuthMethodWorkloadIdentity {
+	if spec.Method == vedro.AuthMethodWorkloadIdentity {
 		authSetup.K8sServiceAccount = &vedro.NamespacedName{
-			Name:      principalAuth.Spec.WorkloadIdentity.ServiceAccountRef.Name,
+			Name:      spec.WorkloadIdentity.ServiceAccountRef.Name,
 			Namespace: principalAuth.Namespace,
 		}
 	}
@@ -52,7 +58,22 @@ func (o *PrincipalAuth) EnsureAuthentication(
 
 	result, err := o.api.GetPrincipalAuth(ctx, authSetup)
 
+	// We need this check for StaticCreds because gcp
+	// uses eventually consitant mechanisms
+	// to store key state. So any operation with
+	// the key performed immediately after creation
+	// can return errors. To mitigate this we just
+	// check against a GracePeriod const
+	withinGracePeriod := spec.Method == vedro.AuthMethodStaticCredentials &&
+		time.Since(status.Applied.CreatedAt.Time) < gcpKeyPropagationGracePeriod
+
 	if errors.Is(err, cloud.ErrAuthNotFound) {
+		if withinGracePeriod {
+			return &cloud.PrincipalAuthResult{
+				Method:        authSetup.Method,
+				CredentialsID: authSetup.CredentialsID,
+			}, nil
+		}
 		logger.Info("credentials not found")
 		result, err := o.api.CreatePrincipalAuth(ctx, authSetup)
 		if err != nil {

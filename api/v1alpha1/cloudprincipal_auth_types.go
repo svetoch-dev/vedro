@@ -111,6 +111,8 @@ type CloudPrincipalAuthProperties struct {
 	//
 	// +optional
 	SecretRef *NamespacedName `json:"secretRef,omitempty"`
+
+	CreatedAt metav1.Time `json:"createdAt"`
 }
 
 // CloudPrincipalAuthStatus defines the observed state of a CloudPrincipalAuth.

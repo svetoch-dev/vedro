@@ -3,6 +3,7 @@ package cloudtest
 import (
 	"context"
 	"errors"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck
 	. "github.com/onsi/gomega"    //nolint:staticcheck
@@ -47,6 +48,7 @@ func PrincipalAuthProviderTests(cfg Config) bool {
 				Method:        vedro.AuthMethodStaticCredentials,
 				CredentialsId: "credentials-id",
 				PrincipalId:   "principal-id",
+				CreatedAt:     metav1.NewTime(time.Now().Add(-2 * time.Minute)),
 			}
 		})
 	}
@@ -106,7 +108,10 @@ func PrincipalAuthProviderTests(cfg Config) bool {
 		})
 
 		It("recreates authentication material that no longer exists", func() {
-			expected := &cloud.PrincipalAuthResult{CredentialsID: "replacement-id"}
+			expected := &cloud.PrincipalAuthResult{
+				CredentialsID: "replacement-id",
+				Method:        vedro.AuthMethodStaticCredentials,
+			}
 			fake.GetAuthErr = cloud.ErrAuthNotFound
 			fake.CreateAuthResult = expected
 

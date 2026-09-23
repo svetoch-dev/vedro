@@ -168,6 +168,9 @@ spec:
                 description: Applied records the authentication method and resources
                   applied by the controller.
                 properties:
+                  createdAt:
+                    format: date-time
+                    type: string
                   credentialsId:
                     description: CredentialsId is the provider-side identifier of
                       the credentials.
@@ -213,6 +216,7 @@ spec:
                     - namespace
                     type: object
                 required:
+                - createdAt
                 - credentialsId
                 - method
                 - principalId

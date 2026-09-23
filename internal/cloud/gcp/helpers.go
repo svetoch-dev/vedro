@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/svetoch-dev/vedro/internal/cloud"
 	iam "google.golang.org/api/iam/v1"
@@ -32,9 +31,6 @@ func saCreateKey(
 	if err != nil {
 		return nil, fmt.Errorf("create service account key: %w", err)
 	}
-	// Need to sleep because it takes some time
-	// for the key to be available via gcp api
-	time.Sleep(time.Second * 5)
 
 	return key, nil
 }

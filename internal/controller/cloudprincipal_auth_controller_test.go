@@ -217,11 +217,13 @@ var _ = Describe("CloudPrincipalAuthReconciler", func() {
 
 		fetched := getCloudPrincipalAuth(ctx, client.ObjectKeyFromObject(auth))
 		Expect(fetched.Status.ObservedProvider).To(Equal("test-provider"))
+
 		Expect(fetched.Status.Applied).To(Equal(&vedro.CloudPrincipalAuthProperties{
 			Method:        vedro.AuthMethodStaticCredentials,
 			CredentialsId: "credentials-id",
 			PrincipalId:   "principal-id",
 			SecretRef:     &vedro.NamespacedName{Name: "static-auth-secret", Namespace: "default"},
+			CreatedAt:     fetched.Status.Applied.CreatedAt,
 		}))
 		expectPrincipalAuthCondition(fetched, conditions.TypeStaticCredentialsConfigured, metav1.ConditionTrue, conditions.ReasonStaticCredentialsReconciled)
 		expectPrincipalAuthCondition(fetched, conditions.TypeReady, metav1.ConditionTrue, conditions.ReasonCloudPrincipalAuthReconciled)
@@ -262,6 +264,7 @@ var _ = Describe("CloudPrincipalAuthReconciler", func() {
 			CredentialsId:     "workload-credentials-id",
 			PrincipalId:       "principal-id",
 			ServiceAccountRef: &vedro.NamespacedName{Name: serviceAccount.Name, Namespace: serviceAccount.Namespace},
+			CreatedAt:         fetched.Status.Applied.CreatedAt,
 		}))
 		expectPrincipalAuthCondition(fetched, conditions.TypeWorkloadIdentityConfigured, metav1.ConditionTrue, conditions.ReasonWorkloadIdentityReconciled)
 		expectPrincipalAuthCondition(fetched, conditions.TypeReady, metav1.ConditionTrue, conditions.ReasonCloudPrincipalAuthReconciled)

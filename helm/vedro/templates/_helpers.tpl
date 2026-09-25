@@ -1,5 +1,5 @@
 {{- define "vedro.accessName" -}}
-{{- $id := printf "%s-%s-%s-%s" .bucket .namespace .principal .level | lower -}}
+{{- $id := printf "%s-%s-%s" .bucket .principal .level | lower -}}
 {{- printf "%s-%s" (trimSuffix "-" (trunc 54 $id)) (trunc 8 (sha256sum $id)) -}}
 {{- end -}}
 

@@ -1,0 +1,5 @@
+{{- range $name, $pvc := .Values.pvcs }}
+{{- $labels := include "common.labels" $ | fromYaml }}
+{{- $pvc = set $pvc "name" ( printf "%s-%s" (include "common.fullname" $ )  $name ) }}
+{{- include "core.pvc" (list $ $labels $pvc ) }}
+{{- end }}

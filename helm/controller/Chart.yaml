@@ -1,0 +1,17 @@
+apiVersion: v2
+name: vedro-controller
+description: Chart for creating vedro controller
+
+type: application
+
+version: 0.1.0
+
+appVersion: "v0.1.0"
+
+dependencies:
+  - name: common
+    version: 0.1.0
+    repository: file://../chart_deps/app/common/
+    alias: controller
+    condition: controller.enabled
+

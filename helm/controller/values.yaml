@@ -1,0 +1,109 @@
+global:
+  image:
+    repository: ghcr.io/svetoch-dev/vedro
+    tag: "{{ .Chart.AppVersion }}"
+
+controller:
+  enabled: true
+  jsonLogs: true
+  resources:
+    limits:
+      cpu: 700m
+      memory: 256Mi
+    requests:
+      cpu: 80m
+      memory: 128Mi
+  command:
+    - /manager
+  args:
+    - --leader-elect
+    - --health-probe-bind-address=:8081
+    - -zap-devel=false
+    - '{{ ternary "--zap-encoder=json" "" $.Values.jsonLogs }}'
+  ports:
+    - name: health
+      containerPort: 8081
+      protocol: TCP
+  service:
+    enabled: false
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8081
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 8081
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  podSecurityContext:
+    runAsGroup: 65532
+    runAsNonRoot: true
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  clusterRole:
+    enabled: true
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - secrets
+        verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+      - apiGroups:
+          - ""
+        resources:
+          - serviceaccounts
+        verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+      - apiGroups:
+          - vedro.svetoch.dev
+        resources:
+          - bucketaccesses
+          - buckets
+          - cloudprincipalauths
+          - cloudprincipals
+          - providerconfigs
+        verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+      - apiGroups:
+          - vedro.svetoch.dev
+        resources:
+          - bucketaccesses/finalizers
+          - buckets/finalizers
+          - cloudprincipalauths/finalizers
+          - cloudprincipals/finalizers
+          - providerconfigs/finalizers
+        verbs:
+          - update
+      - apiGroups:
+          - vedro.svetoch.dev
+        resources:
+          - bucketaccesses/status
+          - buckets/status
+          - cloudprincipalauths/status
+          - cloudprincipals/status
+          - providerconfigs/status
+        verbs:
+          - get
+          - patch
+          - update

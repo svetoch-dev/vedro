@@ -1,0 +1,1464 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: bucketaccesses.vedro.svetoch.dev
+spec:
+  group: vedro.svetoch.dev
+  names:
+    categories:
+    - vedro
+    kind: BucketAccess
+    listKind: BucketAccessList
+    plural: bucketaccesses
+    singular: bucketaccess
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.bucketRef.name
+      name: Bucket
+      type: string
+    - jsonPath: .spec.principalRef.name
+      name: Principal
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ProviderConfig is the Schema for the providerconfigs API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              access:
+                properties:
+                  level:
+                    enum:
+                    - ObjectReader
+                    - ObjectWriter
+                    - ObjectAdmin
+                    - BucketAdmin
+                    type: string
+                required:
+                - level
+                type: object
+              bucketRef:
+                description: BucketRef references the Bucket to which access is granted.
+                properties:
+                  name:
+                    description: Name is the name of the Bucket.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: Namespace of the Bucket.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
+                x-kubernetes-validations:
+                - message: bucketRef is immutable
+                  rule: self == oldSelf
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy controls what happens to the bucketaccess
+                  when this Kubernetes object is deleted. If Retain is used
+                  when BucketAccess object is deleted permissions are not revoked
+                enum:
+                - Delete
+                - Retain
+                type: string
+              principalRef:
+                description: PrincipalRef references the CloudPrincipal to which access
+                  is granted.
+                properties:
+                  name:
+                    description: Name is the name of the CloudPrincipal.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: Namespace of the CloudPrincipal.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
+            required:
+            - access
+            - bucketRef
+            - principalRef
+            type: object
+          status:
+            description: ProviderConfigStatus defines the observed provider configuration
+              state.
+            properties:
+              applied:
+                description: Applied - what has been already applied by this controller
+                properties:
+                  bucketId:
+                    description: |-
+                      BucketId id of the bucket to which access is granted. Can
+                      be the equal to BucketName
+                    type: string
+                  bucketName:
+                    description: BucketName name of the bucket to which access is
+                      granted
+                    type: string
+                  grantedAccess:
+                    description: GrantedAccess cloud specific access name that is
+                      granted
+                    type: string
+                  principalId:
+                    description: PrincipalId id of the cloud principal that access
+                      is granted too
+                    type: string
+                required:
+                - bucketId
+                - bucketName
+                - grantedAccess
+                - principalId
+                type: object
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the BucketAccess state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the latest metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              observedProvider:
+                description: Provider used for this BucketAccess
+                type: string
+              unsupported:
+                description: List of unsupported features set on BucketAccess resource
+                items:
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                  required:
+                  - field
+                  - message
+                  - reason
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: buckets.vedro.svetoch.dev
+spec:
+  group: vedro.svetoch.dev
+  names:
+    categories:
+    - vedro
+    kind: Bucket
+    listKind: BucketList
+    plural: buckets
+    singular: bucket
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.providerRef.name
+      name: Provider
+      type: string
+    - jsonPath: .status.externalName
+      name: Bucket
+      type: string
+    - jsonPath: .spec.location
+      name: Location
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Bucket is the Schema for the buckets API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              cloudSpecificConfig:
+                description: |-
+                  CloudSpecificConfig contains provider-specific bucket settings that do not
+                  have a cloud-agnostic equivalent in BucketSpec.
+
+                  These settings are applied only when the selected provider matches the
+                  corresponding provider config field. For example, Gcp is used only for GCS
+                  buckets.
+                properties:
+                  gcp:
+                    description: GCP-specific bucket configuration.
+                    properties:
+                      softDeletePolicy:
+                        properties:
+                          retentionDuration:
+                            default: 168h
+                            description: |-
+                              RetentionDuration is how long deleted objects are retained before permanent deletion.
+                              Must be 0 or a whole number of days between 7 and 90 for GCS.
+                              Example: "168h" for 7 days.
+                            type: string
+                            x-kubernetes-validations:
+                            - message: retentionDuration must be 0 or a whole number
+                                of days between 7 and 90
+                              rule: duration(self) == duration('0s') || (duration(self)
+                                >= duration('168h') && duration(self) <= duration('2160h')
+                                && duration(self).getSeconds() % 86400 == 0)
+                        required:
+                        - retentionDuration
+                        type: object
+                    type: object
+                  yc:
+                    description: |-
+                      Yandex cloud-specific bucket configuration.
+                      Reserved for future Yandex Cloud extensions.
+                    type: object
+                type: object
+              deletionPolicy:
+                default: Retain
+                description: |-
+                  DeletionPolicy controls what happens to the external bucket
+                  when this Kubernetes object is deleted.
+                enum:
+                - Delete
+                - Retain
+                type: string
+              labels:
+                additionalProperties:
+                  type: string
+                description: Labels are cloud provider labels/tags applied to the
+                  bucket.
+                type: object
+              lifecycle:
+                description: Lifecycle configures object lifecycle rules.
+                properties:
+                  rules:
+                    items:
+                      properties:
+                        action:
+                          description: Action describes what happens to matching objects.
+                          enum:
+                          - Delete
+                          type: string
+                        ageDays:
+                          description: AgeDays matches objects older than this many
+                            days.
+                          format: int64
+                          minimum: 1
+                          type: integer
+                        enabled:
+                          default: true
+                          description: Enabled controls whether this lifecycle rule
+                            should be active.
+                          type: boolean
+                        name:
+                          description: Name is a stable identifier for this lifecycle
+                            rule.
+                          minLength: 1
+                          type: string
+                      required:
+                      - action
+                      - enabled
+                      type: object
+                    type: array
+                type: object
+              location:
+                description: |-
+                  Location is the cloud provider location/region.
+
+                  Examples:
+                  - GCP: europe-west1
+                  - Yandex: ru-central1
+                minLength: 1
+                type: string
+              name:
+                description: Name is the real cloud provider bucket name.
+                minLength: 1
+                type: string
+              providerRef:
+                description: ProviderRef references the ProviderConfig used to manage
+                  this bucket.
+                properties:
+                  name:
+                    description: Name is the name of the ProviderConfig.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+                x-kubernetes-validations:
+                - message: providerRef is immutable
+                  rule: self == oldSelf
+              publicAccessPrevention:
+                description: PublicAccessPrevention controls whether the bucket may
+                  be publicly accessible.
+                type: boolean
+              storageClass:
+                default: Standard
+                description: bucket storage class
+                enum:
+                - Standard
+                - Warm
+                - Cold
+                - Ice
+                type: string
+              versioning:
+                description: Versioning configures object versioning.
+                properties:
+                  enabled:
+                    description: Enabled controls bucket object versioning.
+                    type: boolean
+                required:
+                - enabled
+                type: object
+            required:
+            - location
+            - providerRef
+            type: object
+          status:
+            properties:
+              applied:
+                description: Applied is the applied bucket attributes
+                properties:
+                  cloudSpecificConfig:
+                    properties:
+                      gcp:
+                        description: GCP-specific bucket configuration.
+                        properties:
+                          softDeletePolicy:
+                            properties:
+                              retentionDuration:
+                                default: 168h
+                                description: |-
+                                  RetentionDuration is how long deleted objects are retained before permanent deletion.
+                                  Must be 0 or a whole number of days between 7 and 90 for GCS.
+                                  Example: "168h" for 7 days.
+                                type: string
+                                x-kubernetes-validations:
+                                - message: retentionDuration must be 0 or a whole
+                                    number of days between 7 and 90
+                                  rule: duration(self) == duration('0s') || (duration(self)
+                                    >= duration('168h') && duration(self) <= duration('2160h')
+                                    && duration(self).getSeconds() % 86400 == 0)
+                            required:
+                            - retentionDuration
+                            type: object
+                        type: object
+                      yc:
+                        description: |-
+                          Yandex cloud-specific bucket configuration.
+                          Reserved for future Yandex Cloud extensions.
+                        type: object
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  lifecycle:
+                    properties:
+                      rules:
+                        items:
+                          properties:
+                            action:
+                              description: Action describes what happens to matching
+                                objects.
+                              enum:
+                              - Delete
+                              type: string
+                            ageDays:
+                              description: AgeDays matches objects older than this
+                                many days.
+                              format: int64
+                              minimum: 1
+                              type: integer
+                            enabled:
+                              default: true
+                              description: Enabled controls whether this lifecycle
+                                rule should be active.
+                              type: boolean
+                            name:
+                              description: Name is a stable identifier for this lifecycle
+                                rule.
+                              minLength: 1
+                              type: string
+                          required:
+                          - action
+                          - enabled
+                          type: object
+                        type: array
+                    type: object
+                  publicAccessPrevention:
+                    type: boolean
+                  storageClass:
+                    type: string
+                  versioning:
+                    properties:
+                      enabled:
+                        description: Enabled controls bucket object versioning.
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                type: object
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the bucket state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              externalId:
+                description: |-
+                  ExternalId is the provider-side immutable resource identifier.
+                  It may differ from ExternalName.
+                type: string
+              externalName:
+                description: ExternalName is the provider-side bucket name.
+                type: string
+              location:
+                description: Location is the provider-side bucket region.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the latest metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              observedProvider:
+                description: Provider used for this bucket
+                type: string
+              unsupported:
+                description: List of unsupported features set on Bucket resource
+                items:
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                  required:
+                  - field
+                  - message
+                  - reason
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: cloudprincipalauths.vedro.svetoch.dev
+spec:
+  group: vedro.svetoch.dev
+  names:
+    categories:
+    - vedro
+    kind: CloudPrincipalAuth
+    listKind: CloudPrincipalAuthList
+    plural: cloudprincipalauths
+    singular: cloudprincipalauth
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.principalRef.name
+      name: Principal
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CloudPrincipalAuth is the Schema for the cloudprincipalauths
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec defines the desired state of the CloudPrincipalAuth.
+            properties:
+              method:
+                description: Method selects the authentication method.
+                enum:
+                - StaticCredentials
+                - WorkloadIdentity
+                type: string
+                x-kubernetes-validations:
+                - message: method is immutable
+                  rule: self == oldSelf
+              principalRef:
+                description: PrincipalRef references the CloudPrincipal for which
+                  authentication is configured.
+                properties:
+                  name:
+                    description: Name is the name of the CloudPrincipal.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: Namespace of the CloudPrincipal.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
+                x-kubernetes-validations:
+                - message: principalRef is immutable
+                  rule: self == oldSelf
+              staticCredentials:
+                description: StaticCredentials configures the Secret used when Method
+                  is StaticCredentials.
+                properties:
+                  deletionPolicy:
+                    default: Retain
+                    description: |-
+                      DeletionPolicy controls what happens to the auth material and secret
+                      when this Kubernetes object is deleted.
+                    enum:
+                    - Delete
+                    - Retain
+                    type: string
+                  secretRef:
+                    description: |-
+                      SecretRef names the Kubernetes Secret in which static credentials are stored.
+
+                      Required when method is StaticCredentials.
+                      Usually empty when method is WorkloadIdentity.
+                    properties:
+                      name:
+                        description: Name is the name of the referenced Kubernetes
+                          object.
+                        minLength: 1
+                        type: string
+                        x-kubernetes-validations:
+                        - message: name is immutable
+                          rule: self == oldSelf
+                    required:
+                    - name
+                    type: object
+                required:
+                - secretRef
+                type: object
+              workloadIdentity:
+                description: WorkloadIdentity configures the ServiceAccount used when
+                  Method is WorkloadIdentity.
+                properties:
+                  deletionPolicy:
+                    default: Retain
+                    description: |-
+                      DeletionPolicy controls what happens to the auth material and serviceaccount annotation
+                      when this Kubernetes object is deleted.
+                    enum:
+                    - Delete
+                    - Retain
+                    type: string
+                  serviceAccountRef:
+                    description: |-
+                      ServiceAccountRef names the Kubernetes ServiceAccount to configure for workload identity.
+
+                      Required when method is WorkloadIdentity.
+                      Usually empty when method is StaticCredentials.
+                    properties:
+                      name:
+                        description: Name is the name of the referenced Kubernetes
+                          object.
+                        minLength: 1
+                        type: string
+                        x-kubernetes-validations:
+                        - message: name is immutable
+                          rule: self == oldSelf
+                    required:
+                    - name
+                    type: object
+                required:
+                - serviceAccountRef
+                type: object
+            required:
+            - method
+            - principalRef
+            type: object
+            x-kubernetes-validations:
+            - message: staticCredentials must be set and workloadIdentity must not
+                be set when method is StaticCredentials
+              rule: self.method != 'StaticCredentials' || (has(self.staticCredentials)
+                && !has(self.workloadIdentity))
+            - message: workloadIdentity must be set and staticCredentials must not
+                be set when method is WorkloadIdentity
+              rule: self.method != 'WorkloadIdentity' || (has(self.workloadIdentity)
+                && !has(self.staticCredentials))
+          status:
+            description: Status defines the observed state of the CloudPrincipalAuth.
+            properties:
+              applied:
+                description: Applied records the authentication method and resources
+                  applied by the controller.
+                properties:
+                  createdAt:
+                    format: date-time
+                    type: string
+                  credentialsId:
+                    description: CredentialsId is the provider-side identifier of
+                      the credentials.
+                    type: string
+                  method:
+                    description: Method is the authentication method applied to the
+                      cloud principal.
+                    type: string
+                  principalId:
+                    description: PrincipalId is the provider-side identifier of the
+                      cloud principal.
+                    type: string
+                  secretRef:
+                    description: SecretRef identifies the Kubernetes Secret containing
+                      static credentials, if any.
+                    properties:
+                      name:
+                        description: Name is the name of the referenced Kubernetes
+                          object.
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace of the referenced
+                          Kubernetes object.
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
+                  serviceAccountRef:
+                    description: ServiceAccountRef identifies the configured Kubernetes
+                      ServiceAccount, if any.
+                    properties:
+                      name:
+                        description: Name is the name of the referenced Kubernetes
+                          object.
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace of the referenced
+                          Kubernetes object.
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
+                required:
+                - createdAt
+                - credentialsId
+                - method
+                - principalId
+                type: object
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the CloudPrincipalAuth state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the latest metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              observedProvider:
+                description: ObservedProvider is the ProviderConfig used for the last
+                  successful reconciliation.
+                type: string
+              unsupported:
+                description: UnsupportedFeatures lists requested features that the
+                  selected provider does not support.
+                items:
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                  required:
+                  - field
+                  - message
+                  - reason
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: cloudprincipals.vedro.svetoch.dev
+spec:
+  group: vedro.svetoch.dev
+  names:
+    categories:
+    - vedro
+    kind: CloudPrincipal
+    listKind: CloudPrincipalList
+    plural: cloudprincipals
+    singular: cloudprincipal
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.providerRef.name
+      name: Provider
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CloudPrincipal is the Schema for the cloudprincipals API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec defines the desired state of the CloudPrincipal.
+            properties:
+              kind:
+                description: Kind identifies the type of cloud principal.
+                enum:
+                - ServiceAccount
+                - User
+                - Group
+                - Role
+                - AllUsers
+                type: string
+              managed:
+                description: |-
+                  Managed configures a principal managed by this resource.
+                  It must be set only when ManagementPolicy is Managed.
+                properties:
+                  deletionPolicy:
+                    default: Delete
+                    description: |-
+                      DeletionPolicy controls what happens to the external CloudPrincipal
+                      when this Kubernetes object is deleted.
+                    enum:
+                    - Delete
+                    - Retain
+                    type: string
+                  name:
+                    description: |-
+                      Name is the cloud provider principal name.
+                      Name format depends on what Kind of principal it is
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              managementPolicy:
+                description: |-
+                  ManagementPolicy controls whether the external principal is managed by this
+                  resource or references an existing principal.
+                enum:
+                - Managed
+                - Reference
+                type: string
+                x-kubernetes-validations:
+                - message: managementPolicy is immutable
+                  rule: self == oldSelf
+              providerRef:
+                description: ProviderRef references the ProviderConfig used to manage
+                  this principal.
+                properties:
+                  name:
+                    description: Name is the name of the ProviderConfig.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+                x-kubernetes-validations:
+                - message: providerRef is immutable
+                  rule: self == oldSelf
+              reference:
+                description: |-
+                  Reference identifies an existing principal that is not managed by this resource.
+                  It must be set only when ManagementPolicy is Reference.
+                properties:
+                  name:
+                    description: |-
+                      Name is the cloud provider principal name.
+                      Name format depends on what Kind of principal it is
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - kind
+            - managementPolicy
+            - providerRef
+            type: object
+            x-kubernetes-validations:
+            - message: managed must be set and reference must not be set when managementPolicy
+                is Managed
+              rule: self.managementPolicy != 'Managed' || (has(self.managed) && !has(self.reference))
+            - message: reference must be set unless kind is AllUsers, and managed
+                must not be set when managementPolicy is Reference
+              rule: self.managementPolicy != 'Reference' || ((self.kind == 'AllUsers'
+                || has(self.reference)) && !has(self.managed))
+          status:
+            description: Status defines the observed state of the CloudPrincipal.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the CloudPrincipal state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              externalId:
+                description: ExternalId is the provider-side immutable principal identifier.
+                type: string
+              externalName:
+                description: ExternalName is the provider-side principal name.
+                type: string
+              kind:
+                description: Kind is the kind reported for the external principal.
+                type: string
+              managementPolicy:
+                description: ManagementPolicy is the policy used to reconcile the
+                  external principal.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the latest metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              observedProvider:
+                description: ObservedProvider is the ProviderConfig used for the last
+                  successful reconciliation.
+                type: string
+              unsupported:
+                description: UnsupportedFeatures lists requested features that the
+                  selected provider does not support.
+                items:
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                  required:
+                  - field
+                  - message
+                  - reason
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: providerconfigs.vedro.svetoch.dev
+spec:
+  group: vedro.svetoch.dev
+  names:
+    categories:
+    - vedro
+    kind: ProviderConfig
+    listKind: ProviderConfigList
+    plural: providerconfigs
+    singular: providerconfig
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.type
+      name: Type
+      type: string
+    - jsonPath: .spec.method
+      name: Method
+      type: string
+    - jsonPath: .spec.region
+      name: Region
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ProviderConfig is the Schema for the providerconfigs API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              If StaticCredentials is set credentialsSecretRef should also be set
+              If WorkloadIdentity is set credentialsSecretRef should not be set
+            properties:
+              credentialsSecretRef:
+                description: |-
+                  CredentialsSecretRef references a Kubernetes Secret containing provider credentials.
+
+                  Required when method is StaticCredentials.
+                  Usually empty when method is WorkloadIdentity.
+                properties:
+                  name:
+                    description: name is unique within a namespace to reference a
+                      secret resource.
+                    type: string
+                  namespace:
+                    description: namespace defines the space within which the secret
+                      name must be unique.
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              method:
+                description: Method describes the authentication method.
+                enum:
+                - StaticCredentials
+                - WorkloadIdentity
+                type: string
+              projectId:
+                description: |-
+                  ProjectID identifies the cloud project/account/folder.
+
+                  For GCP this can be the project ID.
+                  For Yandex this can be the folder ID or cloud ID, depending on your design.
+                minLength: 1
+                type: string
+                x-kubernetes-validations:
+                - message: projectId is immutable
+                  rule: self == oldSelf
+              region:
+                type: string
+              type:
+                description: Type is the cloud provider type.
+                enum:
+                - gcp
+                - yc
+                type: string
+                x-kubernetes-validations:
+                - message: type is immutable
+                  rule: self == oldSelf
+              usagePolicy:
+                description: |-
+                  UsagePolicy defines namespace and resource restrictions for this provider.
+                  Resources must satisfy all applicable restrictions to reconcile.
+                properties:
+                  allowedNamespaces:
+                    description: |-
+                      AllowedNamespaces restricts the namespaces of Bucket, CloudPrincipal,
+                      and BucketAccess resources using this provider.
+                    properties:
+                      all:
+                        description: |-
+                          All allows every Kubernetes namespace to use this provider.
+                          Defaults to false and cannot be combined with a non-empty names list.
+                        type: boolean
+                      names:
+                        description: |-
+                          Names lists exact Kubernetes namespace names allowed to use this provider.
+                          Must be empty when all is true. If all is false and names is empty,
+                          no namespaces are allowed.
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  bucketPolicy:
+                    description: BucketPolicy restricts cloud bucket names managed
+                      through this provider.
+                    properties:
+                      allowedNamePatterns:
+                        description: |-
+                          AllowedNamePatterns contains Go regular expressions for cloud bucket names.
+                          Checks spec.name, falling back to metadata.name when spec.name is empty.
+                          During deletion, the recorded external name is used when available.
+                          At least one pattern must match; an empty list allows no names.
+                          Use ^ and $ to match the entire name.
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - allowedNamePatterns
+                    type: object
+                  principalPolicy:
+                    description: |-
+                      PrincipalPolicy restricts principal kinds, management policies, and names
+                      used through this provider.
+                    properties:
+                      allowManaged:
+                        default: true
+                        description: |-
+                          AllowManaged permits CloudPrincipals with managementPolicy Managed.
+                          Defaults to true. Kind and name restrictions still apply.
+                        type: boolean
+                      allowReferences:
+                        default: true
+                        description: |-
+                          AllowReferences permits CloudPrincipals with managementPolicy Reference,
+                          including AllUsers. Defaults to true. Kind and applicable reference-name
+                          restrictions still apply.
+                        type: boolean
+                      allowedKinds:
+                        default:
+                        - ServiceAccount
+                        - Role
+                        - User
+                        - Group
+                        - AllUsers
+                        description: |-
+                          AllowedKinds lists permitted CloudPrincipal kinds for both management
+                          policies. Defaults to ServiceAccount, Role, User, Group, and AllUsers.
+                          An empty list allows no kinds. Provider capability restrictions still apply.
+                          During deletion, the recorded status.kind is checked.
+                        items:
+                          type: string
+                        type: array
+                      allowedNamePatterns:
+                        description: |-
+                          AllowedNamePatterns contains Go regular expressions for managed principal
+                          names from spec.managed.name. During deletion, the recorded external name
+                          is used when available. At least one pattern must match; an empty list
+                          allows no names. Use ^ and $ to match the entire name.
+                        items:
+                          type: string
+                        type: array
+                      allowedReferencePatterns:
+                        default:
+                        - .*
+                        description: |-
+                          AllowedReferencePatterns contains Go regular expressions for referenced
+                          principal names from spec.reference.name. Defaults to [".*"], allowing
+                          any reference name. An empty list allows no reference names.
+                          Use ^ and $ to match the entire name. AllUsers has no reference name
+                          and is exempt from this check.
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - allowManaged
+                    - allowReferences
+                    - allowedKinds
+                    - allowedNamePatterns
+                    - allowedReferencePatterns
+                    type: object
+                required:
+                - allowedNamespaces
+                - bucketPolicy
+                - principalPolicy
+                type: object
+            required:
+            - method
+            - projectId
+            - region
+            - type
+            - usagePolicy
+            type: object
+            x-kubernetes-validations:
+            - message: credentialsSecretRef is required when method is StaticCredentials
+              rule: self.method != 'StaticCredentials' || has(self.credentialsSecretRef)
+            - message: credentialsSecretRef must not be set when method is WorkloadIdentity
+              rule: self.method != 'WorkloadIdentity' || !has(self.credentialsSecretRef)
+          status:
+            description: ProviderConfigStatus defines the observed provider configuration
+              state.
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the ProviderConfig state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the latest metadata.generation
+                  observed by the controller.
+                format: int64
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

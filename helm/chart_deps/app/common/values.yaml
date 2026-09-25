@@ -1,0 +1,230 @@
+# Default values for api.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+revisionHistoryLimit: 2
+
+image:
+  #Must be set either in .Values.global.image
+  #or in .Values.image in chart instances
+  #repository: override_me
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  #tag: latest
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+deploymentEnabled: true
+statefulsetEnabled: false
+
+volumeClaimTemplates: {}
+
+volumes: []
+volumeMounts: []
+persistentVolumeClaimRetentionPolicy: {}
+#  whenDeleted: "Delete"
+#  whenScaled: "Retain"
+
+clusterRole:
+  enabled: false
+  name: '{{ include "common.fullname" . }}'
+  rules: []
+  serviceAccount:
+    name: '{{ include "common.serviceAccountName" . }}'
+    namespace: '{{ .Release.Namespace }}'
+
+role:
+  enabled: false
+  name: '{{ include "common.fullname" . }}'
+  rules: []
+  serviceAccount:
+    name: '{{ include "common.serviceAccountName" . }}'
+    namespace: '{{ .Release.Namespace }}'
+
+job:
+  enabled: false
+  name: '{{ include "common.fullname" . }}'
+  command: []
+  args: []
+  resources: {}
+  environment: []
+  environmentFromSecrets: {}
+  nodeSelector: {}
+  podSecurityContext: {}
+  affinity: {}
+  tolerations: {}
+  serviceAccount:
+    name: '{{ include "common.serviceAccountName" . }}'
+  image:
+    repository: '{{ .Values.image.repository | default .Values.global.image.repository }}'
+    pullPolicy: '{{ .Values.image.pullPolicy }}'
+    tag: '{{ .Values.image.tag | default .Values.global.image.tag }}'
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+pvcs: {}
+
+pvs: {}
+
+environment: []
+
+initContainers: {}
+
+environmentFromSecrets: {}
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  enabled: true
+  name: '{{ include "common.fullname" . }}'
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+
+additionalServices: []
+
+ingress:
+  enabled: false
+  name: '{{ include "common.fullname" . }}'
+  className: ""
+  service:
+    port: 80
+    name: '{{ .Values.service.name }}'
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+ports: []
+#  - name: http
+#    containerPort: 3001
+#    protocol: TCP
+
+livenessProbe: {}
+#  httpGet:
+#    path: /
+#    port: http
+
+readinessProbe: {}
+#  httpGet:
+#    path: /
+#    port: http
+
+command: []
+
+args: []
+
+serviceMonitor:
+  enabled: false
+  prometheusSelector:
+    prometheus: main
+  labels: {}
+  targetLabels: []
+  endpoints:
+    - targetPort: 9355
+      path: /metrics
+
+secrets:
+#  test:
+#    labels:
+#      test: test
+#    annotations:
+#      test: test
+#    type: Opaque
+#    data:
+#      test: "123"
+#      test1: |
+#        some:
+#          yaml:
+#            - 123
+
+probes:
+  enabled: false
+  probes:
+    api:
+      enabled: false
+      selector:
+        prometheus: main
+      spec:
+        prober:
+          url: '{{ .Values.global.svc.prometheus.blackbox }}:9115'
+        jobName: "api"
+        module: http_2xx
+#        targets:
+#          staticConfig:
+#            static:
+#              - 'https://{{ .Values.global.app.name }}-api.{{ .Values.global.env.dns.domain }}/api/health/db'
+#        targets:
+#          ingress:
+#            selector:
+#              matchLabels:
+#                app.kubernetes.io/name: argocd-server
+#            namespaceSelector:
+#              any: true
+
+prometheus-rules:
+  enabled: false
+  PrometheusAlerts:
+    api:
+      env: "{{ .Values.global.env.short_name }}"
+      team: sre
+      selector:
+        prometheus: main
+      AbsentMetricCritical:
+        enabled: false
+        rules:
+          probe_success:
+            enabled: false
+            source: '{{ .Values.global.app.name }}-api probes'
+#            query: '{instance="https://{{ .Values.global.app.name }}-api.{{ .Values.global.env.dns.domain }}/api/health/db"}'

@@ -175,8 +175,13 @@ ifndef ignore-not-found
 endif
 
 .PHONY: install
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+install: helm-crds ## Render CRDs for Helm and install them into the K8s cluster specified in ~/.kube/config.
+	$(KUBECTL) apply -f helm/controller/crds/vedro.yaml
+
+.PHONY: helm-crds
+helm-crds: manifests kustomize ## Render CRDs into the Helm controller chart.
+	mkdir -p helm/controller/crds
+	$(KUSTOMIZE) build config/crd > helm/controller/crds/vedro.yaml
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.

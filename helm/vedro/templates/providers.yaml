@@ -6,7 +6,7 @@ kind: ProviderConfig
 metadata:
   name: {{ $name | quote }}
   labels:
-    app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
+{{ include "common.labels" $ | indent 4 }}
 spec:
   type: {{ required (printf "providers.%s.type is required" $key) $provider.type | quote }}
   projectId: {{ required (printf "providers.%s.projectId is required" $key) $provider.projectId | quote }}

@@ -12,7 +12,7 @@ metadata:
   name: {{ $name | quote }}
   namespace: {{ $namespace | quote }}
   labels:
-    app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
+{{ include "common.labels" $ | indent 4 }}
 spec:
   providerRef:
     name: {{ $provider | quote }}
@@ -38,7 +38,7 @@ metadata:
   name: {{ printf "%s-auth" $name | trunc 63 | trimSuffix "-" | quote }}
   namespace: {{ $namespace | quote }}
   labels:
-    app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
+{{ include "common.labels" $ | indent 4 }}
 spec:
   principalRef:
     name: {{ $name | quote }}

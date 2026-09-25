@@ -1,11 +1,10 @@
 {{- range $key, $principal := .Values.principals }}
 {{- $name := default $key $principal.name }}
 {{- $namespace := default $.Release.Namespace $principal.namespace }}
-{{- $providerName := include "vedro.providerName" (dict "root" $ "ref" $principal.provider) }}
-{{- $policy := default "Managed" $principal.type }}
-{{- if eq $policy "Referenced" }}{{- $policy = "Reference" }}{{- end }}
-{{- if not (has $policy (list "Managed" "Reference")) }}{{- fail (printf "principals.%s.type must be Managed or Referenced" $key) }}{{- end }}
-{{- $kind := default "ServiceAccount" $principal.kind }}
+{{- $provider := required (printf "principals.%s.provider is required" $key) $principal.provider }}
+{{- $policy := required (printf "principals.%s.type is required" $key) $principal.type }}
+{{- if not (has $policy (list "Managed" "Reference")) }}{{- fail (printf "principals.%s.type must be Managed or Reference" $key) }}{{- end }}
+{{- $kind := required (printf "principals.%s.kind is required" $key) $principal.kind }}
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: CloudPrincipal
@@ -16,7 +15,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
 spec:
   providerRef:
-    name: {{ $providerName | quote }}
+    name: {{ $provider | quote }}
   kind: {{ $kind | quote }}
   managementPolicy: {{ $policy | quote }}
   {{- if eq $policy "Managed" }}
@@ -27,7 +26,7 @@ spec:
   reference:
     name: {{ $principal.reference.name | quote }}
   {{- else if ne $kind "AllUsers" }}
-    {{- fail (printf "principals.%s.reference.name is required for Referenced principals" $key) }}
+    {{- fail (printf "principals.%s.reference.name is required for Reference principals" $key) }}
   {{- end }}
 {{- if $principal.auth }}
   {{- if ne $policy "Managed" }}{{- fail (printf "principals.%s.auth is only valid for Managed principals" $key) }}{{- end }}

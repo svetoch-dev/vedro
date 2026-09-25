@@ -3,11 +3,7 @@
 {{- $name := $baseName }}
 {{- if $bucket.prefixReleaseName }}{{- $name = printf "%s-%s" $.Release.Name $baseName }}{{- end }}
 {{- $namespace := default $.Release.Namespace $bucket.namespace }}
-{{- $providerName := include "vedro.providerName" (dict "root" $ "ref" $bucket.provider) }}
-{{- $location := $bucket.location }}
-{{- range $providerKey, $provider := $.Values.providers }}
-  {{- if eq $providerName (default $providerKey $provider.name) }}{{- $location = default $provider.region $location }}{{- end }}
-{{- end }}
+{{- $provider := required (printf "buckets.%s.provider is required" $key) $bucket.provider }}
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: Bucket
@@ -18,8 +14,8 @@ metadata:
     app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
 spec:
   providerRef:
-    name: {{ $providerName | quote }}
-  location: {{ required (printf "buckets.%s.location is required when the provider has no region" $key) $location | quote }}
+    name: {{ $provider | quote }}
+  location: {{ required (printf "buckets.%s.location is required" $key) $bucket.location | quote }}
   {{- with $bucket.nameOverride }}
   name: {{ . | quote }}
   {{- end }}

@@ -9,9 +9,9 @@ helm install example helm/vedro --namespace app --create-namespace -f values.yam
 ```
 
 The top-level `providers`, `principals`, and `buckets` values are maps. The map
-key becomes the Kubernetes resource name unless `name` is set. A principal or
-bucket can refer to a provider by map key or by its resulting `ProviderConfig`
-name. When exactly one provider is defined, `provider` may be omitted.
+key becomes the Kubernetes resource name unless `name` is set. Every principal
+and bucket must set `provider` to the exact name of a `ProviderConfig`, whether
+that resource is created by this chart or already exists in the cluster.
 
 ```yaml
 providers:
@@ -31,6 +31,7 @@ providers:
 
 principals:
   app:
+    provider: primary
     kind: ServiceAccount
     type: Managed
     managed:
@@ -43,6 +44,8 @@ principals:
 
 buckets:
   data:
+    provider: primary
+    location: europe-west1
     prefixReleaseName: true
     deletionPolicy: Retain
     versioning:
@@ -52,15 +55,15 @@ buckets:
 ```
 
 `usagePolicy` strings are evaluated as Helm templates, so release name and
-namespace expressions work there. `Bucket.spec.location` defaults to the
-selected provider's `region`; set `location` on a bucket to override it.
+namespace expressions work there. Every bucket must set `location` explicitly;
+the provider's `region` is not used as a fallback.
 `nameOverride` sets the external bucket name in `Bucket.spec.name`.
 `prefixReleaseName` prefixes the Kubernetes Bucket name; when `nameOverride`
 is absent, that is also the external bucket name.
 
-Principal `kind` defaults to `ServiceAccount`, `type` defaults to `Managed`,
-and `managed.name` defaults to the Kubernetes principal name. Use
-`type: Referenced` with `reference.name` for an existing cloud principal.
+Every principal must set `kind` and `type`. The only accepted `type` values are
+`Managed` and `Reference`. `managed.name` defaults to the Kubernetes principal
+name. Use `type: Reference` with `reference.name` for an existing cloud principal.
 Authentication is only created when `auth` is set; it references a Secret or
 ServiceAccount in the principal's namespace. The chart does not create those
 Secret or ServiceAccount objects.

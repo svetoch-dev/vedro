@@ -1,0 +1,22 @@
+{{- range $key, $provider := .Values.providers }}
+{{- $name := default $key $provider.name }}
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: {{ $name | quote }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
+spec:
+  type: {{ required (printf "providers.%s.type is required" $key) $provider.type | quote }}
+  projectId: {{ required (printf "providers.%s.projectId is required" $key) $provider.projectId | quote }}
+  region: {{ required (printf "providers.%s.region is required" $key) $provider.region | quote }}
+  method: {{ required (printf "providers.%s.method is required" $key) $provider.method | quote }}
+  {{- if eq $provider.method "StaticCredentials" }}
+  credentialsSecretRef:
+    name: {{ required (printf "providers.%s.credentialsSecretRef.name is required for StaticCredentials" $key) $provider.credentialsSecretRef.name | quote }}
+    namespace: {{ required (printf "providers.%s.credentialsSecretRef.namespace is required for StaticCredentials" $key) $provider.credentialsSecretRef.namespace | quote }}
+  {{- end }}
+  usagePolicy:
+{{ tpl (toYaml (required (printf "providers.%s.usagePolicy is required" $key) $provider.usagePolicy)) $ | indent 4 }}
+{{- end }}

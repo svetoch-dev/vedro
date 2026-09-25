@@ -1,0 +1,62 @@
+{{- range $key, $principal := .Values.principals }}
+{{- $name := default $key $principal.name }}
+{{- $namespace := default $.Release.Namespace $principal.namespace }}
+{{- $providerName := include "vedro.providerName" (dict "root" $ "ref" $principal.provider) }}
+{{- $policy := default "Managed" $principal.type }}
+{{- if eq $policy "Referenced" }}{{- $policy = "Reference" }}{{- end }}
+{{- if not (has $policy (list "Managed" "Reference")) }}{{- fail (printf "principals.%s.type must be Managed or Referenced" $key) }}{{- end }}
+{{- $kind := default "ServiceAccount" $principal.kind }}
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: CloudPrincipal
+metadata:
+  name: {{ $name | quote }}
+  namespace: {{ $namespace | quote }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
+spec:
+  providerRef:
+    name: {{ $providerName | quote }}
+  kind: {{ $kind | quote }}
+  managementPolicy: {{ $policy | quote }}
+  {{- if eq $policy "Managed" }}
+  managed:
+    name: {{ default $name $principal.managed.name | quote }}
+    deletionPolicy: {{ default "Delete" $principal.managed.deletionPolicy | quote }}
+  {{- else if $principal.reference.name }}
+  reference:
+    name: {{ $principal.reference.name | quote }}
+  {{- else if ne $kind "AllUsers" }}
+    {{- fail (printf "principals.%s.reference.name is required for Referenced principals" $key) }}
+  {{- end }}
+{{- if $principal.auth }}
+  {{- if ne $policy "Managed" }}{{- fail (printf "principals.%s.auth is only valid for Managed principals" $key) }}{{- end }}
+  {{- $method := required (printf "principals.%s.auth.method is required" $key) $principal.auth.method }}
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: CloudPrincipalAuth
+metadata:
+  name: {{ printf "%s-auth" $name | trunc 63 | trimSuffix "-" | quote }}
+  namespace: {{ $namespace | quote }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
+spec:
+  principalRef:
+    name: {{ $name | quote }}
+    namespace: {{ $namespace | quote }}
+  method: {{ $method | quote }}
+  {{- if eq $method "WorkloadIdentity" }}
+  workloadIdentity:
+    serviceAccountRef:
+      name: {{ required (printf "principals.%s.auth.workloadIdentity.serviceAccountRef.name is required" $key) $principal.auth.workloadIdentity.serviceAccountRef.name | quote }}
+    deletionPolicy: {{ default "Delete" $principal.auth.workloadIdentity.deletionPolicy | quote }}
+  {{- else if eq $method "StaticCredentials" }}
+  staticCredentials:
+    secretRef:
+      name: {{ required (printf "principals.%s.auth.staticCredentials.secretRef.name is required" $key) $principal.auth.staticCredentials.secretRef.name | quote }}
+    deletionPolicy: {{ default "Delete" $principal.auth.staticCredentials.deletionPolicy | quote }}
+  {{- else }}
+    {{- fail (printf "principals.%s.auth.method must be WorkloadIdentity or StaticCredentials" $key) }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,99 @@
+{{- $releasename := .Release.Name }}
+{{- range $name, $alert := .Values.PrometheusAlerts }}
+{{- $alert := set $alert "env" (tpl $alert.env $) }}
+{{- $namespace := $.Release.Namespace }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $releasename }}-{{ $name }}-alerts
+  labels:
+    {{- include "prometheus-rules.labels" $ | nindent 4 }}
+    {{- toYaml $alert.selector | nindent 4 }}
+spec:
+  groups:
+  {{- if and .AbsentMetricCritical .AbsentMetricCritical.enabled }}
+    - name: AbsentMetricCritical
+      {{- if .AbsentMetricCritical.interval }}
+      interval: {{ .AbsentMetricCritical.interval }}
+      {{- end }}
+      rules:
+      {{- range $absentMetricRuleName, $absentMetricRule := .AbsentMetricCritical.rules }}
+      {{- if $absentMetricRule.enabled }}
+      {{- $query := tpl ($absentMetricRule.query | default "{}") $ }}
+      {{- $tm := ($absentMetricRule.for | default "10m") }}
+      {{- $source := tpl ($absentMetricRule.source | default $name) $ }}
+        - alert: absent_{{$absentMetricRuleName}}
+          expr: absent({{$absentMetricRuleName}}{{$query}})
+          for: {{ $tm }}
+          labels:
+            env: {{ $alert.env }}
+            severity: critical
+            namespace: {{ $namespace }}
+            team: {{ $alert.team }}
+          annotations:
+            summary: |
+              Critical metrics is Absent {{ $name }} {{ $absentMetricRuleName }}
+            description: |
+              There are no metric {{ $absentMetricRuleName }}{{ $query }} from {{ $source }} in '{{ $name }}' alert.
+              Check the source {{ $source }} instance and scrape process
+      {{- end }}
+      {{- end }}
+  {{- end -}}
+  {{- if and .CriticalMetric .CriticalMetric.enabled }}
+    - name: CriticalMetric
+    {{- if .CriticalMetric.interval }}
+      interval: {{ .CriticalMetric.interval }}
+    {{- end }}
+      rules:
+      {{- range $critMetricRuleName, $critMetricRule := .CriticalMetric.rules }}
+      {{- if $critMetricRule.enabled }}
+        - alert: {{ $critMetricRuleName }}
+          expr: |
+            {{- $critMetricRule.expr | nindent 12 }}
+          for: {{ $critMetricRule.for }}
+          {{- with $critMetricRule.keep_firing_for }}
+          keep_firing_for: {{ . }}
+          {{- end }}
+          labels:
+            env: {{ $alert.env }}
+            severity: critical
+            team: {{ $alert.team }}
+            namespace: {{ $namespace }}
+          annotations:
+            summary: |
+              {{- $critMetricRule.summary | default $critMetricRuleName | nindent 14 }}
+            description: |
+              {{- $critMetricRule.description | nindent 14 }}
+      {{- end }}
+      {{- end }}
+  {{- end }}
+  {{- if and .WarningMetric .WarningMetric.enabled }}
+    - name: WarningMetric
+    {{- if .WarningMetric.interval }}
+      interval: {{ .WarningMetric.interval }}
+    {{- end }}
+      rules:
+        {{- range $warnMetricRuleName, $warnMetricRule := .WarningMetric.rules }}
+        {{- if $warnMetricRule.enabled }}
+        - alert: {{ $warnMetricRuleName }}
+          expr: |
+            {{- $warnMetricRule.expr | nindent 12}}
+          for: {{ $warnMetricRule.for }}
+          {{- with $warnMetricRule.keep_firing_for }}
+          keep_firing_for: {{ . }}
+          {{- end }}
+          labels:
+            env: {{ $alert.env }}
+            severity: medium
+            team: {{ $alert.team }}
+            namespace: {{ $namespace }}
+          annotations:
+            summary: |
+              {{- $warnMetricRule.summary | default $warnMetricRuleName | nindent 14  }}
+            description: |
+              {{- $warnMetricRule.description | nindent 14 }}
+        {{- end }}
+        {{- end }}
+  {{- end }}
+{{- end }}

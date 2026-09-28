@@ -30,7 +30,7 @@ spec:
   storageClass: {{ tpl . $ | quote }}
   {{- end }}
   {{- if hasKey $bucket "publicAccessPrevention" }}
-  publicAccessPrevention: {{ tpl $bucket.publicAccessPrevention $ }}
+  publicAccessPrevention: {{ $bucket.publicAccessPrevention }}
   {{- end }}
   {{- with $bucket.versioning }}
   versioning:

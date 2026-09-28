@@ -1,7 +1,7 @@
 global:
   image:
     repository: ghcr.io/svetoch-dev/vedro
-    tag: "{{ .Chart.AppVersion }}"
+    tag: "v0.1.0"
 
 controller:
   enabled: true
@@ -44,6 +44,29 @@ controller:
     runAsUser: 65532
     seccompProfile:
       type: RuntimeDefault
+
+  role:
+    enabled: true
+    rules:
+      - apiGroups:
+        - coordination.k8s.io
+        resources:
+        - leases
+        verbs:
+        - get
+        - list
+        - watch
+        - create
+        - update
+        - patch
+        - delete
+      - apiGroups:
+        - ""
+        resources:
+        - events
+        verbs:
+        - create
+        - patch
   clusterRole:
     enabled: true
     rules:

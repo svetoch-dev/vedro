@@ -9,10 +9,6 @@
 {{- $region = tpl $region $ }}
 {{- $method := required (printf "providers.%s.method is required" $key) $provider.method }}
 {{- $method = tpl $method $ }}
-{{- $credentialsSecretRefName := required (printf "providers.%s.credentialsSecretRef.name is required for StaticCredentials" $key) $provider.credentialsSecretRef.name }}
-{{- $credentialsSecretRefName =  tpl $credentialsSecretRefName  $ }} 
-{{- $credentialsSecretRefNamespace := required (printf "providers.%s.credentialsSecretRef.namespace is required for StaticCredentials" $key) $provider.credentialsSecretRef.namespace }}
-{{- $credentialsSecretRefNamespace = tpl $credentialsSecretRefNamespace $ }}
 ---
 apiVersion: vedro.svetoch.dev/v1alpha1
 kind: ProviderConfig
@@ -26,6 +22,10 @@ spec:
   region: {{ $region }}
   method: {{ $method }}
   {{- if eq $provider.method "StaticCredentials" }}
+  {{- $credentialsSecretRefName := required (printf "providers.%s.credentialsSecretRef.name is required for StaticCredentials" $key) $provider.credentialsSecretRef.name }}
+  {{- $credentialsSecretRefName =  tpl $credentialsSecretRefName  $ }} 
+  {{- $credentialsSecretRefNamespace := required (printf "providers.%s.credentialsSecretRef.namespace is required for StaticCredentials" $key) $provider.credentialsSecretRef.namespace }}
+  {{- $credentialsSecretRefNamespace = tpl $credentialsSecretRefNamespace $ }}
   credentialsSecretRef:
     name: {{ $credentialsSecretRefName }}
     namespace: {{ $credentialsSecretRefNamespace }}

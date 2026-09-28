@@ -1,0 +1,51 @@
+name: Publish Helm charts
+
+on:
+  push:
+    tags:
+      - 'helm-v*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5.0.1
+        with:
+          version: v3.22.0
+
+      - name: Package charts
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          chart_version="${RELEASE_TAG#helm-v}"
+          mkdir -p dist
+          for chart in helm/controller helm/vedro; do
+            helm dependency update "$chart"
+            helm lint "$chart"
+            helm package "$chart" --version "$chart_version" --destination dist
+          done
+
+      - name: Log in to GHCR
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GHCR_USERNAME" --password-stdin
+
+      - name: Push charts
+        env:
+          OCI_REPOSITORY: oci://ghcr.io/${{ github.repository }}
+        run: |
+          for chart in dist/*.tgz; do
+            helm push "$chart" "$OCI_REPOSITORY"
+          done

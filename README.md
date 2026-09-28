@@ -28,8 +28,6 @@ More indepth info about architecture why/what/when can be found [here](https://g
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
-
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
@@ -40,7 +38,7 @@ make docker-build docker-push IMG=<some-registry>/vedro:tag
 And it is required to have access to pull the image from the working environment.
 Make sure you have the proper permission to the registry if the above commands don’t work.
 
-#### Via manifests 
+### Deploy via manifests
 
 **Install the CRDs into the cluster:**
 
@@ -102,7 +100,7 @@ make uninstall
 make undeploy
 ```
 
-#### Via helm
+### Deploy via helm
 
 **Install controller helm chart**
 

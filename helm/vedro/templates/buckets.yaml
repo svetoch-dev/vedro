@@ -1,0 +1,75 @@
+{{- range $key, $bucket := .Values.buckets }}
+{{- $baseName := default $key $bucket.name }}
+{{- $name := $baseName }}
+{{- if $bucket.prefixReleaseName }}{{- $name = printf "%s-%s" $.Release.Name $baseName }}{{- end }}
+{{- $name = (tpl $name $) }}
+{{- $namespace := default $.Release.Namespace $bucket.namespace }}
+{{- $namespace = (tpl $namespace $ ) }}
+{{- $provider := required (printf "buckets.%s.provider is required" $key) $bucket.provider }}
+{{- $provider = (tpl $provider $) }}
+{{- $location := required (printf "buckets.%s.location is required" $key) $bucket.location }}
+{{- $location = (tpl $location $) }}
+
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: Bucket
+metadata:
+  name: {{ $name | quote }}
+  namespace: {{ $namespace | quote }}
+  labels:
+{{ include "common.labels" $ | indent 4 }}
+spec:
+  providerRef:
+    name: {{ $provider | quote }}
+  location:  {{ $location | quote }}
+  {{- with $bucket.nameOverride }}
+  name: {{ tpl . $ }}
+  {{- end }}
+  deletionPolicy: {{ default "Retain" $bucket.deletionPolicy | quote }}
+  {{- with $bucket.storageClass }}
+  storageClass: {{ tpl . $ | quote }}
+  {{- end }}
+  {{- if hasKey $bucket "publicAccessPrevention" }}
+  publicAccessPrevention: {{ $bucket.publicAccessPrevention }}
+  {{- end }}
+  {{- with $bucket.versioning }}
+  versioning:
+{{ tpl (toYaml .) $ | indent 4 }}
+  {{- end }}
+  {{- with $bucket.lifecycle }}
+  lifecycle:
+{{ tpl (toYaml . ) $ | indent 4 }}
+  {{- end }}
+  {{- with $bucket.labels }}
+  labels:
+{{ tpl (toYaml .) $ | indent 4 }}
+  {{- end }}
+  {{- with $bucket.cloudSpecificConfig }}
+  cloudSpecificConfig:
+{{ tpl (toYaml .) $ | indent 4 }}
+  {{- end }}
+{{- range $role, $level := dict "admins" "BucketAdmin" "objAdmins" "ObjectAdmin" "readers" "ObjectReader" "writers" "ObjectWriter" }}
+{{- range $principal := index $bucket $role | default list }}
+{{- $principalName := required (printf "buckets.%s.%s[].name is required" $key $role) (tpl $principal.name $)}}
+{{- $principalNamespace := default $.Release.Namespace $principal.namespace }}
+{{- $principalNamespace = (tpl $principalNamespace $)}}
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: BucketAccess
+metadata:
+  name: {{ include "vedro.accessName" (dict "bucket" $name "principal" $principalName "level" $level) | quote }}
+  namespace: {{ $namespace | quote }}
+  labels:
+{{ include "common.labels" $ | indent 4 }}
+spec:
+  bucketRef:
+    name: {{ $name | quote }}
+    namespace: {{ $namespace | quote }}
+  principalRef:
+    name: {{ $principalName | quote }}
+    namespace: {{ $principalNamespace | quote }}
+  access:
+    level: {{ $level | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

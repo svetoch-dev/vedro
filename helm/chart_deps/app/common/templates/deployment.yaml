@@ -1,0 +1,22 @@
+{{- $app_image_tag := ternary .Values.global.image.tag .Values.image.tag (not .Values.image.tag) }}
+{{- $app_image_repo := ternary .Values.global.image.repository .Values.image.repository (not .Values.image.repository) }}
+{{- $app_nodeSelector := ternary .Values.nodeSelector .Values.global.nodeSelector ( hasKey .Values "nodeSelector") }}
+{{- $app_tolerations := ternary .Values.tolerations .Values.global.tolerations ( hasKey .Values "tolerations") }}
+{{- $app_affinity := ternary .Values.affinity .Values.global.affinity ( hasKey .Values "affinity") }}
+{{- $labels := include "common.labels" $ | fromYaml }}
+{{- $deployment := mustDeepCopy .Values }}
+{{- $deployment = set $deployment "initContainers" (include "common.initContainers" . | fromYaml).initContainers }}
+{{- $deployment = set $deployment "enabled" .Values.deploymentEnabled }}
+{{- $deployment = set $deployment "name" (include "common.fullname" . ) }}
+{{- $deployment = set $deployment "selectorLabels" (include "common.selectorLabels" . | fromYaml ) }}
+{{- $deployment = set $deployment "imagePullPolicy" .Values.image.pullPolicy }}
+{{- $deployment = set $deployment "image" (printf "%s:%s" $app_image_repo $app_image_tag )}}
+{{- $deployment = set $deployment "nodeSelector" $app_nodeSelector }}
+{{- $deployment = set $deployment "tolerations" $app_tolerations }}
+{{- $deployment = set $deployment "affinity" $app_affinity }}
+{{- $deployment = set $deployment "serviceAccountName" ( include "common.serviceAccountName" . ) }}
+{{- $deployment = set $deployment "containerName" .Chart.Name  }}
+{{- $deployment = set $deployment "env" (include "common.env" . | fromYaml).env }}
+{{- $deployment = set $deployment "volumeMounts" (include "common.volumeMounts" . | fromYaml).volumeMounts }}
+{{- $deployment = set $deployment "volumes" (include "common.volumes" . | fromYaml).volumes }}
+{{- include "core.deployment" (list $ $labels $deployment ) }}

@@ -33,3 +33,5 @@ key
 
 #test files
 123
+
+helm/controller/charts/

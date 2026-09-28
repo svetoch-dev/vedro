@@ -1,0 +1,23 @@
+{{- $labels := include "common.labels" $ | fromYaml }}
+{{- $job := mustDeepCopy .Values.job }}
+{{- $app_image_tag := $job.image.tag | default .Values.global.image.tag }}
+{{- $app_image_repo := $job.image.repository | default .Values.global.image.repository }}
+{{- $app_nodeSelector := $job.nodeSelector | default .Values.global.nodeSelector }}
+{{- $app_tolerations := $job.tolerations | default .Values.global.tolerations }}
+{{- $app_affinity := $job.affinity | default .Values.global.affinity }}
+{{- $job = set $job "name" (include "common.fullname" . ) }}
+{{- $job = set $job "image" (printf "%s:%s" $app_image_repo $app_image_tag )}}
+{{- $job = set $job "nodeSelector" $app_nodeSelector }}
+{{- $job = set $job "tolerations" $app_tolerations }}
+{{- $job = set $job "affinity" $app_affinity }}
+{{- $job = set $job "serviceAccountName" ( include "common.serviceAccountName" . ) }}
+{{- $job = set $job "containerName" .Chart.Name  }}
+{{- $job = set $job "env" $job.environment }}
+{{- $job = set $job "restartPolicy" "OnFailure" }}
+
+{{- if not $job.selectorLabels }}
+{{- $selectorLabels := include "common.selectorLabels" . | fromYaml }}
+{{- $selectorLabels := set $selectorLabels "app.kubernetes.io/workload" "job" }}
+{{- $job := set $job "selectorLabels" $selectorLabels }}
+{{- end }}
+{{- include "core.job" (list . $labels $job )}}

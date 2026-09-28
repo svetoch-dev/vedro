@@ -1,0 +1,4 @@
+# Keys are used as Kubernetes resource names unless name is set.
+providers: {}
+principals: {}
+buckets: {}

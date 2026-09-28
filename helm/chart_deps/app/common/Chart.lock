@@ -1,0 +1,15 @@
+dependencies:
+- name: prometheus-lib
+  repository: file://../../prometheus/lib
+  version: 0.1.0
+- name: core
+  repository: file://../core
+  version: 0.1.0
+- name: probes
+  repository: file://../../prometheus/probes
+  version: 0.1.0
+- name: prometheus-rules
+  repository: file://../../prometheus/prometheus-rules
+  version: 0.1.0
+digest: sha256:807cfe8cf7a93752ef5a0f1e460b57251bd637143b47f43ff18703a7af26dccd
+generated: "2026-07-29T20:29:27.59972086Z"

@@ -1,0 +1,22 @@
+{{- $app_image_tag := ternary .Values.global.image.tag .Values.image.tag (not .Values.image.tag) }}
+{{- $app_image_repo := ternary .Values.global.image.repository .Values.image.repository (not .Values.image.repository) }}
+{{- $app_nodeSelector := ternary .Values.nodeSelector .Values.global.nodeSelector ( hasKey .Values "nodeSelector") }}
+{{- $app_tolerations := ternary .Values.tolerations .Values.global.tolerations ( hasKey .Values "tolerations") }}
+{{- $app_affinity := ternary .Values.affinity .Values.global.affinity ( hasKey .Values "affinity") }}
+{{- $labels := include "common.labels" $ | fromYaml }}
+{{- $statefulset := mustDeepCopy .Values }}
+{{- $statefulset = set $statefulset "initContainers" (include "common.initContainers" . | fromYaml).initContainers }}
+{{- $statefulset = set $statefulset "enabled" .Values.statefulsetEnabled }}
+{{- $statefulset = set $statefulset "name" (include "common.fullname" . ) }}
+{{- $statefulset = set $statefulset "selectorLabels" (include "common.selectorLabels" . | fromYaml ) }}
+{{- $statefulset = set $statefulset "imagePullPolicy" .Values.image.pullPolicy }}
+{{- $statefulset = set $statefulset "image" (printf "%s:%s" $app_image_repo $app_image_tag )}}
+{{- $statefulset = set $statefulset "nodeSelector" $app_nodeSelector }}
+{{- $statefulset = set $statefulset "tolerations" $app_tolerations }}
+{{- $statefulset = set $statefulset "affinity" $app_affinity }}
+{{- $statefulset = set $statefulset "serviceAccountName" ( include "common.serviceAccountName" . ) }}
+{{- $statefulset = set $statefulset "containerName" .Chart.Name  }}
+{{- $statefulset = set $statefulset "env" (include "common.env" . | fromYaml).env }}
+{{- $statefulset = set $statefulset "volumeMounts" (include "common.volumeMounts" . | fromYaml).volumeMounts }}
+{{- $statefulset = set $statefulset "volumes" (include "common.volumes" . | fromYaml).volumes }}
+{{- include "core.statefulset" (list $ $labels $statefulset ) }}

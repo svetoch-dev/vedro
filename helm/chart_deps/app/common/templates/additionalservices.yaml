@@ -1,0 +1,8 @@
+{{- range $service := .Values.additionalServices }}
+{{- $labels := include "common.labels" $ | fromYaml }}
+{{- if not $service.selectorLabels }}
+{{- $selectorLabels := include "common.selectorLabels" $ | fromYaml }}
+{{- $service := set $service "selectorLabels" $selectorLabels }}
+{{- end }}
+{{- include "core.service" (list $ $labels $service )}}
+{{- end }}

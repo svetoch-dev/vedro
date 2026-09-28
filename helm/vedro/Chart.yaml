@@ -1,0 +1,6 @@
+apiVersion: v2
+name: vedro
+description: Provider, principal, bucket, and access resources for the Vedro operator
+type: application
+version: 0.1.0
+appVersion: "v1alpha1"

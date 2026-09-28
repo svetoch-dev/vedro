@@ -1,0 +1,71 @@
+{{- range $key, $principal := .Values.principals }}
+{{- $name := default $key $principal.name }}
+{{- $name = tpl $name $ }}
+{{- $namespace := default $.Release.Namespace $principal.namespace }}
+{{- $namespace = tpl $namespace $ }}
+{{- $provider := required (printf "principals.%s.provider is required" $key) $principal.provider }}
+{{- $provider = tpl $provider $ }}
+{{- $policy := required (printf "principals.%s.type is required" $key) $principal.type }}
+{{- $policy = tpl $policy $ }}
+{{- if not (has $policy (list "Managed" "Reference")) }}{{- fail (printf "principals.%s.type must be Managed or Reference" $key) }}{{- end }}
+{{- $kind := required (printf "principals.%s.kind is required" $key) $principal.kind }}
+{{- $kind = tpl $kind $ }}
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: CloudPrincipal
+metadata:
+  name: {{ $name | quote }}
+  namespace: {{ $namespace | quote }}
+  labels:
+{{ include "common.labels" $ | indent 4 }}
+spec:
+  providerRef:
+    name: {{ $provider | quote }}
+  kind: {{ $kind | quote }}
+  managementPolicy: {{ $policy | quote }}
+  {{- if eq $policy "Managed" }}
+  managed:
+    name: {{ tpl $principal.managed.name $ }}
+    deletionPolicy: {{ default "Delete" $principal.managed.deletionPolicy | quote }}
+  {{- else if $principal.reference.name }}
+  reference:
+    name: {{ tpl $principal.reference.name $}}
+  {{- else if ne $kind "AllUsers" }}
+    {{- fail (printf "principals.%s.reference.name is required for Reference principals" $key) }}
+  {{- end }}
+{{- if $principal.auth }}
+  {{- if ne $policy "Managed" }}{{- fail (printf "principals.%s.auth is only valid for Managed principals" $key) }}{{- end }}
+  {{- $method := required (printf "principals.%s.auth.method is required" $key) $principal.auth.method }}
+  {{- $method = tpl $method $ }}
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: CloudPrincipalAuth
+metadata:
+  name: {{ printf "%s-auth" $name | trunc 63 | trimSuffix "-" | quote }}
+  namespace: {{ $namespace | quote }}
+  labels:
+{{ include "common.labels" $ | indent 4 }}
+spec:
+  principalRef:
+    name: {{ $name | quote }}
+    namespace: {{ $namespace | quote }}
+  method: {{ $method | quote }}
+  {{- if eq $method "WorkloadIdentity" }}
+  {{- $saName := required (printf "principals.%s.auth.workloadIdentity.serviceAccountRef.name is required" $key) $principal.auth.workloadIdentity.serviceAccountRef.name }}
+  {{- $saName = tpl $saName $ }}
+  workloadIdentity:
+    serviceAccountRef:
+      name: {{ $saName }}
+    deletionPolicy: {{ default "Delete" $principal.auth.workloadIdentity.deletionPolicy | quote }}
+  {{- else if eq $method "StaticCredentials" }}
+  {{- $secretName := required (printf "principals.%s.auth.staticCredentials.secretRef.name is required" $key) $principal.auth.staticCredentials.secretRef.name }}
+  {{- $secretName = tpl $secretName $ }}
+  staticCredentials:
+    secretRef:
+      name: {{ $secretName }}
+    deletionPolicy: {{ default "Delete" $principal.auth.staticCredentials.deletionPolicy | quote }}
+  {{- else }}
+    {{- fail (printf "principals.%s.auth.method must be WorkloadIdentity or StaticCredentials" $key) }}
+  {{- end }}
+{{- end }}
+{{- end }}

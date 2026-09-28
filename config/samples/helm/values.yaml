@@ -1,0 +1,59 @@
+providers:
+  sample:
+    name: "providerconfig-{{ .Release.Name }}"
+    type: '{{ last (splitList "-" .Release.Name ) }}'
+    projectId:
+    location: '{{ ternary "europe-west1" "ru-central1" (eq .Values.providers.sample.type "gcp") }}'
+    region: europe-west1
+    method: WorkloadIdentity
+    usagePolicy:
+      allowedNamespaces:
+        names:
+          - "{{ .Release.Namespace }}"
+      bucketPolicy:
+        allowedNamePatterns: 
+          - '^.*{{ .Release.Name }}$'
+      principalPolicy:
+        allowedNamePatterns:
+          - '^.*{{ .Release.Name }}$'
+        allowedReferencePatterns:
+          - "^.*$"
+
+principals:
+  sample:
+    name: "principal-{{ .Release.Name }}"
+    provider: "providerconfig-{{ .Release.Name }}"
+    kind: ServiceAccount
+    type: Managed
+    managed:
+      name: "principal-{{ .Release.Name }}"
+    auth:
+      method: StaticCredentials
+      staticCredentials:
+        secretRef:
+          name: "secret-{{ .Release.Name }}"
+
+buckets:
+  sample:
+    name: "bucket-{{ .Release.Name}}" 
+    provider: "providerconfig-{{ .Release.Name }}"
+    location: '{{ ternary "europe-west1" "ru-central1" (eq (last (splitList "-" .Release.Name )) "gcp") }}'
+
+    storageClass: Standard
+
+    versioning:
+      enabled: true
+
+    lifecycle:
+      rules:
+        - enabled: true
+          ageDays: 90
+          action: Delete
+
+    labels:
+      app: payments
+      env: dev
+    
+    readers:
+      - name: "principal-{{ .Release.Name }}"
+

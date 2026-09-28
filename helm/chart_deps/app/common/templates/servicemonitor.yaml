@@ -1,0 +1,7 @@
+{{- $serviceMonitor := .Values.serviceMonitor }}
+{{- $labels := include "common.labels" . | fromYaml }}
+{{- $serviceMonitor = set $serviceMonitor "jobLabel" (include "common.fullname" . ) }}
+{{- $serviceMonitor = set $serviceMonitor "selectorLabels" (include "common.selectorLabels" . | fromYaml ) }}
+{{- $serviceMonitor = set $serviceMonitor "name" (include "common.fullname" . ) }}
+
+{{- include "prometheus.serviceMonitor" (list $ $labels $serviceMonitor) }}

@@ -1,0 +1,35 @@
+{{- range $key, $provider := .Values.providers }}
+{{- $name := default $key $provider.name }}
+{{- $name = (tpl $name $ ) }}
+{{- $type := required (printf "providers.%s.type is required" $key) $provider.type }}
+{{- $type = tpl $type $ }}
+{{- $projectId := required (printf "providers.%s.projectId is required" $key) $provider.projectId }}
+{{- $projectId = tpl $projectId $ }}
+{{- $region := required (printf "providers.%s.region is required" $key) $provider.region }}
+{{- $region = tpl $region $ }}
+{{- $method := required (printf "providers.%s.method is required" $key) $provider.method }}
+{{- $method = tpl $method $ }}
+---
+apiVersion: vedro.svetoch.dev/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: {{ $name | quote }}
+  labels:
+{{ include "common.labels" $ | indent 4 }}
+spec:
+  type: {{ $type }}
+  projectId: {{ $projectId }}
+  region: {{ $region }}
+  method: {{ $method }}
+  {{- if eq $provider.method "StaticCredentials" }}
+  {{- $credentialsSecretRefName := required (printf "providers.%s.credentialsSecretRef.name is required for StaticCredentials" $key) $provider.credentialsSecretRef.name }}
+  {{- $credentialsSecretRefName =  tpl $credentialsSecretRefName  $ }} 
+  {{- $credentialsSecretRefNamespace := required (printf "providers.%s.credentialsSecretRef.namespace is required for StaticCredentials" $key) $provider.credentialsSecretRef.namespace }}
+  {{- $credentialsSecretRefNamespace = tpl $credentialsSecretRefNamespace $ }}
+  credentialsSecretRef:
+    name: {{ $credentialsSecretRefName }}
+    namespace: {{ $credentialsSecretRefNamespace }}
+  {{- end }}
+  usagePolicy:
+{{ tpl (toYaml (required (printf "providers.%s.usagePolicy is required" $key) $provider.usagePolicy)) $ | indent 4 }}
+{{- end }}

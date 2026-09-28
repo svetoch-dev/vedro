@@ -20,15 +20,14 @@ Create credentials and use them in applications.
 
 More indepth info about architecture why/what/when can be found [here](https://github.com/svetoch-dev/rod-docs/tree/master/docs/proposals/architecture/3-manage-cloud-dependencies-in-k8s)
 
-## Getting Started
 
-### Prerequisites
+## Contributing
+
 - go version v1.26.0+
 - docker version 17.03+.
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
@@ -38,6 +37,8 @@ make docker-build docker-push IMG=<some-registry>/vedro:tag
 **NOTE:** This image ought to be published in the personal registry you specified.
 And it is required to have access to pull the image from the working environment.
 Make sure you have the proper permission to the registry if the above commands don’t work.
+
+### Deploy via manifests
 
 **Install the CRDs into the cluster:**
 
@@ -54,29 +55,37 @@ make deploy IMG=<some-registry>/vedro:tag
 > **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
 privileges or be logged in as admin.
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+
+**Install test manifests**
 
 
-* GCP
+**GCP**
+
+Install
 
 ```sh
-GCP_PROJECT_ID=<YOUR PROJECT ID> envsubst '${GCP_PROJECT_ID}' < config/samples/gcp.yaml | kubectl apply -f -
+GCP_PROJECT_ID=<YOUR PROJECT ID> envsubst '${GCP_PROJECT_ID}' < config/samples/manifests/gcp.yaml | kubectl apply -f -
 ```
 
-* YC 
+Delete
 
 ```sh
-YC_PROJECT_ID=b1gfu8oas3od212hedtu envsubst '${YC_PROJECT_ID}' < config/samples/yc.yaml | kubectl apply -f -
+kubectl delete -f config/samples/manifests/gcp.yaml
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+**YC**
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+Install
 
 ```sh
-kubectl delete -k config/samples/
+YC_PROJECT_ID=b1gfu8oas3od212hedtu envsubst '${YC_PROJECT_ID}' < config/samples/manifests/yc.yaml | kubectl apply -f -
+```
+
+Delete
+
+```sh
+kubectl delete -f config/samples/manifests/yc.yaml
+
 ```
 
 **Delete the APIs(CRDs) from the cluster:**
@@ -91,53 +100,40 @@ make uninstall
 make undeploy
 ```
 
-## Project Distribution
+### Deploy via helm
 
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
+**Install controller helm chart**
 
 ```sh
-make build-installer IMG=<some-registry>/vedro:tag
+helm upgrade --install vedro-gcp-int helm/controller/
 ```
 
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
+**Install test manifests**
 
-2. Using the installer
+**GCP**
 
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
+Install
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/vedro/<tag or branch>/dist/install.yaml
+helm upgrade --install sample-gcp helm/vedro/ --values config/samples/helm/values.yaml --set providers.sample.projectId=some-project
 ```
 
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
+Delete
 
 ```sh
-operator-sdk edit --plugins=helm/v1-alpha
+helm delete sample-gcp
 ```
 
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
+**YC**
 
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
+Install
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+```sh
+helm upgrade --install sample-yc helm/vedro/ --values config/samples/helm/values.yaml --set providers.sample.projectId=dawd1212e1e1d1
+```
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
+Delete
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+```sh
+helm delete sample-yc
+```

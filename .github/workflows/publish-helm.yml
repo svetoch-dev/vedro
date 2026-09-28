@@ -44,7 +44,7 @@ jobs:
 
       - name: Push charts
         env:
-          OCI_REPOSITORY: oci://ghcr.io/${{ github.repository }}
+          OCI_REPOSITORY: oci://ghcr.io/${{ github.repository_owner }}/charts
         run: |
           for chart in dist/*.tgz; do
             helm push "$chart" "$OCI_REPOSITORY"

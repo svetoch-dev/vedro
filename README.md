@@ -56,10 +56,10 @@ make deploy IMG=<some-registry>/vedro:tag
 privileges or be logged in as admin.
 
 
-You can apply the samples (examples) from the config/sample:
+**Install test manifests**
 
 
-** GCP **
+**GCP**
 
 Install
 
@@ -73,7 +73,7 @@ Delete
 kubectl delete -f config/samples/manifests/gcp.yaml
 ```
 
-** YC **
+**YC**
 
 Install
 

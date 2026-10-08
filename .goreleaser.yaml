@@ -8,7 +8,7 @@ before:
 builds:
   - id: vedro
     dir: .
-    main: ./cmd/webhook/
+    main: ./cmd/
     binary: vedro
     env:
       - CGO_ENABLED=0 # build a static binary without C dependencies

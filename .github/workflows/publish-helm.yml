@@ -3,7 +3,7 @@ name: Publish Helm charts
 on:
   push:
     tags:
-      - 'helm-v*'
+      - 'v*'
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          chart_version="${RELEASE_TAG#helm-v}"
+          chart_version="${RELEASE_TAG#v}"
           mkdir -p dist
           for chart in helm/controller helm/vedro; do
             helm dependency update "$chart"

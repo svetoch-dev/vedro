@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -29,19 +29,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Image metadata
-        id: metadata
-        uses: docker/metadata-action@v6.2.0
+      - name: Run Goreleaser
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: goreleaser/goreleaser-action@v7
         with:
-          images: ghcr.io/${{ github.repository }}
-          flavor: latest=true
-          tags: type=ref,event=tag
-
-      - name: Build and push
-        uses: docker/build-push-action@v7.4.0
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}
+          version: "~> v2"
+          args: release --clean

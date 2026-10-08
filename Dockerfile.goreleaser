@@ -1,0 +1,6 @@
+FROM gcr.io/distroless/static:nonroot
+ARG TARGETPLATFORM
+WORKDIR /
+COPY ${TARGETPLATFORM}/vedro /manager
+USER 65532:65532
+ENTRYPOINT ["/manager"]

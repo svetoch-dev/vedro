@@ -25,35 +25,17 @@ builds:
       - amd64
       - arm64
 
-dockers:
+dockers_v2:
   - ids:
       - vedro
-    image_templates:
-      - ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-amd64
-    goos: linux
-    goarch: amd64
-    dockerfile: Dockerfile
-    build_flag_templates:
-      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
-      - "--platform=linux/amd64"
-    use: buildx
-  - ids:
-      - vedro
-    image_templates:
-      - ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-arm64
-    goos: linux
-    goarch: arm64
-    dockerfile: Dockerfile
-    build_flag_templates:
-      - "--build-arg=BINARY_NAME={{ .ProjectName }}"
-      - "--platform=linux/arm64"
-    use: buildx
-
-docker_manifests:
-  - name_template: "ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}"
-    image_templates:
-      - "ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-arm64"
+    images:
+      - ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}
+    tags:
+      - "{{ .Version }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    dockerfile: Dockerfile.goreleaser
 
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
@@ -72,8 +54,6 @@ release:
     name: vedro
   footer: |
     ## Docker Images
-    - ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ trimprefix .Tag "v" }} (universal, multi-platform)
-    - ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ trimprefix .Tag "v" }}-amd64
-    - ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ trimprefix .Tag "v" }}-arm64
+    - ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }} (universal, multi-platform)
   prerelease: auto
   replace_existing_draft: true

@@ -23,7 +23,7 @@ More indepth info about architecture why/what/when can be found [here](https://g
 
 ## Contributing
 
-- go version v1.26.0+
+- go version v1.27.3+
 - docker version 17.03+.
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.

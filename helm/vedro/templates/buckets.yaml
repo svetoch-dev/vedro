@@ -17,7 +17,7 @@ metadata:
   name: {{ $name | quote }}
   namespace: {{ $namespace | quote }}
   labels:
-{{ include "common.labels" $ | indent 4 }}
+{{ include "vedro.labels" $ | indent 4 }}
 spec:
   providerRef:
     name: {{ $provider | quote }}
@@ -60,7 +60,7 @@ metadata:
   name: {{ include "vedro.accessName" (dict "bucket" $name "principal" $principalName "level" $level) | quote }}
   namespace: {{ $namespace | quote }}
   labels:
-{{ include "common.labels" $ | indent 4 }}
+{{ include "vedro.labels" $ | indent 4 }}
 spec:
   bucketRef:
     name: {{ $name | quote }}

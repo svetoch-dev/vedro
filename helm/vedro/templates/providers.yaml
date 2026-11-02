@@ -15,7 +15,7 @@ kind: ProviderConfig
 metadata:
   name: {{ $name | quote }}
   labels:
-{{ include "common.labels" $ | indent 4 }}
+{{ include "vedro.labels" $ | indent 4 }}
 spec:
   type: {{ $type }}
   projectId: {{ $projectId }}

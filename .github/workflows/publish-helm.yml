@@ -22,7 +22,7 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v5.0.1
         with:
-          version: v3.22.0
+          version: v4.3.1
 
       - name: Package charts
         env:

@@ -1,7 +1,10 @@
 {{- range $key, $principal := .Values.principals }}
 {{- $name := default $key $principal.name }}
 {{- $name = tpl $name $ }}
-{{- $auth := include "vedro.principal.auth" (list $ $principal.auth) }}
+{{- $auth := dict }}
+{{- if $principal.auth }}
+{{- $auth = include "vedro.principal.auth" (list $ $principal.auth) }}
+{{- end }}
 {{- $namespace := default $.Release.Namespace $principal.namespace }}
 {{- $namespace = tpl $namespace $ }}
 {{- $provider := required (printf "principals.%s.provider is required" $key) $principal.provider }}

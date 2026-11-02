@@ -2,4 +2,4 @@ apiVersion: v2
 name: vedro
 description: Provider, principal, bucket, and access resources for the Vedro operator
 type: application
-version: 0.2.0
+version: 0.2.1

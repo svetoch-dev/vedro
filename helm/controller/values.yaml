@@ -3,7 +3,7 @@ global:
     repository: ghcr.io/svetoch-dev/vedro
     # Cant use {{ .Chart.AppVersion }} here because it
     # is rendered to a value set in a dependency chart
-    tag: "0.1.1"
+    tag: "0.2.1"
 
 controller:
   enabled: true

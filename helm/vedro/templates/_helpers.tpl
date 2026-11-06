@@ -23,6 +23,21 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
+{{- define "vedro.bucket.cloudSpecificConfig" -}}
+{{- $ := index . 0 -}}
+{{- $csc := index . 1 -}}
+
+{{- if empty $csc -}}
+{{- /* Return empty string */ -}}
+{{- else if kindIs "string" $csc -}}
+  {{- tpl $csc $ -}}
+{{- else if kindIs "map" $csc -}}
+  {{- tpl (toYaml $csc) $ -}}
+{{- else -}}
+  {{- fail "bucket.cloudSpecificConfig must be either a YAML string or a map" -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "vedro.principal.auth.validate" }}
 {{- $auth := . }}
 {{- $auth = fromYaml $auth }}

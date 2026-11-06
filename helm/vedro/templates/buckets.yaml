@@ -1,5 +1,6 @@
 {{- range $key, $bucket := .Values.buckets }}
 {{- $baseName := default $key $bucket.name }}
+{{- $csc := include "vedro.bucket.cloudSpecificConfig" (list $ $bucket.cloudSpecificConfig) }}
 {{- $name := $baseName }}
 {{- if $bucket.prefixReleaseName }}{{- $name = printf "%s-%s" $.Release.Name $baseName }}{{- end }}
 {{- $name = (tpl $name $) }}
@@ -44,9 +45,9 @@ spec:
   labels:
 {{ tpl (toYaml .) $ | indent 4 }}
   {{- end }}
-  {{- with $bucket.cloudSpecificConfig }}
+  {{- if not (empty $csc) }}
   cloudSpecificConfig:
-{{ tpl (toYaml .) $ | indent 4 }}
+{{ $csc | indent 4 }}
   {{- end }}
 {{- range $role, $level := dict "admins" "BucketAdmin" "objAdmins" "ObjectAdmin" "readers" "ObjectReader" "writers" "ObjectWriter" }}
 {{- range $principal := index $bucket $role | default list }}

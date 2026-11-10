@@ -14,8 +14,14 @@ TypeMeta fields while retaining resource status fields. Keep its Kubernetes
 version aligned with the k8s.io dependencies so external API links target the
 matching Kubernetes reference.
 
-`templates/api.tpl` renders resource lists, field tables, defaults, validation
-rules, and enum descriptions. It joins wrapped Go comment lines with spaces so
-source formatting does not create forced line breaks in the reference. Blank
-lines between comment paragraphs remain paragraph breaks, and validation entries
-are separated by semicolons.
+The files in `templates/` follow the upstream Markdown template layout:
+
+- `gv_list.tpl` renders the page title and package index.
+- `gv_details.tpl` renders a package and its resource index.
+- `type.tpl` renders types, field tables, defaults, validation, and enum values.
+- `type_members.tpl` formats field descriptions and contains the shared `cellDoc` helper.
+
+The templates join wrapped Go comment lines with spaces so source formatting does
+not create forced line breaks in the reference. Blank lines between comment
+paragraphs remain paragraph breaks, and validation entries are separated by
+semicolons.

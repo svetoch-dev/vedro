@@ -1,0 +1,9 @@
+processor:
+  ignoreTypes:
+    - "List$"
+  ignoreFields:
+    - "TypeMeta$"
+
+render:
+  # Keep Kubernetes API links aligned with the k8s.io dependencies in go.mod.
+  kubernetesVersion: "1.37"

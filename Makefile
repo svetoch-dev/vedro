@@ -101,9 +101,12 @@ generate: controller-gen generate-api-reference ## Generate DeepCopy implementat
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: generate-api-reference
-generate-api-reference: gen-crd-api-reference-docs ## Generate docs/reference/api.md from the Go API types.
+generate-api-reference: crd-ref-docs ## Generate docs/reference/api.md from the Go API types.
 	mkdir -p docs/reference
-	$(API_DOC_GEN) -api-dir "github.com/svetoch-dev/vedro/api/" -config "hack/docs/config.json" -template-dir "hack/docs/templates" -out-file "docs/reference/api.md"
+	$(API_DOC_GEN) --source-path=api --config=hack/docs/config.yaml --renderer=markdown --output-path=docs/reference/api.md
+	# Remove trailing blank lines emitted by the embedded Markdown templates.
+	sed -i.bak -e :a -e '/^\n*$$/{$$d;N;ba;}' docs/reference/api.md
+	rm -f docs/reference/api.md.bak
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -213,7 +216,7 @@ KUBECTL ?= kubectl
 KIND ?= kind
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-API_DOC_GEN ?= $(LOCALBIN)/gen-crd-api-reference-docs
+API_DOC_GEN ?= $(LOCALBIN)/crd-ref-docs
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 LINT_GOCACHE ?= $(LOCALBIN)/.gocache
@@ -223,6 +226,7 @@ LINT_GOLANGCI_CACHE ?= $(LOCALBIN)/.golangci-lint-cache
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.3
 CONTROLLER_TOOLS_VERSION ?= v0.23.0
+CRD_REF_DOCS_VERSION ?= v0.3.0
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
@@ -239,10 +243,10 @@ controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessar
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
-.PHONY: gen-crd-api-reference-docs
-gen-crd-api-reference-docs: $(API_DOC_GEN) ## Install the API reference generator locally if necessary.
-$(API_DOC_GEN): hack/docs/go.mod hack/docs/go.sum | $(LOCALBIN)
-	cd hack/docs && GOBIN="$(abspath $(LOCALBIN))" go install -mod=readonly github.com/ahmetb/gen-crd-api-reference-docs
+.PHONY: crd-ref-docs
+crd-ref-docs: $(API_DOC_GEN) ## Install the API reference generator locally if necessary.
+$(API_DOC_GEN): | $(LOCALBIN)
+	$(call go-install-tool,$(API_DOC_GEN),github.com/elastic/crd-ref-docs,$(CRD_REF_DOCS_VERSION))
 
 .PHONY: setup-envtest
 setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.

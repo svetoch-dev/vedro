@@ -219,7 +219,6 @@ type CloudPrincipalStatus struct {
 	ManagementPolicy PrincipalManagementPolicy `json:"managementPolicy,omitempty"`
 }
 
-// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced,categories=vedro

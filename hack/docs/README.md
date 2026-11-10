@@ -2,16 +2,17 @@
 
 Run `make generate` to regenerate DeepCopy code and `docs/reference/api.md`, or
 `make generate-api-reference` to update only the reference. The generator is
-installed into `bin/gen-crd-api-reference-docs` when missing and reused on later
-runs. Changes to this tools module trigger reinstallation.
+installed into `bin/crd-ref-docs` when missing and reused on later runs.
 
-The generator version is pinned in this directory's `go.mod`, separately from the
-operator's dependencies. Its `golang.org/x/tools` dependency is updated to support
-the project's Go toolchain. After changing tool dependencies, run `go mod tidy`
-from this directory and regenerate the reference.
+The [crd-ref-docs](https://github.com/elastic/crd-ref-docs) version is pinned by
+`CRD_REF_DOCS_VERSION` in the Makefile and installed using the same local tool
+helper as controller-gen. It does not add dependencies to the operator's Go module.
 
 The reference uses comments and JSON field names from `api/`. Update those Go
-types to change API descriptions. `config.json` hides list wrappers and links
-Kubernetes metadata types to their upstream documentation. The local templates
-produce HTML tables and anchors inside Markdown, in the style of Prometheus
-Operator's API reference.
+types to change API descriptions. `config.yaml` hides list wrappers and embedded
+TypeMeta fields while retaining resource status fields. Keep its Kubernetes
+version aligned with the k8s.io dependencies so external API links target the
+matching Kubernetes reference.
+
+The generator's embedded Markdown templates render resource lists, field tables,
+defaults, validation rules, and enum descriptions. No local templates are needed.

@@ -29,7 +29,9 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: CloudPrincipal is the Schema for the cloudprincipals API.
+        description: |-
+          CloudPrincipal manages or references a cloud identity used for bucket access and
+          authentication.
         properties:
           apiVersion:
             description: |-
@@ -52,7 +54,12 @@ spec:
             description: Spec defines the desired state of the CloudPrincipal.
             properties:
               kind:
-                description: Kind identifies the type of cloud principal.
+                description: |-
+                  Kind selects ServiceAccount, User, Group, Role, or AllUsers. Both providers can manage
+                  ServiceAccount and reference ServiceAccount, User, and AllUsers. GCP additionally
+                  supports Group references. Role is currently unsupported by both providers.
+                  AllUsers represents unauthenticated public access and requires Reference management
+                  with both managed and reference omitted.
                 enum:
                 - ServiceAccount
                 - User
@@ -62,22 +69,26 @@ spec:
                 type: string
               managed:
                 description: |-
-                  Managed configures a principal managed by this resource.
-                  It must be set only when ManagementPolicy is Managed.
+                  Managed supplies the name and deletion policy for an external principal created or
+                  reconciled by the controller. Required when managementPolicy is Managed and forbidden
+                  otherwise.
                 properties:
                   deletionPolicy:
                     default: Delete
                     description: |-
-                      DeletionPolicy controls what happens to the external CloudPrincipal
-                      when this Kubernetes object is deleted.
+                      DeletionPolicy controls cleanup of the managed external principal when the
+                      CloudPrincipal is deleted. Delete removes the external principal and is the default.
+                      Retain leaves it in the cloud provider.
                     enum:
                     - Delete
                     - Retain
                     type: string
                   name:
                     description: |-
-                      Name is the cloud provider principal name.
-                      Name format depends on what Kind of principal it is
+                      Name is the desired external principal name, subject to provider naming rules. It is
+                      required; the API does not default it from metadata.name. For a GCP ServiceAccount, use
+                      the short account ID rather than its email address. The resolved name cannot change
+                      after provisioning.
                     minLength: 1
                     type: string
                 required:
@@ -85,8 +96,9 @@ spec:
                 type: object
               managementPolicy:
                 description: |-
-                  ManagementPolicy controls whether the external principal is managed by this
-                  resource or references an existing principal.
+                  ManagementPolicy selects Managed to create and reconcile an external principal, or
+                  Reference to resolve an existing principal without managing its lifecycle. The policy is
+                  immutable. Both providers currently support Managed only for ServiceAccount.
                 enum:
                 - Managed
                 - Reference
@@ -95,11 +107,14 @@ spec:
                 - message: managementPolicy is immutable
                   rule: self == oldSelf
               providerRef:
-                description: ProviderRef references the ProviderConfig used to manage
-                  this principal.
+                description: |-
+                  ProviderRef selects the cluster-scoped ProviderConfig used to manage or resolve this
+                  principal. The reference is immutable, and the principal must satisfy the provider's
+                  usage policy.
                 properties:
                   name:
-                    description: Name is the name of the ProviderConfig.
+                    description: Name is the name of the cluster-scoped ProviderConfig.
+                      No namespace is required.
                     minLength: 1
                     type: string
                 required:
@@ -110,13 +125,17 @@ spec:
                   rule: self == oldSelf
               reference:
                 description: |-
-                  Reference identifies an existing principal that is not managed by this resource.
-                  It must be set only when ManagementPolicy is Reference.
+                  Reference identifies an existing external principal. Required when managementPolicy is
+                  Reference, except for AllUsers, where it must be omitted. Forbidden when
+                  managementPolicy is Managed.
                 properties:
                   name:
                     description: |-
-                      Name is the cloud provider principal name.
-                      Name format depends on what Kind of principal it is
+                      Name identifies an existing external principal in the format expected by the provider
+                      and kind. For a GCP ServiceAccount, use its email address. For a Yandex Cloud
+                      ServiceAccount, use <folder-name>:<service-account-name>, such as prod:some-sa.
+                      User and GCP Group references use email addresses. References are resolved without
+                      creating or deleting the external principal.
                     minLength: 1
                     type: string
                 required:
@@ -136,7 +155,9 @@ spec:
               rule: self.managementPolicy != 'Reference' || ((self.kind == 'AllUsers'
                 || has(self.reference)) && !has(self.managed))
           status:
-            description: Status defines the observed state of the CloudPrincipal.
+            description: |-
+              Status records the observed state of the CloudPrincipal and is maintained by the
+              controller.
             properties:
               conditions:
                 description: Conditions represent the latest available observations
@@ -222,12 +243,22 @@ spec:
                 description: UnsupportedFeatures lists requested features that the
                   selected provider does not support.
                 items:
+                  description: |-
+                    UnsupportedFeature describes a spec field that cannot be applied by the selected
+                    provider.
                   properties:
                     field:
+                      description: |-
+                        Field is the path to the unsupported field in the requested spec, including a list index
+                        when applicable.
                       type: string
                     message:
+                      description: Message explains why the selected provider cannot
+                        apply the requested feature.
                       type: string
                     reason:
+                      description: Reason is a machine-readable code identifying the
+                        unsupported capability.
                       type: string
                   required:
                   - field

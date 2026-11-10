@@ -20,82 +20,117 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// BucketAccessLevel selects a provider-neutral bucket permission level.
 type BucketAccessLevel string
 
 const (
+	// ObjectReader maps to GCS roles/storage.objectViewer or Yandex Cloud storage.viewer on
+	// the bucket.
 	ObjectReader BucketAccessLevel = "ObjectReader"
+	// ObjectWriter maps to GCS roles/storage.objectCreator or Yandex Cloud storage.uploader on
+	// the bucket. It is not a combined reader and writer role.
 	ObjectWriter BucketAccessLevel = "ObjectWriter"
-	ObjectAdmin  BucketAccessLevel = "ObjectAdmin"
-	BucketAdmin  BucketAccessLevel = "BucketAdmin"
+	// ObjectAdmin maps to GCS roles/storage.objectAdmin or Yandex Cloud storage.editor on the
+	// bucket.
+	ObjectAdmin BucketAccessLevel = "ObjectAdmin"
+	// BucketAdmin maps to GCS roles/storage.admin or Yandex Cloud storage.admin on the bucket.
+	BucketAdmin BucketAccessLevel = "BucketAdmin"
 )
 
 const (
+	// BucketAccessUnsupportedObjectReader indicates that the selected provider does not
+	// support ObjectReader grants.
 	BucketAccessUnsupportedObjectReader UnsupportedFeatureReason = "BucketAccessUnsupportedObjectReader"
+	// BucketAccessUnsupportedObjectWriter indicates that the selected provider does not
+	// support ObjectWriter grants.
 	BucketAccessUnsupportedObjectWriter UnsupportedFeatureReason = "BucketAccessUnsupportedObjectWriter"
-	BucketAccessUnsupportedObjectAdmin  UnsupportedFeatureReason = "BucketAccessUnsupportedObjectAdmin"
-	BucketAccessUnsupportedBucketAdmin  UnsupportedFeatureReason = "BucketAccessUnsupportedBucketAdmin"
+	// BucketAccessUnsupportedObjectAdmin indicates that the selected provider does not support
+	// ObjectAdmin grants.
+	BucketAccessUnsupportedObjectAdmin UnsupportedFeatureReason = "BucketAccessUnsupportedObjectAdmin"
+	// BucketAccessUnsupportedBucketAdmin indicates that the selected provider does not support
+	// BucketAdmin grants.
+	BucketAccessUnsupportedBucketAdmin UnsupportedFeatureReason = "BucketAccessUnsupportedBucketAdmin"
 )
 
+// Access configures the permission level granted to a cloud principal on a bucket.
 type Access struct {
+	// Level selects ObjectReader, ObjectWriter, ObjectAdmin, or BucketAdmin. The selected
+	// level is mapped to a provider-specific role on the bucket.
+	//
 	// +kubebuilder:validation:Enum=ObjectReader;ObjectWriter;ObjectAdmin;BucketAdmin
 	Level BucketAccessLevel `json:"level"`
 }
 
+// BucketAccessProperties records the cloud identities and access level of an applied grant.
 type BucketAccessProperties struct {
-	// BucketName name of the bucket to which access is granted
-	//
+	// BucketName is the external name of the bucket on which access was granted.
 	BucketName string `json:"bucketName"`
-	// BucketId id of the bucket to which access is granted. Can
-	// be the equal to BucketName
-	//
+
+	// BucketId is the provider-side bucket identifier used for access management. It may be
+	// the same as BucketName.
 	BucketId string `json:"bucketId"`
-	// PrincipalId id of the cloud principal that access is granted too
-	//
+
+	// PrincipalId is the provider-side identity to which access was granted.
 	PrincipalId string `json:"principalId"`
-	// GrantedAccess cloud specific access name that is granted
-	//
+
+	// GrantedAccess is the Vedro access level last applied to the bucket, rather than the
+	// provider-specific role name.
 	GrantedAccess BucketAccessLevel `json:"grantedAccess"`
 }
 
+// BucketAccessSpec defines a permission grant between a Bucket and a CloudPrincipal.
 type BucketAccessSpec struct {
-	// BucketRef references the Bucket to which access is granted.
+	// BucketRef identifies the Bucket on which access is granted. The reference, including its
+	// explicit namespace, is immutable. The bucket and principal must reference the same
+	// ProviderConfig.
 	//
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="bucketRef is immutable"
 	BucketRef BucketReference `json:"bucketRef"`
-	// PrincipalRef references the CloudPrincipal to which access is granted.
-	//
+
+	// PrincipalRef identifies the CloudPrincipal receiving access, including its explicit
+	// namespace. Changing the principal causes the previously recorded grant to be revoked
+	// before the new grant is applied.
 	PrincipalRef PrincipalReference `json:"principalRef"`
 
-	// DeletionPolicy controls what happens to the bucketaccess
-	// when this Kubernetes object is deleted. If Retain is used
-	// when BucketAccess object is deleted permissions are not revoked
+	// DeletionPolicy controls the grant when this Kubernetes resource is deleted. Delete
+	// revokes the recorded permission and is the default. Retain leaves the permission in
+	// place. Neither policy deletes the bucket or principal.
 	//
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:default:=Delete
 	// +optional
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 
+	// Access specifies the desired permission level on the referenced bucket.
 	Access Access `json:"access"`
 }
 
-// ProviderConfigStatus defines the observed provider configuration state.
+// BucketAccessStatus records the applied grant and reconciliation state.
 type BucketAccessStatus struct {
-	// Applied - what has been already applied by this controller
+	// Applied records the external bucket, principal, and permission level from the last
+	// successful reconciliation. These values identify the grant to revoke during updates or
+	// deletion.
 	//
 	// +optional
 	Applied *BucketAccessProperties `json:"applied,omitempty"`
+
 	// ObservedGeneration is the latest metadata.generation observed by the controller.
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// List of unsupported features set on BucketAccess resource
+
+	// UnsupportedFeatures lists requested access levels that the selected provider does not
+	// support.
 	//
 	// +optional
 	UnsupportedFeatures []UnsupportedFeature `json:"unsupported,omitempty"`
-	// Provider used for this BucketAccess
+
+	// ObservedProvider is the name of the ProviderConfig recorded during successful access
+	// reconciliation and used to revoke the grant during deletion.
 	//
 	// +optional
 	ObservedProvider string `json:"observedProvider,omitempty"`
+
 	// Conditions represent the latest available observations of the BucketAccess state.
 	//
 	// +optional
@@ -111,23 +146,35 @@ type BucketAccessStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// BucketAccess is the Schema for the bucketaccesses API.
+// BucketAccess grants a CloudPrincipal access to a Bucket through their shared
+// ProviderConfig.
 type BucketAccess struct {
-	metav1.TypeMeta   `json:",inline"`
+	// TypeMeta identifies the API version and kind of this resource.
+	metav1.TypeMeta `json:",inline"`
+
+	// ObjectMeta contains Kubernetes identity, labels, annotations, and ownership metadata.
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// Spec defines the desired state of the BucketAccess.
 	Spec BucketAccessSpec `json:"spec,omitempty"`
 
+	// Status records the observed state of the BucketAccess and is maintained by the
+	// controller.
+	//
 	// +optional
 	Status BucketAccessStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ProviderConfigList contains a list of ProviderConfig.
+// BucketAccessList contains a list of BucketAccess resources.
 type BucketAccessList struct {
+	// TypeMeta identifies the API version and kind of this resource.
 	metav1.TypeMeta `json:",inline"`
+
+	// ListMeta contains Kubernetes list metadata, including pagination and resource version.
 	metav1.ListMeta `json:"metadata,omitempty"`
 
+	// Items contains the BucketAccess resources in this list.
 	Items []BucketAccess `json:"items"`
 }

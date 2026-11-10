@@ -94,7 +94,7 @@ type PrincipalPolicySpec struct {
 // UsagePolicySpec controls which resources may use a ProviderConfig.
 type UsagePolicySpec struct {
 	// AllowedNamespaces restricts the namespaces of Bucket, CloudPrincipal,
-	// and BucketAccess resources using this provider.
+	// BucketAccess, and CloudPrincipalAuth resources using this provider.
 	AllowedNamespaces AllowedNamespacesSpec `json:"allowedNamespaces"`
 
 	// BucketPolicy restricts cloud bucket names managed through this provider.
@@ -105,37 +105,41 @@ type UsagePolicySpec struct {
 	PrincipalPolicy PrincipalPolicySpec `json:"principalPolicy"`
 }
 
-// If StaticCredentials is set credentialsSecretRef should also be set
+// ProviderConfigSpec defines cloud scope, operator authentication, and resource usage
+// restrictions.
+//
 // +kubebuilder:validation:XValidation:rule="self.method != 'StaticCredentials' || has(self.credentialsSecretRef)",message="credentialsSecretRef is required when method is StaticCredentials"
-// If WorkloadIdentity is set credentialsSecretRef should not be set
 // +kubebuilder:validation:XValidation:rule="self.method != 'WorkloadIdentity' || !has(self.credentialsSecretRef)",message="credentialsSecretRef must not be set when method is WorkloadIdentity"
 type ProviderConfigSpec struct {
-	// Type is the cloud provider type.
+	// Type selects the cloud implementation: gcp for Google Cloud or yc for Yandex Cloud. This
+	// field is immutable.
 	//
 	// +kubebuilder:validation:Enum=gcp;yc
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="type is immutable"
 	Type ProviderType `json:"type"`
 
-	// ProjectID identifies the cloud project/account/folder.
-	//
-	// For GCP this can be the project ID.
-	// For Yandex this can be the folder ID or cloud ID, depending on your design.
+	// ProjectId is the Google Cloud project ID for gcp or the Yandex Cloud folder ID for yc.
+	// It determines where managed cloud resources are created and is immutable.
 	//
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="projectId is immutable"
 	// +kubebuilder:validation:MinLength=1
 	ProjectId string `json:"projectId"`
 
+	// Region is the provider region, such as europe-west1 or ru-central1. It must be a
+	// non-empty regional name. Bucket placement is selected separately by Bucket.spec.location.
 	Region string `json:"region"`
 
-	// Method describes the authentication method.
+	// Method selects how the operator authenticates to the provider. StaticCredentials reads a
+	// service account key from credentialsSecretRef. WorkloadIdentity uses the operator's
+	// ambient Google Cloud credentials or the Yandex Cloud instance service account.
 	//
 	// +kubebuilder:validation:Enum=StaticCredentials;WorkloadIdentity
 	Method AuthMethod `json:"method"`
 
-	// CredentialsSecretRef references a Kubernetes Secret containing provider credentials.
-	//
-	// Required when method is StaticCredentials.
-	// Usually empty when method is WorkloadIdentity.
+	// CredentialsSecretRef identifies an existing Kubernetes Secret by name and namespace.
+	// Required for StaticCredentials and forbidden for WorkloadIdentity. The Secret must
+	// contain a key entry with a Google Cloud service account JSON key for gcp or a Yandex
+	// Cloud authorized service account key in JSON format for yc.
 	//
 	// +optional
 	CredentialsSecretRef *corev1.SecretReference `json:"credentialsSecretRef,omitempty"`
@@ -151,6 +155,7 @@ type ProviderConfigStatus struct {
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
 	// ObservedGeneration is the latest metadata.generation observed by the controller.
 	//
 	// +optional
@@ -166,13 +171,21 @@ type ProviderConfigStatus struct {
 // +kubebuilder:printcolumn:name="Region",type=string,JSONPath=`.spec.region`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// ProviderConfig is the Schema for the providerconfigs API.
+// ProviderConfig is a cluster-scoped resource defining cloud connectivity and policies for
+// resources that use it.
 type ProviderConfig struct {
-	metav1.TypeMeta   `json:",inline"`
+	// TypeMeta identifies the API version and kind of this resource.
+	metav1.TypeMeta `json:",inline"`
+
+	// ObjectMeta contains Kubernetes identity, labels, annotations, and ownership metadata.
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// Spec defines the desired state of the ProviderConfig.
 	Spec ProviderConfigSpec `json:"spec,omitempty"`
 
+	// Status records the observed state of the ProviderConfig and is maintained by the
+	// controller.
+	//
 	// +optional
 	Status ProviderConfigStatus `json:"status,omitempty"`
 }
@@ -181,8 +194,12 @@ type ProviderConfig struct {
 
 // ProviderConfigList contains a list of ProviderConfig.
 type ProviderConfigList struct {
+	// TypeMeta identifies the API version and kind of this resource.
 	metav1.TypeMeta `json:",inline"`
+
+	// ListMeta contains Kubernetes list metadata, including pagination and resource version.
 	metav1.ListMeta `json:"metadata,omitempty"`
 
+	// Items contains the ProviderConfig resources in this list.
 	Items []ProviderConfig `json:"items"`
 }

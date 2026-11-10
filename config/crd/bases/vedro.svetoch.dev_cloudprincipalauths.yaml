@@ -29,8 +29,9 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: CloudPrincipalAuth is the Schema for the cloudprincipalauths
-          API.
+        description: |-
+          CloudPrincipalAuth provisions authentication for a managed CloudPrincipal and publishes
+          or configures its Kubernetes authentication resources.
         properties:
           apiVersion:
             description: |-
@@ -53,7 +54,10 @@ spec:
             description: Spec defines the desired state of the CloudPrincipalAuth.
             properties:
               method:
-                description: Method selects the authentication method.
+                description: |-
+                  Method selects StaticCredentials to issue cloud credentials into a Secret, or
+                  WorkloadIdentity to configure a Kubernetes ServiceAccount. This field is immutable. Only
+                  the matching configuration block may be set.
                 enum:
                 - StaticCredentials
                 - WorkloadIdentity
@@ -62,15 +66,22 @@ spec:
                 - message: method is immutable
                   rule: self == oldSelf
               principalRef:
-                description: PrincipalRef references the CloudPrincipal for which
-                  authentication is configured.
+                description: |-
+                  PrincipalRef identifies the CloudPrincipal for which authentication is configured,
+                  including its explicit namespace. The reference is immutable. The principal must use
+                  managementPolicy Managed. Both providers currently support authentication only for
+                  ServiceAccount principals.
                 properties:
                   name:
-                    description: Name is the name of the CloudPrincipal.
+                    description: |-
+                      Name is the Kubernetes resource name of the CloudPrincipal, not its external cloud name
+                      or identifier.
                     minLength: 1
                     type: string
                   namespace:
-                    description: Namespace of the CloudPrincipal.
+                    description: |-
+                      Namespace is the Kubernetes namespace containing the CloudPrincipal. It must be
+                      specified explicitly, including for references within the same namespace.
                     minLength: 1
                     type: string
                 required:
@@ -81,28 +92,31 @@ spec:
                 - message: principalRef is immutable
                   rule: self == oldSelf
               staticCredentials:
-                description: StaticCredentials configures the Secret used when Method
-                  is StaticCredentials.
+                description: |-
+                  StaticCredentials configures credential issuance and the output Secret. Required when
+                  method is StaticCredentials and forbidden when method is WorkloadIdentity.
                 properties:
                   deletionPolicy:
                     default: Retain
                     description: |-
-                      DeletionPolicy controls what happens to the auth material and secret
-                      when this Kubernetes object is deleted.
+                      DeletionPolicy controls cleanup when CloudPrincipalAuth is deleted. Delete revokes the
+                      cloud credentials and allows the managed Secret to be deleted. Retain preserves both the
+                      credentials and Secret, removing the Secret's owner references. Defaults to Retain.
                     enum:
                     - Delete
                     - Retain
                     type: string
                   secretRef:
                     description: |-
-                      SecretRef names the Kubernetes Secret in which static credentials are stored.
-
-                      Required when method is StaticCredentials.
-                      Usually empty when method is WorkloadIdentity.
+                      SecretRef names the output Secret in the CloudPrincipalAuth namespace. The controller
+                      stores a GCP service account JSON key under credentials.json, or Yandex Cloud S3
+                      credentials under AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. The Secret is created and
+                      managed by the controller; it is not an input credential Secret.
                     properties:
                       name:
-                        description: Name is the name of the referenced Kubernetes
-                          object.
+                        description: |-
+                          Name is the referenced Kubernetes object name in the CloudPrincipalAuth namespace. The
+                          name is immutable.
                         minLength: 1
                         type: string
                         x-kubernetes-validations:
@@ -115,28 +129,31 @@ spec:
                 - secretRef
                 type: object
               workloadIdentity:
-                description: WorkloadIdentity configures the ServiceAccount used when
-                  Method is WorkloadIdentity.
+                description: |-
+                  WorkloadIdentity configures the Kubernetes ServiceAccount and cloud identity binding.
+                  Required when method is WorkloadIdentity and forbidden when method is StaticCredentials.
                 properties:
                   deletionPolicy:
                     default: Retain
                     description: |-
-                      DeletionPolicy controls what happens to the auth material and serviceaccount annotation
-                      when this Kubernetes object is deleted.
+                      DeletionPolicy controls cleanup when CloudPrincipalAuth is deleted. Delete removes the
+                      cloud authentication binding and managed ServiceAccount annotation. Retain preserves the
+                      configuration. The Kubernetes ServiceAccount itself is not deleted. Defaults to Retain.
                     enum:
                     - Delete
                     - Retain
                     type: string
                   serviceAccountRef:
                     description: |-
-                      ServiceAccountRef names the Kubernetes ServiceAccount to configure for workload identity.
-
-                      Required when method is WorkloadIdentity.
-                      Usually empty when method is StaticCredentials.
+                      ServiceAccountRef names an existing Kubernetes ServiceAccount in the CloudPrincipalAuth
+                      namespace. For GCP, the controller grants workload identity access to the cloud service
+                      account and configures the Kubernetes ServiceAccount annotation. Workload identity for
+                      principals is currently unsupported by the Yandex Cloud provider.
                     properties:
                       name:
-                        description: Name is the name of the referenced Kubernetes
-                          object.
+                        description: |-
+                          Name is the referenced Kubernetes object name in the CloudPrincipalAuth namespace. The
+                          name is immutable.
                         minLength: 1
                         type: string
                         x-kubernetes-validations:
@@ -162,18 +179,25 @@ spec:
               rule: self.method != 'WorkloadIdentity' || (has(self.workloadIdentity)
                 && !has(self.staticCredentials))
           status:
-            description: Status defines the observed state of the CloudPrincipalAuth.
+            description: |-
+              Status records the observed state of the CloudPrincipalAuth and is maintained by the
+              controller.
             properties:
               applied:
                 description: Applied records the authentication method and resources
                   applied by the controller.
                 properties:
                   createdAt:
+                    description: |-
+                      CreatedAt is the time the controller recorded creation of the current authentication
+                      material. It is refreshed when static credentials are recreated and is used to allow for
+                      GCP key propagation delays.
                     format: date-time
                     type: string
                   credentialsId:
-                    description: CredentialsId is the provider-side identifier of
-                      the credentials.
+                    description: |-
+                      CredentialsId is the provider-side identifier used to look up or revoke the issued
+                      credentials or workload identity binding. Its format depends on the provider and method.
                     type: string
                   method:
                     description: Method is the authentication method applied to the
@@ -292,12 +316,22 @@ spec:
                 description: UnsupportedFeatures lists requested features that the
                   selected provider does not support.
                 items:
+                  description: |-
+                    UnsupportedFeature describes a spec field that cannot be applied by the selected
+                    provider.
                   properties:
                     field:
+                      description: |-
+                        Field is the path to the unsupported field in the requested spec, including a list index
+                        when applicable.
                       type: string
                     message:
+                      description: Message explains why the selected provider cannot
+                        apply the requested feature.
                       type: string
                     reason:
+                      description: Reason is a machine-readable code identifying the
+                        unsupported capability.
                       type: string
                   required:
                   - field

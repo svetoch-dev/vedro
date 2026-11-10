@@ -16,7 +16,7 @@
 <li><a href="#vedro.svetoch.dev/v1alpha1.ProviderConfig">ProviderConfig</a></li>
 </ul>
 <h3 id="vedro.svetoch.dev/v1alpha1.Bucket">Bucket</h3>
-<div><p>Bucket is the Schema for the buckets API.</p>
+<div><p>Bucket manages a cloud object storage bucket through a ProviderConfig.</p>
 </div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
@@ -28,6 +28,7 @@
 <em><a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta">k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta</a></em>
 </td>
 <td>
+<p>ObjectMeta contains Kubernetes identity, labels, annotations, and ownership metadata.</p>
 Refer to the Kubernetes API documentation for the fields of <code>metadata</code>.
 </td>
 </tr>
@@ -36,6 +37,7 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketSpec">BucketSpec</a></em>
 </td>
 <td>
+<p>Spec defines the desired state of the Bucket.</p>
 </td>
 </tr>
 <tr>
@@ -44,12 +46,14 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 </td>
 <td>
 <em>(Optional)</em>
+<p>Status records the observed state of the Bucket and is maintained by the controller.</p>
 </td>
 </tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.BucketAccess">BucketAccess</h3>
-<div><p>BucketAccess is the Schema for the bucketaccesses API.</p>
+<div><p>BucketAccess grants a CloudPrincipal access to a Bucket through their shared
+ProviderConfig.</p>
 </div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
@@ -61,6 +65,7 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 <em><a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta">k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta</a></em>
 </td>
 <td>
+<p>ObjectMeta contains Kubernetes identity, labels, annotations, and ownership metadata.</p>
 Refer to the Kubernetes API documentation for the fields of <code>metadata</code>.
 </td>
 </tr>
@@ -69,6 +74,7 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketAccessSpec">BucketAccessSpec</a></em>
 </td>
 <td>
+<p>Spec defines the desired state of the BucketAccess.</p>
 </td>
 </tr>
 <tr>
@@ -77,12 +83,15 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 </td>
 <td>
 <em>(Optional)</em>
+<p>Status records the observed state of the BucketAccess and is maintained by the
+controller.</p>
 </td>
 </tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.CloudPrincipal">CloudPrincipal</h3>
-<div><p>CloudPrincipal is the Schema for the cloudprincipals API.</p>
+<div><p>CloudPrincipal manages or references a cloud identity used for bucket access and
+authentication.</p>
 </div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
@@ -94,6 +103,7 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 <em><a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta">k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta</a></em>
 </td>
 <td>
+<p>ObjectMeta contains Kubernetes identity, labels, annotations, and ownership metadata.</p>
 Refer to the Kubernetes API documentation for the fields of <code>metadata</code>.
 </td>
 </tr>
@@ -111,13 +121,15 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 </td>
 <td>
 <em>(Optional)</em>
-<p>Status defines the observed state of the CloudPrincipal.</p>
+<p>Status records the observed state of the CloudPrincipal and is maintained by the
+controller.</p>
 </td>
 </tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.CloudPrincipalAuth">CloudPrincipalAuth</h3>
-<div><p>CloudPrincipalAuth is the Schema for the cloudprincipalauths API.</p>
+<div><p>CloudPrincipalAuth provisions authentication for a managed CloudPrincipal and publishes
+or configures its Kubernetes authentication resources.</p>
 </div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
@@ -129,6 +141,7 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 <em><a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta">k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta</a></em>
 </td>
 <td>
+<p>ObjectMeta contains Kubernetes identity, labels, annotations, and ownership metadata.</p>
 Refer to the Kubernetes API documentation for the fields of <code>metadata</code>.
 </td>
 </tr>
@@ -146,13 +159,15 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 </td>
 <td>
 <em>(Optional)</em>
-<p>Status defines the observed state of the CloudPrincipalAuth.</p>
+<p>Status records the observed state of the CloudPrincipalAuth and is maintained by the
+controller.</p>
 </td>
 </tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.ProviderConfig">ProviderConfig</h3>
-<div><p>ProviderConfig is the Schema for the providerconfigs API.</p>
+<div><p>ProviderConfig is a cluster-scoped resource defining cloud connectivity and policies for
+resources that use it.</p>
 </div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
@@ -164,6 +179,7 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 <em><a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#ObjectMeta">k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta</a></em>
 </td>
 <td>
+<p>ObjectMeta contains Kubernetes identity, labels, annotations, and ownership metadata.</p>
 Refer to the Kubernetes API documentation for the fields of <code>metadata</code>.
 </td>
 </tr>
@@ -172,6 +188,7 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 <em><a href="#vedro.svetoch.dev/v1alpha1.ProviderConfigSpec">ProviderConfigSpec</a></em>
 </td>
 <td>
+<p>Spec defines the desired state of the ProviderConfig.</p>
 </td>
 </tr>
 <tr>
@@ -180,6 +197,8 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 </td>
 <td>
 <em>(Optional)</em>
+<p>Status records the observed state of the ProviderConfig and is maintained by the
+controller.</p>
 </td>
 </tr>
 </tbody>
@@ -188,7 +207,8 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketAccessSpec">BucketAccessSpec</a>
 </p>
-<div></div>
+<div><p>Access configures the permission level granted to a cloud principal on a bucket.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -197,6 +217,8 @@ Refer to the Kubernetes API documentation for the fields of <code>metadata</code
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketAccessLevel">BucketAccessLevel</a></em>
 </td>
 <td>
+<p>Level selects ObjectReader, ObjectWriter, ObjectAdmin, or BucketAdmin. The selected
+level is mapped to a provider-specific role on the bucket.</p>
 </td>
 </tr>
 </tbody>
@@ -245,12 +267,18 @@ Defaults to false and cannot be combined with a non-empty names list.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalAuthProperties">CloudPrincipalAuthProperties</a>, <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalAuthSpec">CloudPrincipalAuthSpec</a>, <a href="#vedro.svetoch.dev/v1alpha1.ProviderConfigSpec">ProviderConfigSpec</a>
 </p>
-<div></div>
+<div><p>AuthMethod selects static credentials or workload identity authentication. ProviderConfig
+uses it for operator credentials; CloudPrincipalAuth uses it for application credentials.</p>
+</div>
 <table>
 <thead><tr><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><p>&#34;StaticCredentials&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;WorkloadIdentity&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;StaticCredentials&#34;</p></td><td><p>AuthMethodStaticCredentials uses a provider key or issues static application
+credentials, depending on the resource.</p>
+</td></tr>
+<tr><td><p>&#34;WorkloadIdentity&#34;</p></td><td><p>AuthMethodWorkloadIdentity uses ambient operator credentials or configures a Kubernetes
+workload identity, depending on the resource.</p>
+</td></tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.AuthObjectReference">AuthObjectReference</h3>
@@ -267,7 +295,8 @@ Defaults to false and cannot be combined with a non-empty names list.</p>
 <em>string</em>
 </td>
 <td>
-<p>Name is the name of the referenced Kubernetes object.</p>
+<p>Name is the referenced Kubernetes object name in the CloudPrincipalAuth namespace. The
+name is immutable.</p>
 </td>
 </tr>
 </tbody>
@@ -276,21 +305,30 @@ Defaults to false and cannot be combined with a non-empty names list.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.Access">Access</a>, <a href="#vedro.svetoch.dev/v1alpha1.BucketAccessProperties">BucketAccessProperties</a>
 </p>
-<div></div>
+<div><p>BucketAccessLevel selects a provider-neutral bucket permission level.</p>
+</div>
 <table>
 <thead><tr><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><p>&#34;BucketAdmin&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;ObjectAdmin&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;ObjectReader&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;ObjectWriter&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;BucketAdmin&#34;</p></td><td><p>BucketAdmin maps to GCS roles/storage.admin or Yandex Cloud storage.admin on the bucket.</p>
+</td></tr>
+<tr><td><p>&#34;ObjectAdmin&#34;</p></td><td><p>ObjectAdmin maps to GCS roles/storage.objectAdmin or Yandex Cloud storage.editor on the
+bucket.</p>
+</td></tr>
+<tr><td><p>&#34;ObjectReader&#34;</p></td><td><p>ObjectReader maps to GCS roles/storage.objectViewer or Yandex Cloud storage.viewer on
+the bucket.</p>
+</td></tr>
+<tr><td><p>&#34;ObjectWriter&#34;</p></td><td><p>ObjectWriter maps to GCS roles/storage.objectCreator or Yandex Cloud storage.uploader on
+the bucket. It is not a combined reader and writer role.</p>
+</td></tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.BucketAccessProperties">BucketAccessProperties</h3>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketAccessStatus">BucketAccessStatus</a>
 </p>
-<div></div>
+<div><p>BucketAccessProperties records the cloud identities and access level of an applied grant.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -299,7 +337,7 @@ Defaults to false and cannot be combined with a non-empty names list.</p>
 <em>string</em>
 </td>
 <td>
-<p>BucketName name of the bucket to which access is granted</p>
+<p>BucketName is the external name of the bucket on which access was granted.</p>
 </td>
 </tr>
 <tr>
@@ -307,8 +345,8 @@ Defaults to false and cannot be combined with a non-empty names list.</p>
 <em>string</em>
 </td>
 <td>
-<p>BucketId id of the bucket to which access is granted. Can
-be the equal to BucketName</p>
+<p>BucketId is the provider-side bucket identifier used for access management. It may be
+the same as BucketName.</p>
 </td>
 </tr>
 <tr>
@@ -316,7 +354,7 @@ be the equal to BucketName</p>
 <em>string</em>
 </td>
 <td>
-<p>PrincipalId id of the cloud principal that access is granted too</p>
+<p>PrincipalId is the provider-side identity to which access was granted.</p>
 </td>
 </tr>
 <tr>
@@ -324,7 +362,8 @@ be the equal to BucketName</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketAccessLevel">BucketAccessLevel</a></em>
 </td>
 <td>
-<p>GrantedAccess cloud specific access name that is granted</p>
+<p>GrantedAccess is the Vedro access level last applied to the bucket, rather than the
+provider-specific role name.</p>
 </td>
 </tr>
 </tbody>
@@ -333,7 +372,8 @@ be the equal to BucketName</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketAccess">BucketAccess</a>
 </p>
-<div></div>
+<div><p>BucketAccessSpec defines a permission grant between a Bucket and a CloudPrincipal.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -342,7 +382,9 @@ be the equal to BucketName</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketReference">BucketReference</a></em>
 </td>
 <td>
-<p>BucketRef references the Bucket to which access is granted.</p>
+<p>BucketRef identifies the Bucket on which access is granted. The reference, including its
+explicit namespace, is immutable. The bucket and principal must reference the same
+ProviderConfig.</p>
 </td>
 </tr>
 <tr>
@@ -350,7 +392,9 @@ be the equal to BucketName</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.PrincipalReference">PrincipalReference</a></em>
 </td>
 <td>
-<p>PrincipalRef references the CloudPrincipal to which access is granted.</p>
+<p>PrincipalRef identifies the CloudPrincipal receiving access, including its explicit
+namespace. Changing the principal causes the previously recorded grant to be revoked
+before the new grant is applied.</p>
 </td>
 </tr>
 <tr>
@@ -359,9 +403,9 @@ be the equal to BucketName</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>DeletionPolicy controls what happens to the bucketaccess
-when this Kubernetes object is deleted. If Retain is used
-when BucketAccess object is deleted permissions are not revoked</p>
+<p>DeletionPolicy controls the grant when this Kubernetes resource is deleted. Delete
+revokes the recorded permission and is the default. Retain leaves the permission in
+place. Neither policy deletes the bucket or principal.</p>
 </td>
 </tr>
 <tr>
@@ -369,6 +413,7 @@ when BucketAccess object is deleted permissions are not revoked</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.Access">Access</a></em>
 </td>
 <td>
+<p>Access specifies the desired permission level on the referenced bucket.</p>
 </td>
 </tr>
 </tbody>
@@ -377,7 +422,7 @@ when BucketAccess object is deleted permissions are not revoked</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketAccess">BucketAccess</a>
 </p>
-<div><p>ProviderConfigStatus defines the observed provider configuration state.</p>
+<div><p>BucketAccessStatus records the applied grant and reconciliation state.</p>
 </div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
@@ -388,7 +433,9 @@ when BucketAccess object is deleted permissions are not revoked</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Applied - what has been already applied by this controller</p>
+<p>Applied records the external bucket, principal, and permission level from the last
+successful reconciliation. These values identify the grant to revoke during updates or
+deletion.</p>
 </td>
 </tr>
 <tr>
@@ -406,7 +453,8 @@ when BucketAccess object is deleted permissions are not revoked</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of unsupported features set on BucketAccess resource</p>
+<p>UnsupportedFeatures lists requested access levels that the selected provider does not
+support.</p>
 </td>
 </tr>
 <tr>
@@ -415,7 +463,8 @@ when BucketAccess object is deleted permissions are not revoked</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provider used for this BucketAccess</p>
+<p>ObservedProvider is the name of the ProviderConfig recorded during successful access
+reconciliation and used to revoke the grant during deletion.</p>
 </td>
 </tr>
 <tr>
@@ -433,7 +482,9 @@ when BucketAccess object is deleted permissions are not revoked</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketProperties">BucketProperties</a>, <a href="#vedro.svetoch.dev/v1alpha1.BucketSpec">BucketSpec</a>
 </p>
-<div></div>
+<div><p>BucketCloudSpecificConfig contains settings that are specific to the selected cloud
+provider.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -443,7 +494,8 @@ when BucketAccess object is deleted permissions are not revoked</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>GCP-specific bucket configuration.</p>
+<p>Gcp configures Google Cloud Storage settings. It may only be set when the ProviderConfig
+type is gcp.</p>
 </td>
 </tr>
 <tr>
@@ -452,8 +504,8 @@ when BucketAccess object is deleted permissions are not revoked</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Yandex cloud-specific bucket configuration.
-Reserved for future Yandex Cloud extensions.</p>
+<p>Yc reserves a configuration block for Yandex Cloud extensions. It currently has no
+settings and may only be set when the ProviderConfig type is yc.</p>
 </td>
 </tr>
 </tbody>
@@ -462,7 +514,9 @@ Reserved for future Yandex Cloud extensions.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketCloudSpecificConfig">BucketCloudSpecificConfig</a>
 </p>
-<div></div>
+<div><p>BucketGcpConfig configures Google Cloud Storage features without a provider-neutral
+equivalent.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -472,6 +526,9 @@ Reserved for future Yandex Cloud extensions.</p>
 </td>
 <td>
 <em>(Optional)</em>
+<p>SoftDeletePolicy configures retention of soft-deleted objects. When omitted, the
+controller applies a seven-day retention period. Set retentionDuration to &ldquo;0s&rdquo; to
+disable soft delete.</p>
 </td>
 </tr>
 </tbody>
@@ -480,7 +537,8 @@ Reserved for future Yandex Cloud extensions.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketProperties">BucketProperties</a>, <a href="#vedro.svetoch.dev/v1alpha1.BucketSpec">BucketSpec</a>
 </p>
-<div></div>
+<div><p>BucketLifecycle defines the desired object lifecycle rules for a bucket.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -490,6 +548,8 @@ Reserved for future Yandex Cloud extensions.</p>
 </td>
 <td>
 <em>(Optional)</em>
+<p>Rules is the desired set of object lifecycle rules. An empty list configures no
+lifecycle rules. Rule names and other capabilities depend on the selected provider.</p>
 </td>
 </tr>
 </tbody>
@@ -498,18 +558,21 @@ Reserved for future Yandex Cloud extensions.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketLifecycleRule">BucketLifecycleRule</a>
 </p>
-<div></div>
+<div><p>BucketLifecycleAction is the operation performed by an object lifecycle rule.</p>
+</div>
 <table>
 <thead><tr><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><p>&#34;Delete&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;Delete&#34;</p></td><td><p>BucketLifecycleActionDelete requests deletion of objects matching the lifecycle rule.</p>
+</td></tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.BucketLifecycleRule">BucketLifecycleRule</h3>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketLifecycle">BucketLifecycle</a>
 </p>
-<div></div>
+<div><p>BucketLifecycleRule selects objects by age and configures a lifecycle action.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -519,7 +582,8 @@ Reserved for future Yandex Cloud extensions.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Name is a stable identifier for this lifecycle rule.</p>
+<p>Name is an optional stable identifier for this lifecycle rule. Yandex Cloud supports
+rule names; GCS does not.</p>
 </td>
 </tr>
 <tr>
@@ -527,7 +591,8 @@ Reserved for future Yandex Cloud extensions.</p>
 <em>bool</em>
 </td>
 <td>
-<p>Enabled controls whether this lifecycle rule should be active.</p>
+<p>Enabled controls whether this rule is active. Defaults to true. Disabled rules are
+excluded from the lifecycle configuration sent to GCS.</p>
 </td>
 </tr>
 <tr>
@@ -536,7 +601,8 @@ Reserved for future Yandex Cloud extensions.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>AgeDays matches objects older than this many days.</p>
+<p>AgeDays selects objects by age in days for the lifecycle action. When set, it must be at
+least 1. The provider determines how object age is evaluated.</p>
 </td>
 </tr>
 <tr>
@@ -544,7 +610,8 @@ Reserved for future Yandex Cloud extensions.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketLifecycleAction">BucketLifecycleAction</a></em>
 </td>
 <td>
-<p>Action describes what happens to matching objects.</p>
+<p>Action is the operation to perform on matching objects. The only supported value is
+Delete; execution follows the cloud provider&rsquo;s lifecycle scheduling.</p>
 </td>
 </tr>
 </tbody>
@@ -576,7 +643,8 @@ Use ^ and $ to match the entire name.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketStatus">BucketStatus</a>
 </p>
-<div></div>
+<div><p>BucketProperties records bucket settings returned by a provider during reconciliation.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -585,6 +653,8 @@ Use ^ and $ to match the entire name.</p>
 <em>bool</em>
 </td>
 <td>
+<p>PublicAccessPrevention records the provider-reported setting for preventing public
+access.</p>
 </td>
 </tr>
 <tr>
@@ -592,6 +662,8 @@ Use ^ and $ to match the entire name.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketVersioning">BucketVersioning</a></em>
 </td>
 <td>
+<p>Versioning records the object versioning configuration reported or applied by the
+provider.</p>
 </td>
 </tr>
 <tr>
@@ -599,6 +671,7 @@ Use ^ and $ to match the entire name.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketLifecycle">BucketLifecycle</a></em>
 </td>
 <td>
+<p>Lifecycle records the lifecycle rules reported or applied by the provider.</p>
 </td>
 </tr>
 <tr>
@@ -606,6 +679,7 @@ Use ^ and $ to match the entire name.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketStorageClass">BucketStorageClass</a></em>
 </td>
 <td>
+<p>StorageClass records the bucket storage class using Vedro storage class names.</p>
 </td>
 </tr>
 <tr>
@@ -613,6 +687,7 @@ Use ^ and $ to match the entire name.</p>
 <em>map[string]string</em>
 </td>
 <td>
+<p>Labels records the cloud bucket labels or tags reported or applied by the provider.</p>
 </td>
 </tr>
 <tr>
@@ -620,6 +695,8 @@ Use ^ and $ to match the entire name.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketCloudSpecificConfig">BucketCloudSpecificConfig</a></em>
 </td>
 <td>
+<p>CloudSpecificConfig records provider-specific bucket settings reported or applied by the
+provider, including normalized defaults when available.</p>
 </td>
 </tr>
 </tbody>
@@ -628,7 +705,8 @@ Use ^ and $ to match the entire name.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketAccessSpec">BucketAccessSpec</a>
 </p>
-<div></div>
+<div><p>BucketReference identifies a namespaced Bucket resource.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -637,7 +715,7 @@ Use ^ and $ to match the entire name.</p>
 <em>string</em>
 </td>
 <td>
-<p>Name is the name of the Bucket.</p>
+<p>Name is the Kubernetes resource name of the Bucket, not its external cloud name.</p>
 </td>
 </tr>
 <tr>
@@ -645,7 +723,8 @@ Use ^ and $ to match the entire name.</p>
 <em>string</em>
 </td>
 <td>
-<p>Namespace of the Bucket.</p>
+<p>Namespace is the Kubernetes namespace containing the Bucket. It must be specified
+explicitly, including for references within the same namespace.</p>
 </td>
 </tr>
 </tbody>
@@ -654,7 +733,8 @@ Use ^ and $ to match the entire name.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.Bucket">Bucket</a>
 </p>
-<div></div>
+<div><p>BucketSpec defines the desired cloud bucket and its lifecycle settings.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -663,7 +743,8 @@ Use ^ and $ to match the entire name.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.ProviderConfigReference">ProviderConfigReference</a></em>
 </td>
 <td>
-<p>ProviderRef references the ProviderConfig used to manage this bucket.</p>
+<p>ProviderRef selects the cluster-scoped ProviderConfig used to manage this bucket. The
+reference is immutable, and the bucket must satisfy the provider&rsquo;s usage policy.</p>
 </td>
 </tr>
 <tr>
@@ -672,7 +753,9 @@ Use ^ and $ to match the entire name.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Name is the real cloud provider bucket name.</p>
+<p>Name is the external cloud bucket name. When omitted, metadata.name is used. The
+resolved name must satisfy provider naming rules and cannot change after the external
+name has been recorded in status.</p>
 </td>
 </tr>
 <tr>
@@ -680,10 +763,10 @@ Use ^ and $ to match the entire name.</p>
 <em>string</em>
 </td>
 <td>
-<p>Location is the cloud provider location/region.</p>
-<p>Examples:
-- GCP: europe-west1
-- Yandex: ru-central1</p>
+<p>Location is the cloud bucket location, such as europe-west1 for GCS or ru-central1 for
+Yandex Cloud. GCS also accepts multi-regions such as EU and predefined dual-regions such
+as EUR4. An existing bucket must match the requested location; the controller does not
+relocate buckets.</p>
 </td>
 </tr>
 <tr>
@@ -692,7 +775,10 @@ Use ^ and $ to match the entire name.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>bucket storage class</p>
+<p>StorageClass sets the bucket&rsquo;s default storage class. Defaults to Standard. GCS maps
+Standard, Warm, Cold, and Ice to STANDARD, NEARLINE, COLDLINE, and ARCHIVE. Yandex Cloud
+supports Standard, Cold, and Ice, mapped to STANDARD, COLD, and ICE; Warm is
+unsupported.</p>
 </td>
 </tr>
 <tr>
@@ -701,8 +787,9 @@ Use ^ and $ to match the entire name.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>DeletionPolicy controls what happens to the external bucket
-when this Kubernetes object is deleted.</p>
+<p>DeletionPolicy controls cleanup when this Kubernetes resource is deleted. Retain leaves
+the external bucket and its objects intact and is the default. Delete removes object
+versions before deleting the bucket; cloud retention restrictions may prevent cleanup.</p>
 </td>
 </tr>
 <tr>
@@ -711,7 +798,9 @@ when this Kubernetes object is deleted.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>PublicAccessPrevention controls whether the bucket may be publicly accessible.</p>
+<p>PublicAccessPrevention enforces prevention of public access when true. GCS treats false
+or omission as inherited public access prevention, which may still be enforced by a
+parent policy. Yandex Cloud does not support this setting.</p>
 </td>
 </tr>
 <tr>
@@ -720,7 +809,8 @@ when this Kubernetes object is deleted.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Versioning configures object versioning.</p>
+<p>Versioning configures object versioning. Omission requests disabled versioning; existing
+object versions are not removed by disabling versioning.</p>
 </td>
 </tr>
 <tr>
@@ -729,7 +819,8 @@ when this Kubernetes object is deleted.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Lifecycle configures object lifecycle rules.</p>
+<p>Lifecycle configures object expiration rules. Omission or an empty rules list requests
+no lifecycle rules. Support for individual rule fields depends on the provider.</p>
 </td>
 </tr>
 <tr>
@@ -738,7 +829,9 @@ when this Kubernetes object is deleted.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Labels are cloud provider labels/tags applied to the bucket.</p>
+<p>Labels is the desired map of cloud bucket labels or tags, separate from Kubernetes
+metadata.labels. The controller reconciles the entire map; labels absent from it are
+removed.</p>
 </td>
 </tr>
 <tr>
@@ -746,11 +839,10 @@ when this Kubernetes object is deleted.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.BucketCloudSpecificConfig">BucketCloudSpecificConfig</a></em>
 </td>
 <td>
-<p>CloudSpecificConfig contains provider-specific bucket settings that do not
-have a cloud-agnostic equivalent in BucketSpec.</p>
-<p>These settings are applied only when the selected provider matches the
-corresponding provider config field. For example, Gcp is used only for GCS
-buckets.</p>
+<p>CloudSpecificConfig configures settings without a cloud-agnostic equivalent. Set only
+the block matching the selected ProviderConfig type; a block for another provider is
+rejected during reconciliation. GCS applies a seven-day soft-delete retention period
+when its soft-delete settings are omitted.</p>
 </td>
 </tr>
 </tbody>
@@ -759,7 +851,9 @@ buckets.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.Bucket">Bucket</a>
 </p>
-<div></div>
+<div><p>BucketStatus records the external bucket identity, applied settings, and reconciliation
+state.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -769,7 +863,8 @@ buckets.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ExternalName is the provider-side bucket name.</p>
+<p>ExternalName is the external cloud bucket name recorded after provisioning. It is also
+used to identify the bucket during deletion.</p>
 </td>
 </tr>
 <tr>
@@ -778,8 +873,8 @@ buckets.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ExternalId is the provider-side immutable resource identifier.
-It may differ from ExternalName.</p>
+<p>ExternalId is the provider-side bucket identifier. It may be the same as ExternalName
+and is used when configuring bucket access.</p>
 </td>
 </tr>
 <tr>
@@ -788,7 +883,8 @@ It may differ from ExternalName.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Location is the provider-side bucket region.</p>
+<p>Location is the provider-reported bucket location, including a region, multi-region,
+or dual-region where supported.</p>
 </td>
 </tr>
 <tr>
@@ -797,7 +893,8 @@ It may differ from ExternalName.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provider used for this bucket</p>
+<p>ObservedProvider is the name of the ProviderConfig recorded during successful bucket
+reconciliation and used for cleanup.</p>
 </td>
 </tr>
 <tr>
@@ -815,7 +912,9 @@ It may differ from ExternalName.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Applied is the applied bucket attributes</p>
+<p>Applied records the bucket properties returned by the last successful provider
+reconciliation. Provider defaults and normalization may make these differ from the
+requested spec.</p>
 </td>
 </tr>
 <tr>
@@ -824,7 +923,8 @@ It may differ from ExternalName.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of unsupported features set on Bucket resource</p>
+<p>UnsupportedFeatures lists requested settings that the selected provider cannot apply.
+Unsupported settings prevent normal reconciliation until the request is corrected.</p>
 </td>
 </tr>
 <tr>
@@ -842,21 +942,28 @@ It may differ from ExternalName.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketProperties">BucketProperties</a>, <a href="#vedro.svetoch.dev/v1alpha1.BucketSpec">BucketSpec</a>
 </p>
-<div></div>
+<div><p>BucketStorageClass is a provider-neutral storage tier. The provider maps each supported
+value to its own storage class.</p>
+</div>
 <table>
 <thead><tr><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><p>&#34;Cold&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;Ice&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;Standard&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;Warm&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;Cold&#34;</p></td><td><p>BucketStorageClassCold maps to GCS COLDLINE or Yandex Cloud COLD.</p>
+</td></tr>
+<tr><td><p>&#34;Ice&#34;</p></td><td><p>BucketStorageClassIce maps to GCS ARCHIVE or Yandex Cloud ICE.</p>
+</td></tr>
+<tr><td><p>&#34;Standard&#34;</p></td><td><p>BucketStorageClassStandard maps to STANDARD on GCS and Yandex Cloud.</p>
+</td></tr>
+<tr><td><p>&#34;Warm&#34;</p></td><td><p>BucketStorageClassWarm maps to GCS NEARLINE and is unsupported by Yandex Cloud.</p>
+</td></tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.BucketVersioning">BucketVersioning</h3>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketProperties">BucketProperties</a>, <a href="#vedro.svetoch.dev/v1alpha1.BucketSpec">BucketSpec</a>
 </p>
-<div></div>
+<div><p>BucketVersioning configures preservation of object versions.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -865,7 +972,9 @@ It may differ from ExternalName.</p>
 <em>bool</em>
 </td>
 <td>
-<p>Enabled controls bucket object versioning.</p>
+<p>Enabled enables object versioning when true and disables or suspends it when false,
+according to provider semantics. Disabling versioning does not remove existing object
+versions.</p>
 </td>
 </tr>
 </tbody>
@@ -899,7 +1008,8 @@ It is currently empty and reserved for future extensions.</p>
 <em>string</em>
 </td>
 <td>
-<p>CredentialsId is the provider-side identifier of the credentials.</p>
+<p>CredentialsId is the provider-side identifier used to look up or revoke the issued
+credentials or workload identity binding. Its format depends on the provider and method.</p>
 </td>
 </tr>
 <tr>
@@ -933,6 +1043,9 @@ It is currently empty and reserved for future extensions.</p>
 <em><a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Time">k8s.io/apimachinery/pkg/apis/meta/v1.Time</a></em>
 </td>
 <td>
+<p>CreatedAt is the time the controller recorded creation of the current authentication
+material. It is refreshed when static credentials are recreated and is used to allow for
+GCP key propagation delays.</p>
 </td>
 </tr>
 </tbody>
@@ -951,7 +1064,10 @@ It is currently empty and reserved for future extensions.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.PrincipalReference">PrincipalReference</a></em>
 </td>
 <td>
-<p>PrincipalRef references the CloudPrincipal for which authentication is configured.</p>
+<p>PrincipalRef identifies the CloudPrincipal for which authentication is configured,
+including its explicit namespace. The reference is immutable. The principal must use
+managementPolicy Managed. Both providers currently support authentication only for
+ServiceAccount principals.</p>
 </td>
 </tr>
 <tr>
@@ -959,7 +1075,9 @@ It is currently empty and reserved for future extensions.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.AuthMethod">AuthMethod</a></em>
 </td>
 <td>
-<p>Method selects the authentication method.</p>
+<p>Method selects StaticCredentials to issue cloud credentials into a Secret, or
+WorkloadIdentity to configure a Kubernetes ServiceAccount. This field is immutable. Only
+the matching configuration block may be set.</p>
 </td>
 </tr>
 <tr>
@@ -968,7 +1086,8 @@ It is currently empty and reserved for future extensions.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>StaticCredentials configures the Secret used when Method is StaticCredentials.</p>
+<p>StaticCredentials configures credential issuance and the output Secret. Required when
+method is StaticCredentials and forbidden when method is WorkloadIdentity.</p>
 </td>
 </tr>
 <tr>
@@ -977,7 +1096,8 @@ It is currently empty and reserved for future extensions.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>WorkloadIdentity configures the ServiceAccount used when Method is WorkloadIdentity.</p>
+<p>WorkloadIdentity configures the Kubernetes ServiceAccount and cloud identity binding.
+Required when method is WorkloadIdentity and forbidden when method is StaticCredentials.</p>
 </td>
 </tr>
 </tbody>
@@ -1042,7 +1162,8 @@ It is currently empty and reserved for future extensions.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipal">CloudPrincipal</a>
 </p>
-<div></div>
+<div><p>CloudPrincipalSpec defines a cloud principal to manage or reference.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -1051,7 +1172,9 @@ It is currently empty and reserved for future extensions.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.ProviderConfigReference">ProviderConfigReference</a></em>
 </td>
 <td>
-<p>ProviderRef references the ProviderConfig used to manage this principal.</p>
+<p>ProviderRef selects the cluster-scoped ProviderConfig used to manage or resolve this
+principal. The reference is immutable, and the principal must satisfy the provider&rsquo;s
+usage policy.</p>
 </td>
 </tr>
 <tr>
@@ -1059,7 +1182,11 @@ It is currently empty and reserved for future extensions.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.PrincipalKind">PrincipalKind</a></em>
 </td>
 <td>
-<p>Kind identifies the type of cloud principal.</p>
+<p>Kind selects ServiceAccount, User, Group, Role, or AllUsers. Both providers can manage
+ServiceAccount and reference ServiceAccount, User, and AllUsers. GCP additionally
+supports Group references. Role is currently unsupported by both providers.
+AllUsers represents unauthenticated public access and requires Reference management
+with both managed and reference omitted.</p>
 </td>
 </tr>
 <tr>
@@ -1067,8 +1194,9 @@ It is currently empty and reserved for future extensions.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.PrincipalManagementPolicy">PrincipalManagementPolicy</a></em>
 </td>
 <td>
-<p>ManagementPolicy controls whether the external principal is managed by this
-resource or references an existing principal.</p>
+<p>ManagementPolicy selects Managed to create and reconcile an external principal, or
+Reference to resolve an existing principal without managing its lifecycle. The policy is
+immutable. Both providers currently support Managed only for ServiceAccount.</p>
 </td>
 </tr>
 <tr>
@@ -1077,8 +1205,9 @@ resource or references an existing principal.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Managed configures a principal managed by this resource.
-It must be set only when ManagementPolicy is Managed.</p>
+<p>Managed supplies the name and deletion policy for an external principal created or
+reconciled by the controller. Required when managementPolicy is Managed and forbidden
+otherwise.</p>
 </td>
 </tr>
 <tr>
@@ -1087,8 +1216,9 @@ It must be set only when ManagementPolicy is Managed.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Reference identifies an existing principal that is not managed by this resource.
-It must be set only when ManagementPolicy is Reference.</p>
+<p>Reference identifies an existing external principal. Required when managementPolicy is
+Reference, except for AllUsers, where it must be omitted. Forbidden when
+managementPolicy is Managed.</p>
 </td>
 </tr>
 </tbody>
@@ -1180,19 +1310,27 @@ It must be set only when ManagementPolicy is Reference.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketAccessSpec">BucketAccessSpec</a>, <a href="#vedro.svetoch.dev/v1alpha1.BucketSpec">BucketSpec</a>, <a href="#vedro.svetoch.dev/v1alpha1.ManagedPrincipalSpec">ManagedPrincipalSpec</a>, <a href="#vedro.svetoch.dev/v1alpha1.StaticCredentialsSpec">StaticCredentialsSpec</a>, <a href="#vedro.svetoch.dev/v1alpha1.WorkloadIdentitySpec">WorkloadIdentitySpec</a>
 </p>
-<div></div>
+<div><p>DeletionPolicy determines whether external resources or authentication material are
+deleted or retained when their Kubernetes resource is deleted.</p>
+</div>
 <table>
 <thead><tr><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><p>&#34;Delete&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;Retain&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;Delete&#34;</p></td><td><p>DeletionPolicyDelete requests removal of the associated external resource or
+authentication material.</p>
+</td></tr>
+<tr><td><p>&#34;Retain&#34;</p></td><td><p>DeletionPolicyRetain preserves the associated external resource or authentication
+material after Kubernetes resource deletion.</p>
+</td></tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.ManagedPrincipalSpec">ManagedPrincipalSpec</h3>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalSpec">CloudPrincipalSpec</a>
 </p>
-<div></div>
+<div><p>ManagedPrincipalSpec defines an external principal whose lifecycle is managed by the
+controller.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -1201,8 +1339,10 @@ It must be set only when ManagementPolicy is Reference.</p>
 <em>string</em>
 </td>
 <td>
-<p>Name is the cloud provider principal name.
-Name format depends on what Kind of principal it is</p>
+<p>Name is the desired external principal name, subject to provider naming rules. It is
+required; the API does not default it from metadata.name. For a GCP ServiceAccount, use
+the short account ID rather than its email address. The resolved name cannot change
+after provisioning.</p>
 </td>
 </tr>
 <tr>
@@ -1211,8 +1351,9 @@ Name format depends on what Kind of principal it is</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>DeletionPolicy controls what happens to the external CloudPrincipal
-when this Kubernetes object is deleted.</p>
+<p>DeletionPolicy controls cleanup of the managed external principal when the
+CloudPrincipal is deleted. Delete removes the external principal and is the default.
+Retain leaves it in the cloud provider.</p>
 </td>
 </tr>
 </tbody>
@@ -1248,27 +1389,41 @@ when this Kubernetes object is deleted.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalSpec">CloudPrincipalSpec</a>, <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalStatus">CloudPrincipalStatus</a>, <a href="#vedro.svetoch.dev/v1alpha1.PrincipalPolicySpec">PrincipalPolicySpec</a>
 </p>
-<div></div>
+<div><p>PrincipalKind identifies a cloud identity type. Support varies by provider and management
+policy.</p>
+</div>
 <table>
 <thead><tr><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><p>&#34;AllUsers&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;Group&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;Role&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;ServiceAccount&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;User&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;AllUsers&#34;</p></td><td><p>PrincipalKindAllUsers represents public access for all users, including unauthenticated
+users. It can only be referenced, not managed.</p>
+</td></tr>
+<tr><td><p>&#34;Group&#34;</p></td><td><p>PrincipalKindGroup identifies a cloud group identity.</p>
+</td></tr>
+<tr><td><p>&#34;Role&#34;</p></td><td><p>PrincipalKindRole identifies a cloud IAM role; support depends on the provider.</p>
+</td></tr>
+<tr><td><p>&#34;ServiceAccount&#34;</p></td><td><p>PrincipalKindServiceAccount identifies a cloud service account.</p>
+</td></tr>
+<tr><td><p>&#34;User&#34;</p></td><td><p>PrincipalKindUser identifies a cloud user identity.</p>
+</td></tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.PrincipalManagementPolicy">PrincipalManagementPolicy (<code>string</code> alias)</h3>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalSpec">CloudPrincipalSpec</a>, <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalStatus">CloudPrincipalStatus</a>
 </p>
-<div></div>
+<div><p>PrincipalManagementPolicy selects whether the controller manages an external principal or
+only resolves a reference to it.</p>
+</div>
 <table>
 <thead><tr><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><p>&#34;Managed&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;Reference&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;Managed&#34;</p></td><td><p>PrincipalManagementPolicyManaged creates and reconciles the external principal according
+to spec.managed.</p>
+</td></tr>
+<tr><td><p>&#34;Reference&#34;</p></td><td><p>PrincipalManagementPolicyReference resolves an existing identity without creating or
+deleting it.</p>
+</td></tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.PrincipalPolicySpec">PrincipalPolicySpec</h3>
@@ -1339,7 +1494,8 @@ During deletion, the recorded status.kind is checked.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketAccessSpec">BucketAccessSpec</a>, <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalAuthSpec">CloudPrincipalAuthSpec</a>
 </p>
-<div></div>
+<div><p>PrincipalReference identifies a namespaced CloudPrincipal resource.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -1348,7 +1504,8 @@ During deletion, the recorded status.kind is checked.</p>
 <em>string</em>
 </td>
 <td>
-<p>Name is the name of the CloudPrincipal.</p>
+<p>Name is the Kubernetes resource name of the CloudPrincipal, not its external cloud name
+or identifier.</p>
 </td>
 </tr>
 <tr>
@@ -1356,7 +1513,8 @@ During deletion, the recorded status.kind is checked.</p>
 <em>string</em>
 </td>
 <td>
-<p>Namespace of the CloudPrincipal.</p>
+<p>Namespace is the Kubernetes namespace containing the CloudPrincipal. It must be
+specified explicitly, including for references within the same namespace.</p>
 </td>
 </tr>
 </tbody>
@@ -1365,7 +1523,8 @@ During deletion, the recorded status.kind is checked.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketSpec">BucketSpec</a>, <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalSpec">CloudPrincipalSpec</a>
 </p>
-<div></div>
+<div><p>ProviderConfigReference selects a cluster-scoped provider configuration.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -1374,7 +1533,7 @@ During deletion, the recorded status.kind is checked.</p>
 <em>string</em>
 </td>
 <td>
-<p>Name is the name of the ProviderConfig.</p>
+<p>Name is the name of the cluster-scoped ProviderConfig. No namespace is required.</p>
 </td>
 </tr>
 </tbody>
@@ -1383,8 +1542,8 @@ During deletion, the recorded status.kind is checked.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.ProviderConfig">ProviderConfig</a>
 </p>
-<div><p>If StaticCredentials is set credentialsSecretRef should also be set
-If WorkloadIdentity is set credentialsSecretRef should not be set</p>
+<div><p>ProviderConfigSpec defines cloud scope, operator authentication, and resource usage
+restrictions.</p>
 </div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
@@ -1394,7 +1553,8 @@ If WorkloadIdentity is set credentialsSecretRef should not be set</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.ProviderType">ProviderType</a></em>
 </td>
 <td>
-<p>Type is the cloud provider type.</p>
+<p>Type selects the cloud implementation: gcp for Google Cloud or yc for Yandex Cloud. This
+field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1402,9 +1562,8 @@ If WorkloadIdentity is set credentialsSecretRef should not be set</p>
 <em>string</em>
 </td>
 <td>
-<p>ProjectID identifies the cloud project/account/folder.</p>
-<p>For GCP this can be the project ID.
-For Yandex this can be the folder ID or cloud ID, depending on your design.</p>
+<p>ProjectId is the Google Cloud project ID for gcp or the Yandex Cloud folder ID for yc.
+It determines where managed cloud resources are created and is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1412,6 +1571,8 @@ For Yandex this can be the folder ID or cloud ID, depending on your design.</p>
 <em>string</em>
 </td>
 <td>
+<p>Region is the provider region, such as europe-west1 or ru-central1. It must be a
+non-empty regional name. Bucket placement is selected separately by Bucket.spec.location.</p>
 </td>
 </tr>
 <tr>
@@ -1419,7 +1580,9 @@ For Yandex this can be the folder ID or cloud ID, depending on your design.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.AuthMethod">AuthMethod</a></em>
 </td>
 <td>
-<p>Method describes the authentication method.</p>
+<p>Method selects how the operator authenticates to the provider. StaticCredentials reads a
+service account key from credentialsSecretRef. WorkloadIdentity uses the operator&rsquo;s
+ambient Google Cloud credentials or the Yandex Cloud instance service account.</p>
 </td>
 </tr>
 <tr>
@@ -1428,9 +1591,10 @@ For Yandex this can be the folder ID or cloud ID, depending on your design.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>CredentialsSecretRef references a Kubernetes Secret containing provider credentials.</p>
-<p>Required when method is StaticCredentials.
-Usually empty when method is WorkloadIdentity.</p>
+<p>CredentialsSecretRef identifies an existing Kubernetes Secret by name and namespace.
+Required for StaticCredentials and forbidden for WorkloadIdentity. The Secret must
+contain a key entry with a Google Cloud service account JSON key for gcp or a Yandex
+Cloud authorized service account key in JSON format for yc.</p>
 </td>
 </tr>
 <tr>
@@ -1477,19 +1641,24 @@ Resources must satisfy all applicable restrictions to reconcile.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.ProviderConfigSpec">ProviderConfigSpec</a>
 </p>
-<div></div>
+<div><p>ProviderType identifies a supported cloud implementation.</p>
+</div>
 <table>
 <thead><tr><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><p>&#34;gcp&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;yc&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;gcp&#34;</p></td><td><p>ProviderTypeGCP selects Google Cloud Storage and IAM.</p>
+</td></tr>
+<tr><td><p>&#34;yc&#34;</p></td><td><p>ProviderTypeYandexCloud selects Yandex Cloud Object Storage and IAM.</p>
+</td></tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.ReferencedPrincipalSpec">ReferencedPrincipalSpec</h3>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalSpec">CloudPrincipalSpec</a>
 </p>
-<div></div>
+<div><p>ReferencedPrincipalSpec identifies an existing external principal without managing its
+lifecycle.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -1498,8 +1667,11 @@ Resources must satisfy all applicable restrictions to reconcile.</p>
 <em>string</em>
 </td>
 <td>
-<p>Name is the cloud provider principal name.
-Name format depends on what Kind of principal it is</p>
+<p>Name identifies an existing external principal in the format expected by the provider
+and kind. For a GCP ServiceAccount, use its email address. For a Yandex Cloud
+ServiceAccount, use <folder-name>:<service-account-name>, such as prod:some-sa.
+User and GCP Group references use email addresses. References are resolved without
+creating or deleting the external principal.</p>
 </td>
 </tr>
 </tbody>
@@ -1508,7 +1680,8 @@ Name format depends on what Kind of principal it is</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketGcpConfig">BucketGcpConfig</a>
 </p>
-<div></div>
+<div><p>SoftDeletePolicy controls Google Cloud Storage retention of deleted objects.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -1517,9 +1690,9 @@ Name format depends on what Kind of principal it is</p>
 <em><a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Duration">k8s.io/apimachinery/pkg/apis/meta/v1.Duration</a></em>
 </td>
 <td>
-<p>RetentionDuration is how long deleted objects are retained before permanent deletion.
-Must be 0 or a whole number of days between 7 and 90 for GCS.
-Example: &ldquo;168h&rdquo; for 7 days.</p>
+<p>RetentionDuration is how long GCS retains soft-deleted objects before permanent
+deletion. Use &ldquo;0s&rdquo; to disable soft delete, or a Go duration representing a whole number
+of days from 7 through 90, such as &ldquo;168h&rdquo; for seven days. Defaults to &ldquo;168h&rdquo;.</p>
 </td>
 </tr>
 </tbody>
@@ -1538,9 +1711,10 @@ Example: &ldquo;168h&rdquo; for 7 days.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.AuthObjectReference">AuthObjectReference</a></em>
 </td>
 <td>
-<p>SecretRef names the Kubernetes Secret in which static credentials are stored.</p>
-<p>Required when method is StaticCredentials.
-Usually empty when method is WorkloadIdentity.</p>
+<p>SecretRef names the output Secret in the CloudPrincipalAuth namespace. The controller
+stores a GCP service account JSON key under credentials.json, or Yandex Cloud S3
+credentials under AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. The Secret is created and
+managed by the controller; it is not an input credential Secret.</p>
 </td>
 </tr>
 <tr>
@@ -1549,8 +1723,9 @@ Usually empty when method is WorkloadIdentity.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>DeletionPolicy controls what happens to the auth material and secret
-when this Kubernetes object is deleted.</p>
+<p>DeletionPolicy controls cleanup when CloudPrincipalAuth is deleted. Delete revokes the
+cloud credentials and allows the managed Secret to be deleted. Retain preserves both the
+credentials and Secret, removing the Secret&rsquo;s owner references. Defaults to Retain.</p>
 </td>
 </tr>
 </tbody>
@@ -1559,7 +1734,9 @@ when this Kubernetes object is deleted.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.BucketAccessStatus">BucketAccessStatus</a>, <a href="#vedro.svetoch.dev/v1alpha1.BucketStatus">BucketStatus</a>, <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalAuthStatus">CloudPrincipalAuthStatus</a>, <a href="#vedro.svetoch.dev/v1alpha1.CloudPrincipalStatus">CloudPrincipalStatus</a>
 </p>
-<div></div>
+<div><p>UnsupportedFeature describes a spec field that cannot be applied by the selected
+provider.</p>
+</div>
 <table>
 <thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
@@ -1568,6 +1745,8 @@ when this Kubernetes object is deleted.</p>
 <em>string</em>
 </td>
 <td>
+<p>Field is the path to the unsupported field in the requested spec, including a list index
+when applicable.</p>
 </td>
 </tr>
 <tr>
@@ -1575,6 +1754,7 @@ when this Kubernetes object is deleted.</p>
 <em>string</em>
 </td>
 <td>
+<p>Message explains why the selected provider cannot apply the requested feature.</p>
 </td>
 </tr>
 <tr>
@@ -1582,6 +1762,7 @@ when this Kubernetes object is deleted.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.UnsupportedFeatureReason">UnsupportedFeatureReason</a></em>
 </td>
 <td>
+<p>Reason is a machine-readable code identifying the unsupported capability.</p>
 </td>
 </tr>
 </tbody>
@@ -1590,22 +1771,48 @@ when this Kubernetes object is deleted.</p>
 <p><em>Appears on:</em>
 <a href="#vedro.svetoch.dev/v1alpha1.UnsupportedFeature">UnsupportedFeature</a>
 </p>
-<div></div>
+<div><p>UnsupportedFeatureReason identifies a requested capability that the selected provider
+does not support.</p>
+</div>
 <table>
 <thead><tr><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><p>&#34;BucketAccessUnsupportedBucketAdmin&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketAccessUnsupportedObjectAdmin&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketAccessUnsupportedObjectReader&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketAccessUnsupportedObjectWriter&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketUnsupportedLabels&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketUnsupportedLifecycle&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketUnsupportedLifecycleEnabled&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketUnsupportedLifecycleExpiration&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketUnsupportedLifecycleNamed&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketUnsupportedPublicAccessPrevention&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketUnsupportedStorageClass&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;BucketUnsupportedVersioning&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;BucketAccessUnsupportedBucketAdmin&#34;</p></td><td><p>BucketAccessUnsupportedBucketAdmin indicates that the selected provider does not support
+BucketAdmin grants.</p>
+</td></tr>
+<tr><td><p>&#34;BucketAccessUnsupportedObjectAdmin&#34;</p></td><td><p>BucketAccessUnsupportedObjectAdmin indicates that the selected provider does not support
+ObjectAdmin grants.</p>
+</td></tr>
+<tr><td><p>&#34;BucketAccessUnsupportedObjectReader&#34;</p></td><td><p>BucketAccessUnsupportedObjectReader indicates that the selected provider does not
+support ObjectReader grants.</p>
+</td></tr>
+<tr><td><p>&#34;BucketAccessUnsupportedObjectWriter&#34;</p></td><td><p>BucketAccessUnsupportedObjectWriter indicates that the selected provider does not
+support ObjectWriter grants.</p>
+</td></tr>
+<tr><td><p>&#34;BucketUnsupportedLabels&#34;</p></td><td><p>BucketUnsupportedLabels indicates that the selected provider does not support bucket
+labels or tags.</p>
+</td></tr>
+<tr><td><p>&#34;BucketUnsupportedLifecycle&#34;</p></td><td><p>BucketUnsupportedLifecycle indicates that the selected provider does not support object
+lifecycle rules.</p>
+</td></tr>
+<tr><td><p>&#34;BucketUnsupportedLifecycleEnabled&#34;</p></td><td><p>BucketUnsupportedLifecycleEnabled indicates that the selected provider does not support
+lifecycle rule enablement.</p>
+</td></tr>
+<tr><td><p>&#34;BucketUnsupportedLifecycleExpiration&#34;</p></td><td><p>BucketUnsupportedLifecycleExpiration indicates that the selected provider does not
+support age-based lifecycle expiration.</p>
+</td></tr>
+<tr><td><p>&#34;BucketUnsupportedLifecycleNamed&#34;</p></td><td><p>BucketUnsupportedLifecycleNamed indicates that the selected provider does not support
+lifecycle rule names.</p>
+</td></tr>
+<tr><td><p>&#34;BucketUnsupportedPublicAccessPrevention&#34;</p></td><td><p>BucketUnsupportedPublicAccessPrevention indicates that the selected provider does not
+support public access prevention.</p>
+</td></tr>
+<tr><td><p>&#34;BucketUnsupportedStorageClass&#34;</p></td><td><p>BucketUnsupportedStorageClass indicates that the selected provider does not support the
+requested storage class.</p>
+</td></tr>
+<tr><td><p>&#34;BucketUnsupportedVersioning&#34;</p></td><td><p>BucketUnsupportedVersioning indicates that the selected provider does not support object
+versioning.</p>
+</td></tr>
 <tr><td><p>&#34;PrincipalAuthUnsupportedStaticCredentials&#34;</p></td><td><p>PrincipalAuthUnsupportedStaticCredentials indicates that the provider does not support static credentials.</p>
 </td></tr>
 <tr><td><p>&#34;PrincipalAuthUnsupportedStaticCredentialsKind&#34;</p></td><td><p>PrincipalAuthUnsupportedStaticCredentialsKind indicates that static credentials are unavailable for this principal kind.</p>
@@ -1614,16 +1821,36 @@ when this Kubernetes object is deleted.</p>
 </td></tr>
 <tr><td><p>&#34;PrincipalAuthUnsupportedWorkloadIdentityKind&#34;</p></td><td><p>PrincipalAuthUnsupportedWorkloadIdentityKind indicates that workload identity is unavailable for this principal kind.</p>
 </td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedManagedAllUsers&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedManagedGroup&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedManagedRole&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedManagedSA&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedManagedUser&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedReferencedAllUsers&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedReferencedGroup&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedReferencedRole&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedReferencedSA&#34;</p></td><td></td></tr>
-<tr><td><p>&#34;PrincipalUnsupportedReferencedUser&#34;</p></td><td></td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedManagedAllUsers&#34;</p></td><td><p>PrincipalUnsupportedManagedAllUsers indicates that the selected provider does not
+support management of the AllUsers identity.</p>
+</td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedManagedGroup&#34;</p></td><td><p>PrincipalUnsupportedManagedGroup indicates that the selected provider does not support
+management of groups.</p>
+</td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedManagedRole&#34;</p></td><td><p>PrincipalUnsupportedManagedRole indicates that the selected provider does not support
+management of roles.</p>
+</td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedManagedSA&#34;</p></td><td><p>PrincipalUnsupportedManagedSA indicates that the selected provider does not support
+management of service accounts.</p>
+</td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedManagedUser&#34;</p></td><td><p>PrincipalUnsupportedManagedUser indicates that the selected provider does not support
+management of users.</p>
+</td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedReferencedAllUsers&#34;</p></td><td><p>PrincipalUnsupportedReferencedAllUsers indicates that the selected provider does not
+support references to the AllUsers identity.</p>
+</td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedReferencedGroup&#34;</p></td><td><p>PrincipalUnsupportedReferencedGroup indicates that the selected provider does not
+support references to groups.</p>
+</td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedReferencedRole&#34;</p></td><td><p>PrincipalUnsupportedReferencedRole indicates that the selected provider does not support
+references to roles.</p>
+</td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedReferencedSA&#34;</p></td><td><p>PrincipalUnsupportedReferencedSA indicates that the selected provider does not support
+references to service accounts.</p>
+</td></tr>
+<tr><td><p>&#34;PrincipalUnsupportedReferencedUser&#34;</p></td><td><p>PrincipalUnsupportedReferencedUser indicates that the selected provider does not support
+references to users.</p>
+</td></tr>
 </tbody>
 </table>
 <h3 id="vedro.svetoch.dev/v1alpha1.UsagePolicySpec">UsagePolicySpec</h3>
@@ -1641,7 +1868,7 @@ when this Kubernetes object is deleted.</p>
 </td>
 <td>
 <p>AllowedNamespaces restricts the namespaces of Bucket, CloudPrincipal,
-and BucketAccess resources using this provider.</p>
+BucketAccess, and CloudPrincipalAuth resources using this provider.</p>
 </td>
 </tr>
 <tr>
@@ -1677,9 +1904,10 @@ used through this provider.</p>
 <em><a href="#vedro.svetoch.dev/v1alpha1.AuthObjectReference">AuthObjectReference</a></em>
 </td>
 <td>
-<p>ServiceAccountRef names the Kubernetes ServiceAccount to configure for workload identity.</p>
-<p>Required when method is WorkloadIdentity.
-Usually empty when method is StaticCredentials.</p>
+<p>ServiceAccountRef names an existing Kubernetes ServiceAccount in the CloudPrincipalAuth
+namespace. For GCP, the controller grants workload identity access to the cloud service
+account and configures the Kubernetes ServiceAccount annotation. Workload identity for
+principals is currently unsupported by the Yandex Cloud provider.</p>
 </td>
 </tr>
 <tr>
@@ -1688,8 +1916,9 @@ Usually empty when method is StaticCredentials.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>DeletionPolicy controls what happens to the auth material and serviceaccount annotation
-when this Kubernetes object is deleted.</p>
+<p>DeletionPolicy controls cleanup when CloudPrincipalAuth is deleted. Delete removes the
+cloud authentication binding and managed ServiceAccount annotation. Retain preserves the
+configuration. The Kubernetes ServiceAccount itself is not deleted. Defaults to Retain.</p>
 </td>
 </tr>
 </tbody>

@@ -97,8 +97,13 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen generate-api-reference ## Generate DeepCopy implementations and API reference documentation.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+.PHONY: generate-api-reference
+generate-api-reference: gen-crd-api-reference-docs ## Generate docs/reference/api.md from the Go API types.
+	mkdir -p docs/reference
+	$(API_DOC_GEN) -api-dir "github.com/svetoch-dev/vedro/api/" -config "hack/docs/config.json" -template-dir "hack/docs/templates" -out-file "docs/reference/api.md"
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -208,6 +213,7 @@ KUBECTL ?= kubectl
 KIND ?= kind
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+API_DOC_GEN ?= $(LOCALBIN)/gen-crd-api-reference-docs
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 LINT_GOCACHE ?= $(LOCALBIN)/.gocache
@@ -232,6 +238,11 @@ $(KUSTOMIZE): $(LOCALBIN)
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
+
+.PHONY: gen-crd-api-reference-docs
+gen-crd-api-reference-docs: $(API_DOC_GEN) ## Install the API reference generator locally if necessary.
+$(API_DOC_GEN): hack/docs/go.mod hack/docs/go.sum | $(LOCALBIN)
+	cd hack/docs && GOBIN="$(abspath $(LOCALBIN))" go install -mod=readonly github.com/ahmetb/gen-crd-api-reference-docs
 
 .PHONY: setup-envtest
 setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.

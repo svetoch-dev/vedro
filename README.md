@@ -21,6 +21,13 @@ Create credentials and use them in applications.
 More indepth info about architecture why/what/when can be found [here](https://github.com/svetoch-dev/rod-docs/tree/master/docs/proposals/architecture/3-manage-cloud-dependencies-in-k8s)
 
 
+## API reference
+
+See the [API reference](docs/reference/api.md) for resource types and fields.
+Run `make generate` to regenerate it from the Go API types. The required generator
+is installed into `./bin` automatically when missing. See
+[generation details](hack/docs/README.md) for tool configuration.
+
 ## Contributing
 
 - go version v1.27.3+

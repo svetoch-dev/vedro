@@ -102,6 +102,7 @@ type BucketAccessStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced,categories=vedro
@@ -110,7 +111,7 @@ type BucketAccessStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// ProviderConfig is the Schema for the providerconfigs API.
+// BucketAccess is the Schema for the bucketaccesses API.
 type BucketAccess struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

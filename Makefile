@@ -103,8 +103,8 @@ generate: controller-gen generate-api-reference ## Generate DeepCopy implementat
 .PHONY: generate-api-reference
 generate-api-reference: crd-ref-docs ## Generate docs/reference/api.md from the Go API types.
 	mkdir -p docs/reference
-	$(API_DOC_GEN) --source-path=api --config=hack/docs/config.yaml --renderer=markdown --output-path=docs/reference/api.md
-	# Remove trailing blank lines emitted by the embedded Markdown templates.
+	$(API_DOC_GEN) --source-path=api --config=hack/docs/config.yaml --renderer=markdown --templates-dir=hack/docs/templates --output-path=docs/reference/api.md
+	# Remove trailing blank lines from the generated Markdown.
 	sed -i.bak -e :a -e '/^\n*$$/{$$d;N;ba;}' docs/reference/api.md
 	rm -f docs/reference/api.md.bak
 

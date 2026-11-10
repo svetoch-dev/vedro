@@ -14,5 +14,8 @@ TypeMeta fields while retaining resource status fields. Keep its Kubernetes
 version aligned with the k8s.io dependencies so external API links target the
 matching Kubernetes reference.
 
-The generator's embedded Markdown templates render resource lists, field tables,
-defaults, validation rules, and enum descriptions. No local templates are needed.
+`templates/api.tpl` renders resource lists, field tables, defaults, validation
+rules, and enum descriptions. It joins wrapped Go comment lines with spaces so
+source formatting does not create forced line breaks in the reference. Blank
+lines between comment paragraphs remain paragraph breaks, and validation entries
+are separated by semicolons.

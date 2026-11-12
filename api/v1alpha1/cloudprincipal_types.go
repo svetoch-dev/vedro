@@ -21,26 +21,54 @@ import (
 )
 
 const (
-	PrincipalUnsupportedManagedSA          UnsupportedFeatureReason = "PrincipalUnsupportedManagedSA"
-	PrincipalUnsupportedManagedUser        UnsupportedFeatureReason = "PrincipalUnsupportedManagedUser"
-	PrincipalUnsupportedManagedRole        UnsupportedFeatureReason = "PrincipalUnsupportedManagedRole"
-	PrincipalUnsupportedManagedAllUsers    UnsupportedFeatureReason = "PrincipalUnsupportedManagedAllUsers"
-	PrincipalUnsupportedManagedGroup       UnsupportedFeatureReason = "PrincipalUnsupportedManagedGroup"
-	PrincipalUnsupportedReferencedSA       UnsupportedFeatureReason = "PrincipalUnsupportedReferencedSA"
-	PrincipalUnsupportedReferencedUser     UnsupportedFeatureReason = "PrincipalUnsupportedReferencedUser"
-	PrincipalUnsupportedReferencedRole     UnsupportedFeatureReason = "PrincipalUnsupportedReferencedRole"
-	PrincipalUnsupportedReferencedGroup    UnsupportedFeatureReason = "PrincipalUnsupportedReferencedGroup"
+	// PrincipalUnsupportedManagedSA indicates that the selected provider does not support
+	// management of service accounts.
+	PrincipalUnsupportedManagedSA UnsupportedFeatureReason = "PrincipalUnsupportedManagedSA"
+	// PrincipalUnsupportedManagedUser indicates that the selected provider does not support
+	// management of users.
+	PrincipalUnsupportedManagedUser UnsupportedFeatureReason = "PrincipalUnsupportedManagedUser"
+	// PrincipalUnsupportedManagedRole indicates that the selected provider does not support
+	// management of roles.
+	PrincipalUnsupportedManagedRole UnsupportedFeatureReason = "PrincipalUnsupportedManagedRole"
+	// PrincipalUnsupportedManagedAllUsers indicates that the selected provider does not
+	// support management of the AllUsers identity.
+	PrincipalUnsupportedManagedAllUsers UnsupportedFeatureReason = "PrincipalUnsupportedManagedAllUsers"
+	// PrincipalUnsupportedManagedGroup indicates that the selected provider does not support
+	// management of groups.
+	PrincipalUnsupportedManagedGroup UnsupportedFeatureReason = "PrincipalUnsupportedManagedGroup"
+	// PrincipalUnsupportedReferencedSA indicates that the selected provider does not support
+	// references to service accounts.
+	PrincipalUnsupportedReferencedSA UnsupportedFeatureReason = "PrincipalUnsupportedReferencedSA"
+	// PrincipalUnsupportedReferencedUser indicates that the selected provider does not support
+	// references to users.
+	PrincipalUnsupportedReferencedUser UnsupportedFeatureReason = "PrincipalUnsupportedReferencedUser"
+	// PrincipalUnsupportedReferencedRole indicates that the selected provider does not support
+	// references to roles.
+	PrincipalUnsupportedReferencedRole UnsupportedFeatureReason = "PrincipalUnsupportedReferencedRole"
+	// PrincipalUnsupportedReferencedGroup indicates that the selected provider does not
+	// support references to groups.
+	PrincipalUnsupportedReferencedGroup UnsupportedFeatureReason = "PrincipalUnsupportedReferencedGroup"
+	// PrincipalUnsupportedReferencedAllUsers indicates that the selected provider does not
+	// support references to the AllUsers identity.
 	PrincipalUnsupportedReferencedAllUsers UnsupportedFeatureReason = "PrincipalUnsupportedReferencedAllUsers"
 )
 
+// PrincipalKind identifies a cloud identity type. Support varies by provider and management
+// policy.
 type PrincipalKind string
 
 const (
+	// PrincipalKindServiceAccount identifies a cloud service account.
 	PrincipalKindServiceAccount PrincipalKind = "ServiceAccount"
-	PrincipalKindRole           PrincipalKind = "Role"
-	PrincipalKindUser           PrincipalKind = "User"
-	PrincipalKindGroup          PrincipalKind = "Group"
-	PrincipalKindAllUsers       PrincipalKind = "AllUsers"
+	// PrincipalKindRole identifies a cloud IAM role; support depends on the provider.
+	PrincipalKindRole PrincipalKind = "Role"
+	// PrincipalKindUser identifies a cloud user identity.
+	PrincipalKindUser PrincipalKind = "User"
+	// PrincipalKindGroup identifies a cloud group identity.
+	PrincipalKindGroup PrincipalKind = "Group"
+	// PrincipalKindAllUsers represents public access for all users, including unauthenticated
+	// users. It can only be referenced, not managed.
+	PrincipalKindAllUsers PrincipalKind = "AllUsers"
 )
 
 func (k PrincipalKind) Valid() bool {
@@ -56,22 +84,33 @@ func (k PrincipalKind) Valid() bool {
 	}
 }
 
+// PrincipalManagementPolicy selects whether the controller manages an external principal or
+// only resolves a reference to it.
 type PrincipalManagementPolicy string
 
 const (
-	PrincipalManagementPolicyManaged   PrincipalManagementPolicy = "Managed"
+	// PrincipalManagementPolicyManaged creates and reconciles the external principal according
+	// to spec.managed.
+	PrincipalManagementPolicyManaged PrincipalManagementPolicy = "Managed"
+	// PrincipalManagementPolicyReference resolves an existing identity without creating or
+	// deleting it.
 	PrincipalManagementPolicyReference PrincipalManagementPolicy = "Reference"
 )
 
+// ManagedPrincipalSpec defines an external principal whose lifecycle is managed by the
+// controller.
 type ManagedPrincipalSpec struct {
-	// Name is the cloud provider principal name.
-	// Name format depends on what Kind of principal it is
+	// Name is the desired external principal name, subject to provider naming rules. It is
+	// required; the API does not default it from metadata.name. For a GCP ServiceAccount, use
+	// the short account ID rather than its email address. The resolved name cannot change
+	// after provisioning.
 	//
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
-	// DeletionPolicy controls what happens to the external CloudPrincipal
-	// when this Kubernetes object is deleted.
+	// DeletionPolicy controls cleanup of the managed external principal when the
+	// CloudPrincipal is deleted. Delete removes the external principal and is the default.
+	// Retain leaves it in the cloud provider.
 	//
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:default:=Delete
@@ -79,43 +118,59 @@ type ManagedPrincipalSpec struct {
 	DeletionPolicy DeletionPolicy `json:"deletionPolicy,omitempty"`
 }
 
+// ReferencedPrincipalSpec identifies an existing external principal without managing its
+// lifecycle.
 type ReferencedPrincipalSpec struct {
-	// Name is the cloud provider principal name.
-	// Name format depends on what Kind of principal it is
+	// Name identifies an existing external principal in the format expected by the provider
+	// and kind. For a GCP ServiceAccount, use its email address. For a Yandex Cloud
+	// ServiceAccount, use <folder-name>:<service-account-name>, such as prod:some-sa.
+	// User and GCP Group references use email addresses. References are resolved without
+	// creating or deleting the external principal.
 	//
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 }
 
+// CloudPrincipalSpec defines a cloud principal to manage or reference.
+//
 // +kubebuilder:validation:XValidation:rule="self.managementPolicy != 'Managed' || (has(self.managed) && !has(self.reference))",message="managed must be set and reference must not be set when managementPolicy is Managed"
 // +kubebuilder:validation:XValidation:rule="self.managementPolicy != 'Reference' || ((self.kind == 'AllUsers' || has(self.reference)) && !has(self.managed))",message="reference must be set unless kind is AllUsers, and managed must not be set when managementPolicy is Reference"
 type CloudPrincipalSpec struct {
 
-	// ProviderRef references the ProviderConfig used to manage this principal.
+	// ProviderRef selects the cluster-scoped ProviderConfig used to manage or resolve this
+	// principal. The reference is immutable, and the principal must satisfy the provider's
+	// usage policy.
 	//
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="providerRef is immutable"
 	ProviderRef ProviderConfigReference `json:"providerRef"`
 
-	// Kind identifies the type of cloud principal.
+	// Kind selects ServiceAccount, User, Group, Role, or AllUsers. Both providers can manage
+	// ServiceAccount and reference ServiceAccount, User, and AllUsers. GCP additionally
+	// supports Group references. Role is currently unsupported by both providers.
+	// AllUsers represents unauthenticated public access and requires Reference management
+	// with both managed and reference omitted.
 	//
 	// +kubebuilder:validation:Enum=ServiceAccount;User;Group;Role;AllUsers
 	Kind PrincipalKind `json:"kind"`
 
-	// ManagementPolicy controls whether the external principal is managed by this
-	// resource or references an existing principal.
+	// ManagementPolicy selects Managed to create and reconcile an external principal, or
+	// Reference to resolve an existing principal without managing its lifecycle. The policy is
+	// immutable. Both providers currently support Managed only for ServiceAccount.
 	//
 	// +kubebuilder:validation:Enum=Managed;Reference
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="managementPolicy is immutable"
 	ManagementPolicy PrincipalManagementPolicy `json:"managementPolicy"`
 
-	// Managed configures a principal managed by this resource.
-	// It must be set only when ManagementPolicy is Managed.
+	// Managed supplies the name and deletion policy for an external principal created or
+	// reconciled by the controller. Required when managementPolicy is Managed and forbidden
+	// otherwise.
 	//
 	// +optional
 	Managed *ManagedPrincipalSpec `json:"managed,omitempty"`
 
-	// Reference identifies an existing principal that is not managed by this resource.
-	// It must be set only when ManagementPolicy is Reference.
+	// Reference identifies an existing external principal. Required when managementPolicy is
+	// Reference, except for AllUsers, where it must be omitted. Forbidden when
+	// managementPolicy is Managed.
 	//
 	// +optional
 	Reference *ReferencedPrincipalSpec `json:"reference,omitempty"`
@@ -171,15 +226,20 @@ type CloudPrincipalStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// CloudPrincipal is the Schema for the cloudprincipals API.
+// CloudPrincipal manages or references a cloud identity used for bucket access and
+// authentication.
 type CloudPrincipal struct {
-	metav1.TypeMeta   `json:",inline"`
+	// TypeMeta identifies the API version and kind of this resource.
+	metav1.TypeMeta `json:",inline"`
+
+	// ObjectMeta contains Kubernetes identity, labels, annotations, and ownership metadata.
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the desired state of the CloudPrincipal.
 	Spec CloudPrincipalSpec `json:"spec,omitempty"`
 
-	// Status defines the observed state of the CloudPrincipal.
+	// Status records the observed state of the CloudPrincipal and is maintained by the
+	// controller.
 	//
 	// +optional
 	Status CloudPrincipalStatus `json:"status,omitempty"`
@@ -189,7 +249,10 @@ type CloudPrincipal struct {
 
 // CloudPrincipalList contains a list of CloudPrincipal resources.
 type CloudPrincipalList struct {
+	// TypeMeta identifies the API version and kind of this resource.
 	metav1.TypeMeta `json:",inline"`
+
+	// ListMeta contains Kubernetes list metadata, including pagination and resource version.
 	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items contains the CloudPrincipal resources in this list.

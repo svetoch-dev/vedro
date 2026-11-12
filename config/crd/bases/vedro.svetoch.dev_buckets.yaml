@@ -35,7 +35,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Bucket is the Schema for the buckets API.
+        description: Bucket manages a cloud object storage bucket through a ProviderConfig.
         properties:
           apiVersion:
             description: |-
@@ -55,27 +55,32 @@ spec:
           metadata:
             type: object
           spec:
+            description: Spec defines the desired state of the Bucket.
             properties:
               cloudSpecificConfig:
                 description: |-
-                  CloudSpecificConfig contains provider-specific bucket settings that do not
-                  have a cloud-agnostic equivalent in BucketSpec.
-
-                  These settings are applied only when the selected provider matches the
-                  corresponding provider config field. For example, Gcp is used only for GCS
-                  buckets.
+                  CloudSpecificConfig configures settings without a cloud-agnostic equivalent. Set only
+                  the block matching the selected ProviderConfig type; a block for another provider is
+                  rejected during reconciliation. GCS applies a seven-day soft-delete retention period
+                  when its soft-delete settings are omitted.
                 properties:
                   gcp:
-                    description: GCP-specific bucket configuration.
+                    description: |-
+                      Gcp configures Google Cloud Storage settings. It may only be set when the ProviderConfig
+                      type is gcp.
                     properties:
                       softDeletePolicy:
+                        description: |-
+                          SoftDeletePolicy configures retention of soft-deleted objects. When omitted, the
+                          controller applies a seven-day retention period. Set retentionDuration to "0s" to
+                          disable soft delete.
                         properties:
                           retentionDuration:
                             default: 168h
                             description: |-
-                              RetentionDuration is how long deleted objects are retained before permanent deletion.
-                              Must be 0 or a whole number of days between 7 and 90 for GCS.
-                              Example: "168h" for 7 days.
+                              RetentionDuration is how long GCS retains soft-deleted objects before permanent
+                              deletion. Use "0s" to disable soft delete, or a Go duration representing a whole number
+                              of days from 7 through 90, such as "168h" for seven days. Defaults to "168h".
                             type: string
                             x-kubernetes-validations:
                             - message: retentionDuration must be 0 or a whole number
@@ -89,15 +94,16 @@ spec:
                     type: object
                   yc:
                     description: |-
-                      Yandex cloud-specific bucket configuration.
-                      Reserved for future Yandex Cloud extensions.
+                      Yc reserves a configuration block for Yandex Cloud extensions. It currently has no
+                      settings and may only be set when the ProviderConfig type is yc.
                     type: object
                 type: object
               deletionPolicy:
                 default: Retain
                 description: |-
-                  DeletionPolicy controls what happens to the external bucket
-                  when this Kubernetes object is deleted.
+                  DeletionPolicy controls cleanup when this Kubernetes resource is deleted. Retain leaves
+                  the external bucket and its objects intact and is the default. Delete removes object
+                  versions before deleting the bucket; cloud retention restrictions may prevent cleanup.
                 enum:
                 - Delete
                 - Retain
@@ -105,34 +111,48 @@ spec:
               labels:
                 additionalProperties:
                   type: string
-                description: Labels are cloud provider labels/tags applied to the
-                  bucket.
+                description: |-
+                  Labels is the desired map of cloud bucket labels or tags, separate from Kubernetes
+                  metadata.labels. The controller reconciles the entire map; labels absent from it are
+                  removed.
                 type: object
               lifecycle:
-                description: Lifecycle configures object lifecycle rules.
+                description: |-
+                  Lifecycle configures object expiration rules. Omission or an empty rules list requests
+                  no lifecycle rules. Support for individual rule fields depends on the provider.
                 properties:
                   rules:
+                    description: |-
+                      Rules is the desired set of object lifecycle rules. An empty list configures no
+                      lifecycle rules. Rule names and other capabilities depend on the selected provider.
                     items:
+                      description: BucketLifecycleRule selects objects by age and
+                        configures a lifecycle action.
                       properties:
                         action:
-                          description: Action describes what happens to matching objects.
+                          description: |-
+                            Action is the operation to perform on matching objects. The only supported value is
+                            Delete; execution follows the cloud provider's lifecycle scheduling.
                           enum:
                           - Delete
                           type: string
                         ageDays:
-                          description: AgeDays matches objects older than this many
-                            days.
+                          description: |-
+                            AgeDays selects objects by age in days for the lifecycle action. When set, it must be at
+                            least 1. The provider determines how object age is evaluated.
                           format: int64
                           minimum: 1
                           type: integer
                         enabled:
                           default: true
-                          description: Enabled controls whether this lifecycle rule
-                            should be active.
+                          description: |-
+                            Enabled controls whether this rule is active. Defaults to true. Disabled rules are
+                            excluded from the lifecycle configuration sent to GCS.
                           type: boolean
                         name:
-                          description: Name is a stable identifier for this lifecycle
-                            rule.
+                          description: |-
+                            Name is an optional stable identifier for this lifecycle rule. Yandex Cloud supports
+                            rule names; GCS does not.
                           minLength: 1
                           type: string
                       required:
@@ -143,23 +163,27 @@ spec:
                 type: object
               location:
                 description: |-
-                  Location is the cloud provider location/region.
-
-                  Examples:
-                  - GCP: europe-west1
-                  - Yandex: ru-central1
+                  Location is the cloud bucket location, such as europe-west1 for GCS or ru-central1 for
+                  Yandex Cloud. GCS also accepts multi-regions such as EU and predefined dual-regions such
+                  as EUR4. An existing bucket must match the requested location; the controller does not
+                  relocate buckets.
                 minLength: 1
                 type: string
               name:
-                description: Name is the real cloud provider bucket name.
+                description: |-
+                  Name is the external cloud bucket name. When omitted, metadata.name is used. The
+                  resolved name must satisfy provider naming rules and cannot change after the external
+                  name has been recorded in status.
                 minLength: 1
                 type: string
               providerRef:
-                description: ProviderRef references the ProviderConfig used to manage
-                  this bucket.
+                description: |-
+                  ProviderRef selects the cluster-scoped ProviderConfig used to manage this bucket. The
+                  reference is immutable, and the bucket must satisfy the provider's usage policy.
                 properties:
                   name:
-                    description: Name is the name of the ProviderConfig.
+                    description: Name is the name of the cluster-scoped ProviderConfig.
+                      No namespace is required.
                     minLength: 1
                     type: string
                 required:
@@ -169,12 +193,18 @@ spec:
                 - message: providerRef is immutable
                   rule: self == oldSelf
               publicAccessPrevention:
-                description: PublicAccessPrevention controls whether the bucket may
-                  be publicly accessible.
+                description: |-
+                  PublicAccessPrevention enforces prevention of public access when true. GCS treats false
+                  or omission as inherited public access prevention, which may still be enforced by a
+                  parent policy. Yandex Cloud does not support this setting.
                 type: boolean
               storageClass:
                 default: Standard
-                description: bucket storage class
+                description: |-
+                  StorageClass sets the bucket's default storage class. Defaults to Standard. GCS maps
+                  Standard, Warm, Cold, and Ice to STANDARD, NEARLINE, COLDLINE, and ARCHIVE. Yandex Cloud
+                  supports Standard, Cold, and Ice, mapped to STANDARD, COLD, and ICE; Warm is
+                  unsupported.
                 enum:
                 - Standard
                 - Warm
@@ -182,10 +212,15 @@ spec:
                 - Ice
                 type: string
               versioning:
-                description: Versioning configures object versioning.
+                description: |-
+                  Versioning configures object versioning. Omission requests disabled versioning; existing
+                  object versions are not removed by disabling versioning.
                 properties:
                   enabled:
-                    description: Enabled controls bucket object versioning.
+                    description: |-
+                      Enabled enables object versioning when true and disables or suspends it when false,
+                      according to provider semantics. Disabling versioning does not remove existing object
+                      versions.
                     type: boolean
                 required:
                 - enabled
@@ -195,23 +230,37 @@ spec:
             - providerRef
             type: object
           status:
+            description: Status records the observed state of the Bucket and is maintained
+              by the controller.
             properties:
               applied:
-                description: Applied is the applied bucket attributes
+                description: |-
+                  Applied records the bucket properties returned by the last successful provider
+                  reconciliation. Provider defaults and normalization may make these differ from the
+                  requested spec.
                 properties:
                   cloudSpecificConfig:
+                    description: |-
+                      CloudSpecificConfig records provider-specific bucket settings reported or applied by the
+                      provider, including normalized defaults when available.
                     properties:
                       gcp:
-                        description: GCP-specific bucket configuration.
+                        description: |-
+                          Gcp configures Google Cloud Storage settings. It may only be set when the ProviderConfig
+                          type is gcp.
                         properties:
                           softDeletePolicy:
+                            description: |-
+                              SoftDeletePolicy configures retention of soft-deleted objects. When omitted, the
+                              controller applies a seven-day retention period. Set retentionDuration to "0s" to
+                              disable soft delete.
                             properties:
                               retentionDuration:
                                 default: 168h
                                 description: |-
-                                  RetentionDuration is how long deleted objects are retained before permanent deletion.
-                                  Must be 0 or a whole number of days between 7 and 90 for GCS.
-                                  Example: "168h" for 7 days.
+                                  RetentionDuration is how long GCS retains soft-deleted objects before permanent
+                                  deletion. Use "0s" to disable soft delete, or a Go duration representing a whole number
+                                  of days from 7 through 90, such as "168h" for seven days. Defaults to "168h".
                                 type: string
                                 x-kubernetes-validations:
                                 - message: retentionDuration must be 0 or a whole
@@ -225,39 +274,52 @@ spec:
                         type: object
                       yc:
                         description: |-
-                          Yandex cloud-specific bucket configuration.
-                          Reserved for future Yandex Cloud extensions.
+                          Yc reserves a configuration block for Yandex Cloud extensions. It currently has no
+                          settings and may only be set when the ProviderConfig type is yc.
                         type: object
                     type: object
                   labels:
                     additionalProperties:
                       type: string
+                    description: Labels records the cloud bucket labels or tags reported
+                      or applied by the provider.
                     type: object
                   lifecycle:
+                    description: Lifecycle records the lifecycle rules reported or
+                      applied by the provider.
                     properties:
                       rules:
+                        description: |-
+                          Rules is the desired set of object lifecycle rules. An empty list configures no
+                          lifecycle rules. Rule names and other capabilities depend on the selected provider.
                         items:
+                          description: BucketLifecycleRule selects objects by age
+                            and configures a lifecycle action.
                           properties:
                             action:
-                              description: Action describes what happens to matching
-                                objects.
+                              description: |-
+                                Action is the operation to perform on matching objects. The only supported value is
+                                Delete; execution follows the cloud provider's lifecycle scheduling.
                               enum:
                               - Delete
                               type: string
                             ageDays:
-                              description: AgeDays matches objects older than this
-                                many days.
+                              description: |-
+                                AgeDays selects objects by age in days for the lifecycle action. When set, it must be at
+                                least 1. The provider determines how object age is evaluated.
                               format: int64
                               minimum: 1
                               type: integer
                             enabled:
                               default: true
-                              description: Enabled controls whether this lifecycle
-                                rule should be active.
+                              description: |-
+                                Enabled controls whether this rule is active. Defaults to true. Disabled rules are
+                                excluded from the lifecycle configuration sent to GCS.
                               type: boolean
                             name:
-                              description: Name is a stable identifier for this lifecycle
-                                rule.
+                              description: |-
+                                Name is an optional stable identifier for this lifecycle rule. Yandex Cloud supports
+                                rule names; GCS does not.
                               minLength: 1
                               type: string
                           required:
@@ -267,13 +329,24 @@ spec:
                         type: array
                     type: object
                   publicAccessPrevention:
+                    description: |-
+                      PublicAccessPrevention records the provider-reported setting for preventing public
+                      access.
                     type: boolean
                   storageClass:
+                    description: StorageClass records the bucket storage class using
+                      Vedro storage class names.
                     type: string
                   versioning:
+                    description: |-
+                      Versioning records the object versioning configuration reported or applied by the
+                      provider.
                     properties:
                       enabled:
-                        description: Enabled controls bucket object versioning.
+                        description: |-
+                          Enabled enables object versioning when true and disables or suspends it when false,
+                          according to provider semantics. Disabling versioning does not remove existing object
+                          versions.
                         type: boolean
                     required:
                     - enabled
@@ -339,14 +412,18 @@ spec:
                 type: array
               externalId:
                 description: |-
-                  ExternalId is the provider-side immutable resource identifier.
-                  It may differ from ExternalName.
+                  ExternalId is the provider-side bucket identifier. It may be the same as ExternalName
+                  and is used when configuring bucket access.
                 type: string
               externalName:
-                description: ExternalName is the provider-side bucket name.
+                description: |-
+                  ExternalName is the external cloud bucket name recorded after provisioning. It is also
+                  used to identify the bucket during deletion.
                 type: string
               location:
-                description: Location is the provider-side bucket region.
+                description: |-
+                  Location is the provider-reported bucket location, including a region, multi-region,
+                  or dual-region where supported.
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the latest metadata.generation
@@ -354,17 +431,31 @@ spec:
                 format: int64
                 type: integer
               observedProvider:
-                description: Provider used for this bucket
+                description: |-
+                  ObservedProvider is the name of the ProviderConfig recorded during successful bucket
+                  reconciliation and used for cleanup.
                 type: string
               unsupported:
-                description: List of unsupported features set on Bucket resource
+                description: |-
+                  UnsupportedFeatures lists requested settings that the selected provider cannot apply.
+                  Unsupported settings prevent normal reconciliation until the request is corrected.
                 items:
+                  description: |-
+                    UnsupportedFeature describes a spec field that cannot be applied by the selected
+                    provider.
                   properties:
                     field:
+                      description: |-
+                        Field is the path to the unsupported field in the requested spec, including a list index
+                        when applicable.
                       type: string
                     message:
+                      description: Message explains why the selected provider cannot
+                        apply the requested feature.
                       type: string
                     reason:
+                      description: Reason is a machine-readable code identifying the
+                        unsupported capability.
                       type: string
                   required:
                   - field

@@ -32,7 +32,9 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ProviderConfig is the Schema for the providerconfigs API.
+        description: |-
+          BucketAccess grants a CloudPrincipal access to a Bucket through their shared
+          ProviderConfig.
         properties:
           apiVersion:
             description: |-
@@ -52,10 +54,16 @@ spec:
           metadata:
             type: object
           spec:
+            description: Spec defines the desired state of the BucketAccess.
             properties:
               access:
+                description: Access specifies the desired permission level on the
+                  referenced bucket.
                 properties:
                   level:
+                    description: |-
+                      Level selects ObjectReader, ObjectWriter, ObjectAdmin, or BucketAdmin. The selected
+                      level is mapped to a provider-specific role on the bucket.
                     enum:
                     - ObjectReader
                     - ObjectWriter
@@ -66,14 +74,20 @@ spec:
                 - level
                 type: object
               bucketRef:
-                description: BucketRef references the Bucket to which access is granted.
+                description: |-
+                  BucketRef identifies the Bucket on which access is granted. The reference, including its
+                  explicit namespace, is immutable. The bucket and principal must reference the same
+                  ProviderConfig.
                 properties:
                   name:
-                    description: Name is the name of the Bucket.
+                    description: Name is the Kubernetes resource name of the Bucket,
+                      not its external cloud name.
                     minLength: 1
                     type: string
                   namespace:
-                    description: Namespace of the Bucket.
+                    description: |-
+                      Namespace is the Kubernetes namespace containing the Bucket. It must be specified
+                      explicitly, including for references within the same namespace.
                     minLength: 1
                     type: string
                 required:
@@ -86,23 +100,29 @@ spec:
               deletionPolicy:
                 default: Delete
                 description: |-
-                  DeletionPolicy controls what happens to the bucketaccess
-                  when this Kubernetes object is deleted. If Retain is used
-                  when BucketAccess object is deleted permissions are not revoked
+                  DeletionPolicy controls the grant when this Kubernetes resource is deleted. Delete
+                  revokes the recorded permission and is the default. Retain leaves the permission in
+                  place. Neither policy deletes the bucket or principal.
                 enum:
                 - Delete
                 - Retain
                 type: string
               principalRef:
-                description: PrincipalRef references the CloudPrincipal to which access
-                  is granted.
+                description: |-
+                  PrincipalRef identifies the CloudPrincipal receiving access, including its explicit
+                  namespace. Changing the principal causes the previously recorded grant to be revoked
+                  before the new grant is applied.
                 properties:
                   name:
-                    description: Name is the name of the CloudPrincipal.
+                    description: |-
+                      Name is the Kubernetes resource name of the CloudPrincipal, not its external cloud name
+                      or identifier.
                     minLength: 1
                     type: string
                   namespace:
-                    description: Namespace of the CloudPrincipal.
+                    description: |-
+                      Namespace is the Kubernetes namespace containing the CloudPrincipal. It must be
+                      specified explicitly, including for references within the same namespace.
                     minLength: 1
                     type: string
                 required:
@@ -115,28 +135,33 @@ spec:
             - principalRef
             type: object
           status:
-            description: ProviderConfigStatus defines the observed provider configuration
-              state.
+            description: |-
+              Status records the observed state of the BucketAccess and is maintained by the
+              controller.
             properties:
               applied:
-                description: Applied - what has been already applied by this controller
+                description: |-
+                  Applied records the external bucket, principal, and permission level from the last
+                  successful reconciliation. These values identify the grant to revoke during updates or
+                  deletion.
                 properties:
                   bucketId:
                     description: |-
-                      BucketId id of the bucket to which access is granted. Can
-                      be the equal to BucketName
+                      BucketId is the provider-side bucket identifier used for access management. It may be
+                      the same as BucketName.
                     type: string
                   bucketName:
-                    description: BucketName name of the bucket to which access is
-                      granted
+                    description: BucketName is the external name of the bucket on
+                      which access was granted.
                     type: string
                   grantedAccess:
-                    description: GrantedAccess cloud specific access name that is
-                      granted
+                    description: |-
+                      GrantedAccess is the Vedro access level last applied to the bucket, rather than the
+                      provider-specific role name.
                     type: string
                   principalId:
-                    description: PrincipalId id of the cloud principal that access
-                      is granted too
+                    description: PrincipalId is the provider-side identity to which
+                      access was granted.
                     type: string
                 required:
                 - bucketId
@@ -208,17 +233,31 @@ spec:
                 format: int64
                 type: integer
               observedProvider:
-                description: Provider used for this BucketAccess
+                description: |-
+                  ObservedProvider is the name of the ProviderConfig recorded during successful access
+                  reconciliation and used to revoke the grant during deletion.
                 type: string
               unsupported:
-                description: List of unsupported features set on BucketAccess resource
+                description: |-
+                  UnsupportedFeatures lists requested access levels that the selected provider does not
+                  support.
                 items:
+                  description: |-
+                    UnsupportedFeature describes a spec field that cannot be applied by the selected
+                    provider.
                   properties:
                     field:
+                      description: |-
+                        Field is the path to the unsupported field in the requested spec, including a list index
+                        when applicable.
                       type: string
                     message:
+                      description: Message explains why the selected provider cannot
+                        apply the requested feature.
                       type: string
                     reason:
+                      description: Reason is a machine-readable code identifying the
+                        unsupported capability.
                       type: string
                   required:
                   - field

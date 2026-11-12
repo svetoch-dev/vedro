@@ -23,6 +23,21 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
+{{- define "vedro.bucket.labels" -}}
+{{- $ := index . 0 -}}
+{{- $labels := index . 1 -}}
+
+{{- if empty $labels -}}
+{{- /* Return empty string */ -}}
+{{- else if kindIs "string" $labels -}}
+  {{- tpl $labels $ -}}
+{{- else if kindIs "map" $labels -}}
+  {{- tpl (toYaml $labels) $ -}}
+{{- else -}}
+  {{- fail "bucket.labels must be either a YAML string or a map" -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "vedro.bucket.cloudSpecificConfig" -}}
 {{- $ := index . 0 -}}
 {{- $csc := index . 1 -}}

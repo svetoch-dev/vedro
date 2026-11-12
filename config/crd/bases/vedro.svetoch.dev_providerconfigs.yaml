@@ -32,7 +32,9 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ProviderConfig is the Schema for the providerconfigs API.
+        description: |-
+          ProviderConfig is a cluster-scoped resource defining cloud connectivity and policies for
+          resources that use it.
         properties:
           apiVersion:
             description: |-
@@ -52,16 +54,14 @@ spec:
           metadata:
             type: object
           spec:
-            description: |-
-              If StaticCredentials is set credentialsSecretRef should also be set
-              If WorkloadIdentity is set credentialsSecretRef should not be set
+            description: Spec defines the desired state of the ProviderConfig.
             properties:
               credentialsSecretRef:
                 description: |-
-                  CredentialsSecretRef references a Kubernetes Secret containing provider credentials.
-
-                  Required when method is StaticCredentials.
-                  Usually empty when method is WorkloadIdentity.
+                  CredentialsSecretRef identifies an existing Kubernetes Secret by name and namespace.
+                  Required for StaticCredentials and forbidden for WorkloadIdentity. The Secret must
+                  contain a key entry with a Google Cloud service account JSON key for gcp or a Yandex
+                  Cloud authorized service account key in JSON format for yc.
                 properties:
                   name:
                     description: name is unique within a namespace to reference a
@@ -74,26 +74,32 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               method:
-                description: Method describes the authentication method.
+                description: |-
+                  Method selects how the operator authenticates to the provider. StaticCredentials reads a
+                  service account key from credentialsSecretRef. WorkloadIdentity uses the operator's
+                  ambient Google Cloud credentials or the Yandex Cloud instance service account.
                 enum:
                 - StaticCredentials
                 - WorkloadIdentity
                 type: string
               projectId:
                 description: |-
-                  ProjectID identifies the cloud project/account/folder.
-
-                  For GCP this can be the project ID.
-                  For Yandex this can be the folder ID or cloud ID, depending on your design.
+                  ProjectId is the Google Cloud project ID for gcp or the Yandex Cloud folder ID for yc.
+                  It determines where managed cloud resources are created and is immutable.
                 minLength: 1
                 type: string
                 x-kubernetes-validations:
                 - message: projectId is immutable
                   rule: self == oldSelf
               region:
+                description: |-
+                  Region is the provider region, such as europe-west1 or ru-central1. It must be a
+                  non-empty regional name. Bucket placement is selected separately by Bucket.spec.location.
                 type: string
               type:
-                description: Type is the cloud provider type.
+                description: |-
+                  Type selects the cloud implementation: gcp for Google Cloud or yc for Yandex Cloud. This
+                  field is immutable.
                 enum:
                 - gcp
                 - yc
@@ -109,7 +115,7 @@ spec:
                   allowedNamespaces:
                     description: |-
                       AllowedNamespaces restricts the namespaces of Bucket, CloudPrincipal,
-                      and BucketAccess resources using this provider.
+                      BucketAccess, and CloudPrincipalAuth resources using this provider.
                     properties:
                       all:
                         description: |-
@@ -173,6 +179,9 @@ spec:
                           An empty list allows no kinds. Provider capability restrictions still apply.
                           During deletion, the recorded status.kind is checked.
                         items:
+                          description: |-
+                            PrincipalKind identifies a cloud identity type. Support varies by provider and management
+                            policy.
                           type: string
                         type: array
                       allowedNamePatterns:
@@ -221,8 +230,9 @@ spec:
             - message: credentialsSecretRef must not be set when method is WorkloadIdentity
               rule: self.method != 'WorkloadIdentity' || !has(self.credentialsSecretRef)
           status:
-            description: ProviderConfigStatus defines the observed provider configuration
-              state.
+            description: |-
+              Status records the observed state of the ProviderConfig and is maintained by the
+              controller.
             properties:
               conditions:
                 description: Conditions represent the latest available observations

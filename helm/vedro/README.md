@@ -179,12 +179,30 @@ Install the Vedro CRDs and controller before installing this chart.
 | `publicAccessPrevention` | `bool` | no | Whether public access is prevented. |
 | `versioning` | `object` | no | Bucket versioning settings, including `enabled`. |
 | `lifecycle` | `object` | no | Bucket lifecycle rules. |
-| `labels` | `map(string)` | no | Cloud provider labels on the bucket, separate from CR metadata labels. |
-| `cloudSpecificConfig` | `object` | no | Provider-specific bucket settings. |
+| `labels` | `map(string)` or YAML `string` | no | Cloud provider labels on the bucket, separate from CR metadata labels. Both forms support Helm templating. |
+| `cloudSpecificConfig` | `object` or YAML `string` | no | Provider-specific bucket settings. Both forms support Helm templating. |
 | `admins` | `list(object)` | no | Principals granted `BucketAdmin`. |
 | `objAdmins` | `list(object)` | no | Principals granted `ObjectAdmin`. |
 | `readers` | `list(object)` | no | Principals granted `ObjectReader`. |
 | `writers` | `list(object)` | no | Principals granted `ObjectWriter`. |
+
+### `buckets{}.labels`
+
+Labels can be supplied as a map or a YAML string:
+
+```yaml
+buckets:
+  map-example:
+    provider: my-provider
+    location: eu-central1
+    labels:
+      release: '{{ .Release.Name }}'
+  string-example:
+    provider: my-provider
+    location: eu-central1
+    labels: |
+      release: {{ .Release.Name | quote }}
+```
 
 ### `buckets{}.versioning`
 
@@ -200,6 +218,32 @@ Install the Vedro CRDs and controller before installing this chart.
 | `enabled` | `bool` | no | Whether the rule is active; defaults to `true`. |
 | `ageDays` | `integer` | no | Match objects older than this number of days. |
 | `action` | `string` | yes | Lifecycle action; currently `Delete`. |
+
+### `buckets{}.cloudSpecificConfig`
+
+Provider-specific settings can be supplied as a map or a YAML string. Both forms
+are evaluated as Helm templates using the root chart context. Omitted or empty
+values are excluded from the rendered Bucket spec.
+
+```yaml
+softDeleteRetention: 168h
+
+buckets:
+  map-example:
+    provider: my-gcp-provider
+    location: europe-west1
+    cloudSpecificConfig:
+      gcp:
+        softDeletePolicy:
+          retentionDuration: '{{ .Values.softDeleteRetention }}'
+  string-example:
+    provider: my-gcp-provider
+    location: europe-west1
+    cloudSpecificConfig: |
+      gcp:
+        softDeletePolicy:
+          retentionDuration: {{ .Values.softDeleteRetention | quote }}
+```
 
 ### `buckets{}.cloudSpecificConfig.gcp.softDeletePolicy`
 
